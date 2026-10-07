@@ -1,0 +1,88 @@
+/**
+ * @brief Non-templated Actor Base for {{ model.exe_name }}
+ *
+ * Provides pure ergonomic Tag aliases and unqualified `emit(...)`.
+ * Does NOT inherit from Skeletons to completely eliminate name collisions/shadowing!
+ */
+class {{ model.exe_name }}ActorBase
+{
+public:
+    // ------------------------------------------------------------------------
+    // Ergonomic Tag Aliases (brought directly into Actor class scope)
+    // ------------------------------------------------------------------------
+{% for alias in model.tag_aliases %}
+{% if not alias.is_ambiguous %}
+    using {{ alias.name }} = {{ alias.target }};
+{% else %}
+    // Ambiguous tag '{{ alias.name }}': {{ alias.conflicts }} -> use fully qualified name.
+{% endif %}
+{% endfor %}
+
+    {{ model.exe_name }}ActorBase() = default;
+    virtual ~{{ model.exe_name }}ActorBase() = default;
+
+{% for proxy in model.consumed_proxies %}
+    {{ proxy.cls }}* get_{{ proxy.ident }}_proxy() const noexcept { return {{ proxy.slot_name }}.get(); }
+    bool is_{{ proxy.ident }}_ready() const noexcept { return {{ proxy.slot_name }}.is_available(); }
+    reaktar::ProxyLease<{{ proxy.cls }}> acquire_{{ proxy.ident }}_proxy() { return {{ proxy.slot_name }}.acquire("{{ proxy.ident }}"); }
+{% endfor %}
+
+    static constexpr size_t kConsumedProxyCount = {{ model.consumed_proxy_count }};
+
+    /**
+     * @brief Check whether all required service proxies have been resolved and published.
+     * Always returns true if this Actor consumes 0 services.
+     */
+    bool is_ready() const noexcept {
+{% if model.consumed_proxy_count == 0 %}
+        return true;
+{% else %}
+        return readiness_.is_ready([this] {
+            return ({% for proxy in model.consumed_proxies %}{{ proxy.slot_name }}.is_available(){{ " && " if not loop.last else "" }}{% endfor %});
+        });
+{% endif %}
+    }
+
+    /**
+     * @brief Block until all required service proxies have been resolved and published.
+     * Fully zero-cost: if this Actor consumes 0 services, returns true immediately without locks or cv.
+     */
+    bool wait_until_ready() {
+{% if model.consumed_proxy_count == 0 %}
+        return true;
+{% else %}
+        return readiness_.wait_until_ready([this] {
+            return ({% for proxy in model.consumed_proxies %}{{ proxy.slot_name }}.is_available(){{ " && " if not loop.last else "" }}{% endfor %});
+        });
+{% endif %}
+    }
+
+    /**
+     * @brief Block with a timeout until all required service proxies have been resolved and published.
+     * Returns true if ready, false if timeout expired.
+     */
+    template <typename Rep, typename Period>
+    bool wait_until_ready(const std::chrono::duration<Rep, Period>& timeout) {
+{% if model.consumed_proxy_count == 0 %}
+        (void)timeout;
+        return true;
+{% else %}
+        return readiness_.wait_until_ready([this] {
+            return ({% for proxy in model.consumed_proxies %}{{ proxy.slot_name }}.is_available(){{ " && " if not loop.last else "" }}{% endfor %});
+        }, timeout);
+{% endif %}
+    }
+
+protected:
+{% if model.consumed_proxy_count > 0 %}
+    void notify_proxy_resolved() {
+        readiness_.notify_resolved();
+    }
+
+    reaktar::ReadinessTracker<kConsumedProxyCount> readiness_{};
+{% endif %}
+{% for proxy in model.consumed_proxies %}
+    reaktar::ProxySlot<{{ proxy.cls }}> {{ proxy.slot_name }}{};
+    std::optional<ara::com::FindServiceHandle> {{ proxy.find_handle_name }}{std::nullopt};
+{% endfor %}
+};

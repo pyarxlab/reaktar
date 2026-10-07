@@ -1,0 +1,124 @@
+{% for skel in model.skeletons %}
+    // Skeleton Adapter for {{ skel.intf_name }}
+    class {{ skel.adapter_name }} : public {{ skel.cls }} {
+        {{ model.exe_name }}Actor* actor_;
+    public:
+        explicit {{ skel.adapter_name }}(
+            {{ model.exe_name }}Actor* a,
+            ara::core::InstanceSpecifier instance_spec,
+            ara::com::MethodCallProcessingMode mode
+        )
+            : {{ skel.cls }}(std::move(instance_spec), mode), actor_(a) {}
+
+        // Skeleton RPC Method Overrides
+{% for m in skel.methods %}
+{% if m.is_faf %}
+        void {{ m.name }}({% for a in m.in_args %}{{ a.pass_type }} {{ a.name }}{{ ", " if not loop.last else "" }}{% endfor %}) override {
+            using MethodTag = {{ m.tag }};
+            if constexpr (has_method_handler_v<Derived, MethodTag{% for a in m.in_args %}, {{ a.pass_type }}{% endfor %}> ||
+                          has_method_handler_v<Derived, MethodTag{% for a in m.in_args %}, {{ a.type }}{% endfor %}>) {
+                actor_->self().on(MethodTag{}{% for a in m.in_args %}, {{ a.name }}{% endfor %});
+            }
+{% if m.is_unique_sig %}
+            else if constexpr (has_direct_method_handler_v<Derived{% for a in m.in_args %}, {{ a.pass_type }}{% endfor %}> ||
+                               has_direct_method_handler_v<Derived{% for a in m.in_args %}, {{ a.type }}{% endfor %}>) {
+                actor_->self().on({% for a in m.in_args %}{{ a.name }}{{ ", " if not loop.last else "" }}{% endfor %});
+            }
+{% else %}
+            else if constexpr (has_direct_method_handler_v<Derived{% for a in m.in_args %}, {{ a.pass_type }}{% endfor %}> ||
+                               has_direct_method_handler_v<Derived{% for a in m.in_args %}, {{ a.type }}{% endfor %}>) {
+                static_assert(!sizeof(Derived*), "reaktar::on() collision: RPC method argument signature is shared across multiple methods. You must specify the method tag: on(MethodTag, ...).");
+            }
+{% endif %}
+            else {
+                // Unhandled fire-and-forget method
+            }
+        }
+{% else %}
+        using {{ m.name }}RetType = decltype(std::declval<{{ skel.cls }}&>().{{ m.name }}({% for a in m.in_args %}std::declval<{{ a.pass_type }}>(){{ ", " if not loop.last else "" }}{% endfor %}));
+
+        {{ m.name }}RetType {{ m.name }}({% for a in m.in_args %}{{ a.pass_type }} {{ a.name }}{{ ", " if not loop.last else "" }}{% endfor %}) override {
+            using MethodTag = {{ m.tag }};
+            if constexpr (has_method_handler_v<Derived, MethodTag{% for a in m.in_args %}, {{ a.pass_type }}{% endfor %}> ||
+                          has_method_handler_v<Derived, MethodTag{% for a in m.in_args %}, {{ a.type }}{% endfor %}>) {
+                if constexpr (std::is_void_v<decltype(actor_->self().on(MethodTag{}{% for a in m.in_args %}, {{ a.name }}{% endfor %}))>) {
+                    actor_->self().on(MethodTag{}{% for a in m.in_args %}, {{ a.name }}{% endfor %});
+                    return result_adapter<{{ m.name }}RetType, void>::adapt();
+                } else {
+                    return result_adapter<{{ m.name }}RetType, decltype(actor_->self().on(MethodTag{}{% for a in m.in_args %}, {{ a.name }}{% endfor %}))>::adapt(
+                        actor_->self().on(MethodTag{}{% for a in m.in_args %}, {{ a.name }}{% endfor %})
+                    );
+                }
+            }
+{% if m.is_unique_sig %}
+            else if constexpr (has_direct_method_handler_v<Derived{% for a in m.in_args %}, {{ a.pass_type }}{% endfor %}> ||
+                               has_direct_method_handler_v<Derived{% for a in m.in_args %}, {{ a.type }}{% endfor %}>) {
+                if constexpr (std::is_void_v<decltype(actor_->self().on({% for a in m.in_args %}{{ a.name }}{{ ", " if not loop.last else "" }}{% endfor %}))>) {
+                    actor_->self().on({% for a in m.in_args %}{{ a.name }}{{ ", " if not loop.last else "" }}{% endfor %});
+                    return result_adapter<{{ m.name }}RetType, void>::adapt();
+                } else {
+                    return result_adapter<{{ m.name }}RetType, decltype(actor_->self().on({% for a in m.in_args %}{{ a.name }}{{ ", " if not loop.last else "" }}{% endfor %}))>::adapt(
+                        actor_->self().on({% for a in m.in_args %}{{ a.name }}{{ ", " if not loop.last else "" }}{% endfor %})
+                    );
+                }
+            }
+{% else %}
+            else if constexpr (has_direct_method_handler_v<Derived{% for a in m.in_args %}, {{ a.pass_type }}{% endfor %}> ||
+                               has_direct_method_handler_v<Derived{% for a in m.in_args %}, {{ a.type }}{% endfor %}>) {
+                static_assert(!sizeof(Derived*), "reaktar::on() collision: RPC method argument signature is shared across multiple methods. You must specify the method tag: on(MethodTag, ...).");
+            }
+{% endif %}
+            else {
+                return result_adapter<{{ m.name }}RetType, void>::adapt();
+            }
+        }
+{% endif %}
+{% endfor %}
+    };
+
+    {{ skel.adapter_name }} {{ skel.var_name }};
+
+    {{ skel.cls }}& {{ skel.getter_name }}() { return {{ skel.var_name }}; }
+
+{% endfor %}
+    explicit {{ model.exe_name }}Actor(
+{% for skel in model.skeletons %}
+        ara::core::InstanceSpecifier {{ skel.port_name.lower() }}_instance = ara::core::InstanceSpecifier("{{ skel.instance_spec }}"),
+{% endfor %}
+        ara::com::MethodCallProcessingMode mode = ara::com::MethodCallProcessingMode::kEvent
+    )
+        : {{ model.exe_name }}ActorBase()
+{% for skel in model.skeletons %}
+        , {{ skel.var_name }}(this, std::move({{ skel.port_name.lower() }}_instance), mode)
+{% endfor %}
+    {
+        if constexpr (Validation == reaktar::StrictValidation::kEnabled) {
+            using LegalSignaturesTuple = std::tuple<
+{% for sig in model.legal_signatures %}
+                reaktar::sig<{{ sig | join(', ') }}>{{ "," if not loop.last else "" }}
+{% endfor %}
+            >;
+
+            static_assert(!reaktar::has_rogue_handler_v<Derived, LegalSignaturesTuple
+{% for t in model.legal_types %}
+                , {{ t }}
+{% endfor %}
+{% for tag in model.legal_tags %}
+                , {{ tag }}
+{% endfor %}
+            >,
+            "\n"
+            "====================================================================================\n"
+            " ReaktAR Compile Error: Rogue/orphan on(...) handler detected in {{ model.exe_name }}!\n"
+            " You declared an on(...) method taking a parameter type or signature combination that\n"
+            " does NOT exist in this ARXML interface (or is a typo/dead handler).\n"
+            " To disable strict ARXML compile-time validation, inherit from:\n"
+            "   reaktar::generated::{{ model.exe_name }}Actor<{{ model.exe_name }}, reaktar::StrictValidation::kDisabled>\n"
+            "====================================================================================\n"
+            );
+        }
+    }
+
+    virtual ~{{ model.exe_name }}Actor() = default;
+
+    Derived& self() { return static_cast<Derived&>(*this); }

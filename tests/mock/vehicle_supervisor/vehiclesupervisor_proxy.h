@@ -1,0 +1,164 @@
+#pragma once
+
+#include "mock_ara/com.hpp"
+
+#include "vehicle_data/types.hpp"
+
+#include "vehicle_supervisor/vehiclesupervisor_skeleton.h"
+#include <string>
+#include <cstdint>
+#include <map>
+#include <functional>
+
+
+namespace vehicle_supervisor {
+
+
+namespace proxy {
+
+class VehicleSupervisorProxy {
+public:
+    using HandleType = ara::com::ServiceHandleType;
+
+    VehicleSupervisorProxy() = default;
+    explicit VehicleSupervisorProxy(const HandleType& handle) : handle_(handle) {}
+
+    // Events
+
+    ara::com::ProxyEvent<vehicle_data::EmergencyAlert> EmergencyAlert;
+
+
+    // Fields
+
+    ara::com::ProxyField<vehicle_data::DriveMode> CurrentDriveMode;
+
+    ara::com::ProxyField<uint32_t> HardwareRevision;
+
+    ara::com::ProxyField<uint32_t> CalibrationKey;
+
+
+    // Methods
+
+
+    std::function<ara::core::Future<methods::TriggerDiagnostic::Output>(const uint32_t&)> skel_trigger_diagnostic_{nullptr};
+
+    template <typename F>
+    void set_mock_trigger_diagnostic(F&& f) {
+        skel_trigger_diagnostic_ = [fn = std::forward<F>(f)](const uint32_t& code) -> ara::core::Future<methods::TriggerDiagnostic::Output> {
+            using Ret = decltype(fn(code));
+            if constexpr (std::is_same_v<std::decay_t<Ret>, ara::core::Future<methods::TriggerDiagnostic::Output>>) {
+                return fn(code);
+            } else {
+                return ara::core::MakeFuture<methods::TriggerDiagnostic::Output>(methods::TriggerDiagnostic::Output(fn(code)));
+            }
+        };
+    }
+
+    ara::core::Future<methods::TriggerDiagnostic::Output> TriggerDiagnostic(const uint32_t& code) {
+        if (skel_trigger_diagnostic_) {
+            return skel_trigger_diagnostic_(code);
+        }
+        return ara::core::MakeFuture<methods::TriggerDiagnostic::Output>(methods::TriggerDiagnostic::Output{});
+    }
+
+
+
+    std::function<ara::core::Future<methods::CalibrateOdometer::Output>(const uint32_t&)> skel_calibrate_odometer_{nullptr};
+
+    template <typename F>
+    void set_mock_calibrate_odometer(F&& f) {
+        skel_calibrate_odometer_ = [fn = std::forward<F>(f)](const uint32_t& current_km) -> ara::core::Future<methods::CalibrateOdometer::Output> {
+            using Ret = decltype(fn(current_km));
+            if constexpr (std::is_same_v<std::decay_t<Ret>, ara::core::Future<methods::CalibrateOdometer::Output>>) {
+                return fn(current_km);
+            } else {
+                return ara::core::MakeFuture<methods::CalibrateOdometer::Output>(methods::CalibrateOdometer::Output(fn(current_km)));
+            }
+        };
+    }
+
+    ara::core::Future<methods::CalibrateOdometer::Output> CalibrateOdometer(const uint32_t& current_km) {
+        if (skel_calibrate_odometer_) {
+            return skel_calibrate_odometer_(current_km);
+        }
+        return ara::core::MakeFuture<methods::CalibrateOdometer::Output>(methods::CalibrateOdometer::Output{});
+    }
+
+
+
+    std::function<void()> skel_reset_trip_meter_{nullptr};
+
+    void ResetTripMeter() {
+        if (skel_reset_trip_meter_) {
+            skel_reset_trip_meter_();
+        }
+    }
+
+
+
+    std::function<ara::core::Future<methods::SetSpeedLimiter::Output>(const float&, const bool&)> skel_set_speed_limiter_{nullptr};
+
+    template <typename F>
+    void set_mock_set_speed_limiter(F&& f) {
+        skel_set_speed_limiter_ = [fn = std::forward<F>(f)](const float& max_kmh, const bool& active) -> ara::core::Future<methods::SetSpeedLimiter::Output> {
+            using Ret = decltype(fn(max_kmh, active));
+            if constexpr (std::is_same_v<std::decay_t<Ret>, ara::core::Future<methods::SetSpeedLimiter::Output>>) {
+                return fn(max_kmh, active);
+            } else {
+                return ara::core::MakeFuture<methods::SetSpeedLimiter::Output>(methods::SetSpeedLimiter::Output(fn(max_kmh, active)));
+            }
+        };
+    }
+
+    ara::core::Future<methods::SetSpeedLimiter::Output> SetSpeedLimiter(const float& max_kmh, const bool& active) {
+        if (skel_set_speed_limiter_) {
+            return skel_set_speed_limiter_(max_kmh, active);
+        }
+        return ara::core::MakeFuture<methods::SetSpeedLimiter::Output>(methods::SetSpeedLimiter::Output{});
+    }
+
+
+
+    static ara::com::FindServiceHandle StartFindService(
+        ara::com::FindServiceHandler<VehicleSupervisorProxy> handler,
+        ara::core::InstanceSpecifier instance_specifier)
+    {
+        ara::com::FindServiceHandle find_handle(ara::com::detail::next_find_handle_id());
+        active_find_handlers()[find_handle.id()] = handler;
+        ara::com::ServiceHandleContainer<HandleType> handles;
+        handles.push_back(HandleType{instance_specifier, 1});
+        handler(handles, find_handle);
+        return find_handle;
+    }
+
+    static void StopFindService(ara::com::FindServiceHandle handle) {
+        active_find_handlers().erase(handle.id());
+    }
+
+    /// Simulation / Test-Bench helper: trigger service availability update across active find handlers
+    static void TriggerFindService(const ara::com::ServiceHandleContainer<HandleType>& handles) {
+        for (const auto& kv : active_find_handlers()) {
+            kv.second(handles, ara::com::FindServiceHandle(kv.first));
+        }
+    }
+
+    /// Simulation / Test-Bench helper: simulate service going offline (empty container)
+    static void TriggerFindServiceEmpty() {
+        TriggerFindService({});
+    }
+
+    const HandleType& GetHandle() const { return handle_; }
+
+private:
+    HandleType handle_{};
+
+    static std::map<uint64_t, ara::com::FindServiceHandler<VehicleSupervisorProxy>>& active_find_handlers() {
+        static std::map<uint64_t, ara::com::FindServiceHandler<VehicleSupervisorProxy>> handlers;
+        return handlers;
+    }
+};
+
+} // namespace proxy
+
+
+} // namespace vehicle_supervisor

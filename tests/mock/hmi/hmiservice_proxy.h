@@ -1,0 +1,100 @@
+#pragma once
+
+#include "mock_ara/com.hpp"
+
+#include "hmi/hmiservice_skeleton.h"
+#include <string>
+#include <cstdint>
+#include <map>
+#include <functional>
+
+
+namespace hmi {
+
+
+namespace proxy {
+
+class HmiServiceProxy {
+public:
+    using HandleType = ara::com::ServiceHandleType;
+
+    HmiServiceProxy() = default;
+    explicit HmiServiceProxy(const HandleType& handle) : handle_(handle) {}
+
+    // Events
+
+    ara::com::ProxyEvent<ara::core::String> StatusNotification;
+
+
+    // Fields
+
+
+    // Methods
+
+
+    std::function<ara::core::Future<methods::ShowPopup::Output>(const ara::core::String&, const uint32_t&)> skel_show_popup_{nullptr};
+
+    template <typename F>
+    void set_mock_show_popup(F&& f) {
+        skel_show_popup_ = [fn = std::forward<F>(f)](const ara::core::String& message, const uint32_t& priority) -> ara::core::Future<methods::ShowPopup::Output> {
+            using Ret = decltype(fn(message, priority));
+            if constexpr (std::is_same_v<std::decay_t<Ret>, ara::core::Future<methods::ShowPopup::Output>>) {
+                return fn(message, priority);
+            } else {
+                return ara::core::MakeFuture<methods::ShowPopup::Output>(methods::ShowPopup::Output(fn(message, priority)));
+            }
+        };
+    }
+
+    ara::core::Future<methods::ShowPopup::Output> ShowPopup(const ara::core::String& message, const uint32_t& priority) {
+        if (skel_show_popup_) {
+            return skel_show_popup_(message, priority);
+        }
+        return ara::core::MakeFuture<methods::ShowPopup::Output>(methods::ShowPopup::Output{});
+    }
+
+
+
+    static ara::com::FindServiceHandle StartFindService(
+        ara::com::FindServiceHandler<HmiServiceProxy> handler,
+        ara::core::InstanceSpecifier instance_specifier)
+    {
+        ara::com::FindServiceHandle find_handle(ara::com::detail::next_find_handle_id());
+        active_find_handlers()[find_handle.id()] = handler;
+        ara::com::ServiceHandleContainer<HandleType> handles;
+        handles.push_back(HandleType{instance_specifier, 1});
+        handler(handles, find_handle);
+        return find_handle;
+    }
+
+    static void StopFindService(ara::com::FindServiceHandle handle) {
+        active_find_handlers().erase(handle.id());
+    }
+
+    /// Simulation / Test-Bench helper: trigger service availability update across active find handlers
+    static void TriggerFindService(const ara::com::ServiceHandleContainer<HandleType>& handles) {
+        for (const auto& kv : active_find_handlers()) {
+            kv.second(handles, ara::com::FindServiceHandle(kv.first));
+        }
+    }
+
+    /// Simulation / Test-Bench helper: simulate service going offline (empty container)
+    static void TriggerFindServiceEmpty() {
+        TriggerFindService({});
+    }
+
+    const HandleType& GetHandle() const { return handle_; }
+
+private:
+    HandleType handle_{};
+
+    static std::map<uint64_t, ara::com::FindServiceHandler<HmiServiceProxy>>& active_find_handlers() {
+        static std::map<uint64_t, ara::com::FindServiceHandler<HmiServiceProxy>> handlers;
+        return handlers;
+    }
+};
+
+} // namespace proxy
+
+
+} // namespace hmi

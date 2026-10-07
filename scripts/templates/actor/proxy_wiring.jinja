@@ -1,0 +1,148 @@
+    void start() {
+        bind_skeleton_fields();
+
+{% for skel in model.skeletons %}
+        {{ skel.var_name }}.OfferService();
+{% endfor %}
+
+{% for proxy in model.consumed_proxies %}
+        this->{{ proxy.find_handle_name }} = {{ proxy.cls }}::StartFindService(
+            [this](ara::com::ServiceHandleContainer<{{ proxy.cls }}::HandleType> handles, ara::com::FindServiceHandle) {
+                if (handles.empty()) {
+                    teardown_{{ proxy.ident }}_proxy();
+                } else {
+                    if (auto* current = this->{{ proxy.slot_name }}.get()) {
+                        if (current->GetHandle() == handles[0]) {
+                            return; // Same handle, already active
+                        }
+                        teardown_{{ proxy.ident }}_proxy();
+                    }
+                    auto new_proxy = std::make_unique<{{ proxy.cls }}>(handles[0]);
+                    bind_{{ proxy.ident }}_events(new_proxy.get());
+                    bind_{{ proxy.ident }}_fields(new_proxy.get());
+                    this->{{ proxy.slot_name }}.publish(std::move(new_proxy));
+                    this->notify_proxy_resolved();
+                }
+            },
+            ara::core::InstanceSpecifier("{{ proxy.instance_spec }}")
+        );
+{% endfor %}
+    }
+
+    void stop() {
+{% for skel in model.skeletons %}
+        {{ skel.var_name }}.StopOfferService();
+{% endfor %}
+{% for proxy in model.consumed_proxies %}
+        if (this->{{ proxy.find_handle_name }}.has_value()) {
+            {{ proxy.cls }}::StopFindService(*this->{{ proxy.find_handle_name }});
+            this->{{ proxy.find_handle_name }}.reset();
+        }
+        teardown_{{ proxy.ident }}_proxy();
+{% endfor %}
+    }
+
+private:
+{% for proxy in model.consumed_proxies %}
+    void teardown_{{ proxy.ident }}_proxy() {
+        if (auto* p = this->{{ proxy.slot_name }}.get()) {
+{% if proxy.all_unsubscribe_targets | length > 0 %}
+{% for target in proxy.all_unsubscribe_targets %}
+            p->{{ target }}.Unsubscribe();
+{% endfor %}
+{% else %}
+            (void)p;
+{% endif %}
+            this->{{ proxy.slot_name }}.reset();
+        }
+    }
+{% endfor %}
+
+    void bind_skeleton_fields() {
+{% for f in model.skeleton_fields %}
+{% if f.has_notifier or f.has_getter %}
+        // Initialise field value before OfferService (required by AUTOSAR Adaptive caching/notifier semantics)
+        {{ f.var_name }}.{{ f.name }}.Update({});
+{% endif %}
+{% if f.has_setter %}
+        if constexpr (has_on_field_set_v<Derived, {{ f.tag }}, {{ f.type }}>) {
+            {{ f.var_name }}.{{ f.name }}.RegisterSetHandler([this](const {{ f.type }}& val) {
+                return result_adapter<{{ f.type }}, decltype(self().on_set({{ f.tag }}{}, val))>::adapt(
+                    self().on_set({{ f.tag }}{}, val)
+                );
+            });
+        }
+{% if f.is_unique_setter %}
+        else if constexpr (has_on_direct_field_set_v<Derived, {{ f.type }}>) {
+            {{ f.var_name }}.{{ f.name }}.RegisterSetHandler([this](const {{ f.type }}& val) {
+                return result_adapter<{{ f.type }}, decltype(self().on_set(val))>::adapt(
+                    self().on_set(val)
+                );
+            });
+        }
+{% endif %}
+{% endif %}
+{% endfor %}
+    }
+
+{% for proxy in model.consumed_proxies %}
+    void bind_{{ proxy.ident }}_events({{ proxy.cls }}* proxy) {
+        if (!proxy) return;
+{% for ev in proxy.events %}
+        // Event: {{ ev.name }} ({{ ev.type }})
+        if constexpr (has_on_event_v<Derived, {{ ev.tag }}, {{ ev.type }}>) {
+            proxy->{{ ev.name }}.SetReceiveHandler([this, proxy]() {
+                proxy->{{ ev.name }}.GetNewSamples([this](auto&& s) {
+                    self().on({{ ev.tag }}{}, *s);
+                });
+            });
+            proxy->{{ ev.name }}.Subscribe(10);
+        }
+{% if ev.is_unique %}
+        else if constexpr (has_on_direct_event_v<Derived, {{ ev.type }}>) {
+            proxy->{{ ev.name }}.SetReceiveHandler([this, proxy]() {
+                proxy->{{ ev.name }}.GetNewSamples([this](auto&& s) {
+                    self().on(*s);
+                });
+            });
+            proxy->{{ ev.name }}.Subscribe(10);
+        }
+{% else %}
+        else if constexpr (has_on_direct_event_v<Derived, {{ ev.type }}>) {
+            static_assert(!sizeof(Derived*), "reaktar::on() collision: type '{{ ev.type }}' is shared across multiple incoming channels (events/fields). You must specify the tag: void on({{ ev.tag }}, const {{ ev.type }}& val).");
+        }
+{% endif %}
+{% endfor %}
+    }
+
+    void bind_{{ proxy.ident }}_fields({{ proxy.cls }}* proxy) {
+        if (!proxy) return;
+{% for f in proxy.fields %}
+{% if f.has_notifier %}
+        // Field Notifier: {{ f.name }} ({{ f.type }})
+        if constexpr (has_on_event_v<Derived, {{ f.tag }}, {{ f.type }}>) {
+            proxy->{{ f.name }}.SetReceiveHandler([this, proxy]() {
+                proxy->{{ f.name }}.GetNewSamples([this](auto&& s) {
+                    self().on({{ f.tag }}{}, *s);
+                });
+            });
+            proxy->{{ f.name }}.Subscribe(10);
+        }
+{% if f.is_unique %}
+        else if constexpr (has_on_direct_event_v<Derived, {{ f.type }}>) {
+            proxy->{{ f.name }}.SetReceiveHandler([this, proxy]() {
+                proxy->{{ f.name }}.GetNewSamples([this](auto&& s) {
+                    self().on(*s);
+                });
+            });
+            proxy->{{ f.name }}.Subscribe(10);
+        }
+{% else %}
+        else if constexpr (has_on_direct_event_v<Derived, {{ f.type }}>) {
+            static_assert(!sizeof(Derived*), "reaktar::on() collision: type '{{ f.type }}' is shared across multiple incoming channels (events/fields). You must specify the tag: void on({{ f.tag }}, const {{ f.type }}& val).");
+        }
+{% endif %}
+{% endif %}
+{% endfor %}
+    }
+{% endfor %}

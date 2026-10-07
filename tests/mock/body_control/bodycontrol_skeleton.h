@@ -1,0 +1,101 @@
+#pragma once
+
+#include "mock_ara/com.hpp"
+
+#include <string>
+#include <cstdint>
+#include <utility>
+
+
+namespace body_control {
+
+
+namespace methods {
+
+namespace LockDoors {
+    struct Tag {};
+
+struct Output {
+
+    bool Result{};
+
+
+    Output() = default;
+
+    explicit Output(bool v) : Result(std::move(v)) {}
+    Output(const ara::core::Result<bool>& res) : Result(res.Value()) {}
+    operator bool() const { return Result; }
+
+};
+
+} // namespace LockDoors
+
+namespace FlashLights {
+    struct Tag {};
+
+} // namespace FlashLights
+
+} // namespace methods
+
+namespace skeleton {
+namespace methods {
+
+
+namespace LockDoors {
+    using Output = ::body_control::methods::LockDoors::Output;
+} // namespace LockDoors
+
+
+
+
+} // namespace methods
+
+class BodyControlSkeleton {
+public:
+    explicit BodyControlSkeleton(
+        ara::core::InstanceSpecifier instance_specifier,
+        ara::com::MethodCallProcessingMode mode = ara::com::MethodCallProcessingMode::kEvent)
+        : instance_specifier_(std::move(instance_specifier)), mode_(mode) {}
+
+    virtual ~BodyControlSkeleton() = default;
+
+    // Events
+
+
+    // Fields
+
+    ara::com::SkeletonField<float> TargetCabinTemperature;
+
+    ara::com::SkeletonField<uint32_t> RainSensorLevel;
+
+    ara::com::SkeletonField<uint32_t> OutsideAirQuality;
+
+    ara::com::SkeletonField<uint32_t> WindowPosition;
+
+
+    // Methods
+
+
+    virtual ara::core::Future<methods::LockDoors::Output> LockDoors(const bool& lock) = 0;
+
+
+
+    virtual void FlashLights(const uint32_t& duration_ms, const uint32_t& count) = 0;
+
+
+
+    void OfferService() { offered_ = true; }
+    void StopOfferService() { offered_ = false; }
+    bool IsOffered() const { return offered_; }
+    ara::com::MethodCallProcessingMode GetMethodCallProcessingMode() const noexcept { return mode_; }
+
+private:
+    ara::core::InstanceSpecifier instance_specifier_;
+    [[maybe_unused]] ara::com::MethodCallProcessingMode mode_;
+    bool offered_{false};
+};
+
+} // namespace skeleton
+
+
+} // namespace body_control

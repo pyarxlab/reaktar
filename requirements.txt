@@ -1,0 +1,4 @@
+# ReaktAR Python Requirements
+# Supported: Python 3.10+
+pyarxlab>=0.2.23
+Jinja2>=3.1.0

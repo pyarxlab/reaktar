@@ -1,0 +1,84 @@
+#pragma once
+
+#include "mock_ara/com.hpp"
+
+#include <string>
+#include <cstdint>
+#include <utility>
+
+
+namespace hmi {
+
+
+namespace methods {
+
+namespace ShowPopup {
+    struct Tag {};
+
+struct Output {
+
+    bool Result{};
+
+
+    Output() = default;
+
+    explicit Output(bool v) : Result(std::move(v)) {}
+    Output(const ara::core::Result<bool>& res) : Result(res.Value()) {}
+    operator bool() const { return Result; }
+
+};
+
+} // namespace ShowPopup
+
+} // namespace methods
+
+namespace skeleton {
+namespace methods {
+
+
+namespace ShowPopup {
+    using Output = ::hmi::methods::ShowPopup::Output;
+} // namespace ShowPopup
+
+
+} // namespace methods
+
+class HmiServiceSkeleton {
+public:
+    explicit HmiServiceSkeleton(
+        ara::core::InstanceSpecifier instance_specifier,
+        ara::com::MethodCallProcessingMode mode = ara::com::MethodCallProcessingMode::kEvent)
+        : instance_specifier_(std::move(instance_specifier)), mode_(mode) {}
+
+    virtual ~HmiServiceSkeleton() = default;
+
+    // Events
+
+    ara::com::SkeletonEvent<ara::core::String> StatusNotification;
+
+
+    // Fields
+
+
+    // Methods
+
+
+    virtual ara::core::Future<methods::ShowPopup::Output> ShowPopup(const ara::core::String& message, const uint32_t& priority) = 0;
+
+
+
+    void OfferService() { offered_ = true; }
+    void StopOfferService() { offered_ = false; }
+    bool IsOffered() const { return offered_; }
+    ara::com::MethodCallProcessingMode GetMethodCallProcessingMode() const noexcept { return mode_; }
+
+private:
+    ara::core::InstanceSpecifier instance_specifier_;
+    [[maybe_unused]] ara::com::MethodCallProcessingMode mode_;
+    bool offered_{false};
+};
+
+} // namespace skeleton
+
+
+} // namespace hmi

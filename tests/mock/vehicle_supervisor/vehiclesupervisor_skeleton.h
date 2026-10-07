@@ -1,0 +1,159 @@
+#pragma once
+
+#include "mock_ara/com.hpp"
+
+#include "vehicle_data/types.hpp"
+
+#include <string>
+#include <cstdint>
+#include <utility>
+
+
+namespace vehicle_supervisor {
+
+
+namespace methods {
+
+namespace TriggerDiagnostic {
+    struct Tag {};
+
+struct Output {
+
+    bool Result{};
+
+
+    Output() = default;
+
+    explicit Output(bool v) : Result(std::move(v)) {}
+    Output(const ara::core::Result<bool>& res) : Result(res.Value()) {}
+    operator bool() const { return Result; }
+
+};
+
+} // namespace TriggerDiagnostic
+
+namespace CalibrateOdometer {
+    struct Tag {};
+
+struct Output {
+
+    uint32_t Result{};
+
+
+    Output() = default;
+
+    explicit Output(uint32_t v) : Result(std::move(v)) {}
+    Output(const ara::core::Result<uint32_t>& res) : Result(res.Value()) {}
+    operator uint32_t() const { return Result; }
+
+};
+
+} // namespace CalibrateOdometer
+
+namespace ResetTripMeter {
+    struct Tag {};
+
+} // namespace ResetTripMeter
+
+namespace SetSpeedLimiter {
+    struct Tag {};
+
+struct Output {
+
+    bool Result{};
+
+
+    Output() = default;
+
+    explicit Output(bool v) : Result(std::move(v)) {}
+    Output(const ara::core::Result<bool>& res) : Result(res.Value()) {}
+    operator bool() const { return Result; }
+
+};
+
+} // namespace SetSpeedLimiter
+
+} // namespace methods
+
+namespace skeleton {
+namespace methods {
+
+
+namespace TriggerDiagnostic {
+    using Output = ::vehicle_supervisor::methods::TriggerDiagnostic::Output;
+} // namespace TriggerDiagnostic
+
+
+
+namespace CalibrateOdometer {
+    using Output = ::vehicle_supervisor::methods::CalibrateOdometer::Output;
+} // namespace CalibrateOdometer
+
+
+
+
+
+namespace SetSpeedLimiter {
+    using Output = ::vehicle_supervisor::methods::SetSpeedLimiter::Output;
+} // namespace SetSpeedLimiter
+
+
+} // namespace methods
+
+class VehicleSupervisorSkeleton {
+public:
+    explicit VehicleSupervisorSkeleton(
+        ara::core::InstanceSpecifier instance_specifier,
+        ara::com::MethodCallProcessingMode mode = ara::com::MethodCallProcessingMode::kEvent)
+        : instance_specifier_(std::move(instance_specifier)), mode_(mode) {}
+
+    virtual ~VehicleSupervisorSkeleton() = default;
+
+    // Events
+
+    ara::com::SkeletonEvent<vehicle_data::EmergencyAlert> EmergencyAlert;
+
+
+    // Fields
+
+    ara::com::SkeletonField<vehicle_data::DriveMode> CurrentDriveMode;
+
+    ara::com::SkeletonField<uint32_t> HardwareRevision;
+
+    ara::com::SkeletonField<uint32_t> CalibrationKey;
+
+
+    // Methods
+
+
+    virtual ara::core::Future<methods::TriggerDiagnostic::Output> TriggerDiagnostic(const uint32_t& code) = 0;
+
+
+
+    virtual ara::core::Future<methods::CalibrateOdometer::Output> CalibrateOdometer(const uint32_t& current_km) = 0;
+
+
+
+    virtual void ResetTripMeter() = 0;
+
+
+
+    virtual ara::core::Future<methods::SetSpeedLimiter::Output> SetSpeedLimiter(const float& max_kmh, const bool& active) = 0;
+
+
+
+    void OfferService() { offered_ = true; }
+    void StopOfferService() { offered_ = false; }
+    bool IsOffered() const { return offered_; }
+    ara::com::MethodCallProcessingMode GetMethodCallProcessingMode() const noexcept { return mode_; }
+
+private:
+    ara::core::InstanceSpecifier instance_specifier_;
+    [[maybe_unused]] ara::com::MethodCallProcessingMode mode_;
+    bool offered_{false};
+};
+
+} // namespace skeleton
+
+
+} // namespace vehicle_supervisor

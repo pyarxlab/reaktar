@@ -1,0 +1,124 @@
+    // ------------------------------------------------------------------------
+    // OUTBOUND: emit<Tag>(args...) OR untagged emit(val)
+    // ------------------------------------------------------------------------
+    template <typename Tag, typename... Args>
+    auto emit(Args&&... args) {
+{% if model.outbound_tagged | length == 0 %}
+        static_assert(!sizeof(Tag*), "reaktar: emit called with unknown tag (no outgoing events/methods available)!");
+{% else %}
+{% for item in model.outbound_tagged %}
+        {{ "if" if loop.first else "else if" }} constexpr (std::is_same_v<Tag, {{ item.tag }}>) {
+{% if item.kind == "skeleton_event" %}
+            {{ item.var_name }}.{{ item.member }}.Send(std::forward<Args>(args)...);
+            return ::reaktar::EmitStatus{true};
+{% elif item.kind == "skeleton_field_update" %}
+            {{ item.var_name }}.{{ item.member }}.Update(std::forward<Args>(args)...);
+            return ::reaktar::EmitStatus{true};
+{% elif item.kind == "proxy_faf" %}
+            auto proxy_lease = this->{{ item.service_ident }}_slot_.acquire("{{ item.service_ident }}");
+            if (proxy_lease) {
+                proxy_lease->{{ item.member }}(std::forward<Args>(args)...);
+                return ::reaktar::EmitStatus{true};
+            }
+            return ::reaktar::EmitStatus{false};
+{% elif item.kind == "proxy_rpc" %}
+            auto proxy_lease = this->{{ item.service_ident }}_slot_.acquire("{{ item.service_ident }}");
+            using AsyncResType = decltype(make_async_result(proxy_lease->{{ item.member }}(std::forward<Args>(args)...)));
+            if (proxy_lease) {
+                return make_async_result(proxy_lease->{{ item.member }}(std::forward<Args>(args)...));
+            }
+            return AsyncResType::Failed();
+{% elif item.kind == "proxy_field_set" %}
+            auto proxy_lease = this->{{ item.service_ident }}_slot_.acquire("{{ item.service_ident }}");
+            using AsyncResType = decltype(make_async_result(proxy_lease->{{ item.member }}.Set(std::forward<Args>(args)...)));
+            if (proxy_lease) {
+                return make_async_result(proxy_lease->{{ item.member }}.Set(std::forward<Args>(args)...));
+            }
+            return AsyncResType::Failed();
+{% endif %}
+        }
+{% endfor %}
+        else {
+            static_assert(!sizeof(Tag*), "reaktar: emit called with unknown tag!");
+        }
+{% endif %}
+    }
+
+    template <typename Tag, typename... Args>
+    auto call(Args&&... args) {
+        return emit<Tag>(std::forward<Args>(args)...);
+    }
+
+    template <typename... Args>
+    auto emit(Args&&... args) {
+        if constexpr (sizeof...(Args) == 1) {
+            using PayloadType = std::decay_t<typename std::tuple_element<0, std::tuple<Args...>>::type>;
+{% if model.outbound_by_type | length == 0 %}
+            static_assert(!sizeof...(Args), "reaktar: emit(payload) failed! The payload type is not produced by any skeleton event, field, or single-arg RPC method in this Actor.");
+{% else %}
+{% for item in model.outbound_by_type %}
+            {{ "if" if loop.first else "else if" }} constexpr (std::is_same_v<PayloadType, {{ item.type }}>) {
+{% if item.kind == "skeleton_event" %}
+                {{ item.var_name }}.{{ item.member }}.Send(std::forward<Args>(args)...);
+                return ::reaktar::EmitStatus{true};
+{% elif item.kind == "skeleton_field_update" %}
+                {{ item.var_name }}.{{ item.member }}.Update(std::forward<Args>(args)...);
+                return ::reaktar::EmitStatus{true};
+{% elif item.kind == "proxy_faf" %}
+                auto proxy_lease = this->{{ item.service_ident }}_slot_.acquire("{{ item.service_ident }}");
+                if (proxy_lease) {
+                    proxy_lease->{{ item.member }}(std::forward<Args>(args)...);
+                    return ::reaktar::EmitStatus{true};
+                }
+                return ::reaktar::EmitStatus{false};
+{% elif item.kind == "proxy_rpc" %}
+                auto proxy_lease = this->{{ item.service_ident }}_slot_.acquire("{{ item.service_ident }}");
+                using AsyncResType = decltype(make_async_result(proxy_lease->{{ item.member }}(std::forward<Args>(args)...)));
+                if (proxy_lease) {
+                    return make_async_result(proxy_lease->{{ item.member }}(std::forward<Args>(args)...));
+                }
+                return AsyncResType::Failed();
+{% elif item.kind == "proxy_field_set" %}
+                auto proxy_lease = this->{{ item.service_ident }}_slot_.acquire("{{ item.service_ident }}");
+                using AsyncResType = decltype(make_async_result(proxy_lease->{{ item.member }}.Set(std::forward<Args>(args)...)));
+                if (proxy_lease) {
+                    return make_async_result(proxy_lease->{{ item.member }}.Set(std::forward<Args>(args)...));
+                }
+                return AsyncResType::Failed();
+{% endif %}
+            }
+{% endfor %}
+            else {
+                static_assert(!sizeof...(Args), "reaktar: emit(payload) failed! The payload type is not produced by any skeleton event, field, or single-arg RPC method in this Actor.");
+            }
+{% endif %}
+        }
+        else {
+{% if model.outbound_multi | length == 0 %}
+            static_assert(!sizeof...(Args), "reaktar: emit(args...) failed! The argument list does not match any unique proxy RPC method in this Actor. Use emit<Tag>(args...) if ambiguous.");
+{% else %}
+            using SigTuple [[maybe_unused]] = std::tuple<std::decay_t<Args>...>;
+{% for item in model.outbound_multi %}
+            {{ "if" if loop.first else "else if" }} constexpr (std::is_same_v<SigTuple, std::tuple<{% for t in item.sig_types %}{{ t }}{{ ", " if not loop.last else "" }}{% endfor %}>>) {
+                auto proxy_lease = this->{{ item.service_ident }}_slot_.acquire("{{ item.service_ident }}");
+{% if item.is_faf %}
+                if (proxy_lease) {
+                    proxy_lease->{{ item.member }}(std::forward<Args>(args)...);
+                    return ::reaktar::EmitStatus{true};
+                }
+                return ::reaktar::EmitStatus{false};
+{% else %}
+                using AsyncResType = decltype(make_async_result(proxy_lease->{{ item.member }}(std::forward<Args>(args)...)));
+                if (proxy_lease) {
+                    return make_async_result(proxy_lease->{{ item.member }}(std::forward<Args>(args)...));
+                }
+                return AsyncResType::Failed();
+{% endif %}
+            }
+{% endfor %}
+            else {
+                static_assert(!sizeof...(Args), "reaktar: emit(args...) failed! The argument list does not match any unique proxy RPC method in this Actor. Use emit<Tag>(args...) if ambiguous.");
+            }
+{% endif %}
+        }
+    }
