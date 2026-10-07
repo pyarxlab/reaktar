@@ -129,7 +129,7 @@ tests/
 
 ## Packaging
 
-To package only the core ReaktAR library and generated headers into a clean redistributable tarball (without tests or mock files):
+To package only the core Reaktar library and generated headers into a clean redistributable tarball (without tests or mock files):
 
 ```bash
 make package

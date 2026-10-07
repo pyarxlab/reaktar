@@ -1,4 +1,11 @@
 #!/usr/bin/env python3
+# ==============================================================================
+# Reaktar - Reactive Actor Framework for AUTOSAR Adaptive
+# Part of the Pyarx project: https://github.com/pyarxlab/reaktar
+#
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Pyarx Lab
+# ==============================================================================
 """
 ReactAR Code Generator:
 Directly processes pyarx domain nodes without intermediate dataclasses.

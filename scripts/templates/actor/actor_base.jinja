@@ -25,6 +25,7 @@ public:
     {{ proxy.cls }}* get_{{ proxy.ident }}_proxy() const noexcept { return {{ proxy.slot_name }}.get(); }
     bool is_{{ proxy.ident }}_ready() const noexcept { return {{ proxy.slot_name }}.is_available(); }
     reaktar::ProxyLease<{{ proxy.cls }}> acquire_{{ proxy.ident }}_proxy() { return {{ proxy.slot_name }}.acquire("{{ proxy.ident }}"); }
+    const std::optional<typename {{ proxy.cls }}::HandleType>& get_{{ proxy.ident }}_handle() const noexcept { return active_{{ proxy.ident }}_handle_; }
 {% endfor %}
 
     static constexpr size_t kConsumedProxyCount = {{ model.consumed_proxy_count }};
@@ -84,5 +85,6 @@ protected:
 {% for proxy in model.consumed_proxies %}
     reaktar::ProxySlot<{{ proxy.cls }}> {{ proxy.slot_name }}{};
     std::optional<ara::com::FindServiceHandle> {{ proxy.find_handle_name }}{std::nullopt};
+    std::optional<typename {{ proxy.cls }}::HandleType> active_{{ proxy.ident }}_handle_{std::nullopt};
 {% endfor %}
 };

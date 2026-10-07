@@ -1,3 +1,11 @@
+# ==============================================================================
+# Reaktar - Reactive Actor Framework for AUTOSAR Adaptive
+# Part of the Pyarx project: https://github.com/pyarxlab/reaktar
+#
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Pyarx Lab
+# ==============================================================================
+
 ARXML ?= arxml/vehicle_system.arxml
 PASS_BY ?= const_ref
 PYTHON ?= python3
@@ -9,6 +17,7 @@ all: build
 
 help:
 	@echo "Available targets:"
+	@echo "  make bootstrap  - Check Python >= 3.10 and install required Python packages (requirements.txt)"
 	@echo "  make generate  - Generate C++ Actor and TestBench headers from ARXML"
 	@echo "                   Usage: make generate [ARXML=arxml/vehicle_system.arxml] [PASS_BY=const_ref|value]"
 	@echo "  make build     - Configure and build all C++ targets (Release)"
@@ -16,6 +25,12 @@ help:
 	@echo "  make package   - Build portable package containing only ReaktAR & generated headers"
 	@echo "                   Usage: make package [ARXML=arxml/vehicle_system.arxml] [OUTPUT=dist]"
 	@echo "  make clean     - Remove build artifacts and package archives"
+
+bootstrap:
+	@echo "==> Verifying Python version (>= 3.10)..."
+	@$(PYTHON) -c 'import sys; assert sys.version_info >= (3, 10), f"Python 3.10+ required, found {sys.version}"'
+	@echo "==> Installing Python dependencies from requirements.txt..."
+	@$(PYTHON) -m pip install -r requirements.txt
 
 generate:
 	@echo "==> Generating C++ Actor & TestBench headers from $(ARXML) (pass-by: $(PASS_BY))..."

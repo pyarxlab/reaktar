@@ -2,7 +2,8 @@
 // Reaktar - Reactive Actor Framework for AUTOSAR Adaptive
 // Part of the Pyarx project: https://github.com/pyarxlab/reaktar
 //
-// Copyright (c) 2026 Pyarx Lab. Licensed under the MIT License.
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 Pyarx Lab
 // ==============================================================================
 
 #pragma once
@@ -95,13 +96,14 @@ struct future_traits<reaktar::Future<T>> {
     using value_type = T;
 };
 
+
+
 // Helper for making future values in a vendor-adaptable way
 template <typename ValType>
 struct make_future_adapter {
     static reaktar::Future<ValType> make(ValType&& val) {
-        using ResType = reaktar::Result<ValType>;
         reaktar::Promise<ValType> p;
-        p.set_value(ResType::FromValue(std::forward<ValType>(val)));
+        p.set_value(std::forward<ValType>(val));
         return p.get_future();
     }
     static reaktar::Future<ValType> make(const ValType& val) {
@@ -111,12 +113,16 @@ struct make_future_adapter {
     template <typename ResType>
     static reaktar::Future<ValType> from_result(ResType&& res) {
         reaktar::Promise<ValType> p;
-        p.set_value(std::forward<ResType>(res));
+        if (res.HasValue()) {
+            p.set_value(std::forward<ResType>(res).Value());
+        } else {
+            p.SetError(std::forward<ResType>(res).Error());
+        }
         return p.get_future();
     }
     static reaktar::Future<ValType> from_error(reaktar::ErrorCode err) {
         reaktar::Promise<ValType> p;
-        p.set_error(std::move(err));
+        p.SetError(std::move(err));
         return p.get_future();
     }
 };
@@ -131,12 +137,16 @@ struct make_future_adapter<void> {
     template <typename ResType>
     static reaktar::Future<void> from_result(ResType&& res) {
         reaktar::Promise<void> p;
-        p.set_value(std::forward<ResType>(res));
+        if (res.HasValue()) {
+            p.set_value();
+        } else {
+            p.SetError(std::forward<ResType>(res).Error());
+        }
         return p.get_future();
     }
     static reaktar::Future<void> from_error(reaktar::ErrorCode err) {
         reaktar::Promise<void> p;
-        p.set_error(std::move(err));
+        p.SetError(std::move(err));
         return p.get_future();
     }
 };
@@ -311,6 +321,7 @@ public:
 template <typename Derived, typename ValueType>
 inline constexpr bool has_on_direct_field_set_v = has_on_direct_field_set<Derived, ValueType>::value;
 
+
 /**
  * @brief Zero-overhead status for one-way / fire-and-forget dispatches (methods and events).
  *
@@ -339,72 +350,20 @@ struct EmitStatus {
 };
 
 /**
- * @brief Ergonomic Async Result continuation wrapper.
- * Returned when emitting an RPC request.
- * - Wraps vendor Future directly with zero heap allocations and zero mutex locks.
- * - Relies on AUTOSAR Adaptive's threading and continuation model.
- * - Allows .then([this](T val) { ... }) with unwrapped value
- * - Allows .or_else([this](ErrorCode err) { ... })
- * - Allows .get() for synchronous blocking wait
- * - Can be safely discarded for fire-and-forget
+ * @brief Zero-overhead, zero-heap Async Result wrapper for AUTOSAR Adaptive RPC invocations.
+ *
+ * - Wraps vendor Future directly with zero heap allocations, zero std::function, zero mutex locks.
+ * - Supports explicit operator bool() / ok() for `if (!emit(...))` synchronous check.
+ * - `.then(fn)`: Direct pass-through to vanilla AUTOSAR Future::then(fn) (receives Future<T> / Result<T>).
+ * - `.on_success(fn)`: Syntactic sugar that automatically unwraps Result and invokes fn(val) on success only.
+ * - `.on_failure(fn)`: Syntactic sugar that invokes fn(ErrorCode) on failure or when proxy is missing.
+ * - Non-chainable / terminal to completely eliminate type erasure and expression template overhead.
  */
 template <typename T>
-class AsyncContinuation;
-
-template <typename T>
 class AsyncResult {
-    friend class AsyncContinuation<T>;
 private:
     reaktar::Future<T> future_{};
     bool is_valid_{false};
-    bool dispatched_{false};
-    std::function<void(T)> on_success_{};
-    std::function<void(reaktar::ErrorCode)> on_error_{};
-    std::function<void()> on_error_void_{};
-
-    template <typename Callback>
-    void set_then(Callback&& cb) {
-        if (!is_valid_) return;
-        on_success_ = std::forward<Callback>(cb);
-    }
-
-    template <typename ErrorCallback>
-    void set_or_else(ErrorCallback&& cb) {
-        if (!is_valid_) {
-            if constexpr (std::is_invocable_v<ErrorCallback, reaktar::ErrorCode>) {
-                cb(reaktar::ErrorCode{});
-            } else {
-                cb();
-            }
-            return;
-        }
-        if constexpr (std::is_invocable_v<ErrorCallback, reaktar::ErrorCode>) {
-            on_error_ = std::forward<ErrorCallback>(cb);
-        } else {
-            on_error_void_ = [c = std::forward<ErrorCallback>(cb)]() mutable { c(); };
-        }
-    }
-
-    void dispatch() {
-        if (!is_valid_ || dispatched_) return;
-        if (!on_success_ && !on_error_ && !on_error_void_) return;
-        dispatched_ = true;
-        future_.then([s = std::move(on_success_),
-                      e = std::move(on_error_),
-                      ev = std::move(on_error_void_)](reaktar::Future<T> f) mutable {
-            auto res = f.get();
-            if (res.HasValue()) {
-                if constexpr (!std::is_void_v<T>) {
-                    if (s) s(res.Value());
-                } else {
-                    if (s) s();
-                }
-            } else {
-                if (e) e(res.Error());
-                else if (ev) ev();
-            }
-        });
-    }
 
 public:
     AsyncResult() noexcept : is_valid_(false) {}
@@ -412,32 +371,19 @@ public:
     explicit AsyncResult(reaktar::Future<T> future)
         : future_(std::move(future)), is_valid_(true) {}
 
-    ~AsyncResult() {
-        dispatch();
-    }
+    ~AsyncResult() = default;
 
     AsyncResult(AsyncResult&& other) noexcept
         : future_(std::move(other.future_)),
-          is_valid_(other.is_valid_),
-          dispatched_(other.dispatched_),
-          on_success_(std::move(other.on_success_)),
-          on_error_(std::move(other.on_error_)),
-          on_error_void_(std::move(other.on_error_void_)) {
+          is_valid_(other.is_valid_) {
         other.is_valid_ = false;
-        other.dispatched_ = true;
     }
 
     AsyncResult& operator=(AsyncResult&& other) noexcept {
         if (this != &other) {
-            dispatch();
             future_ = std::move(other.future_);
             is_valid_ = other.is_valid_;
-            dispatched_ = other.dispatched_;
-            on_success_ = std::move(other.on_success_);
-            on_error_ = std::move(other.on_error_);
-            on_error_void_ = std::move(other.on_error_void_);
             other.is_valid_ = false;
-            other.dispatched_ = true;
         }
         return *this;
     }
@@ -449,268 +395,95 @@ public:
         return AsyncResult<T>{};
     }
 
-    explicit operator bool() const noexcept { return is_valid_; }
-    bool ok() const noexcept { return is_valid_; }
+    constexpr explicit operator bool() const noexcept { return is_valid_; }
+    constexpr bool ok() const noexcept { return is_valid_; }
 
+    /**
+     * @brief Vanilla AUTOSAR Future pass-through.
+     * Passes the callback directly into the vendor future without storage or intermediate wrappers.
+     */
     template <typename Callback>
-    AsyncContinuation<T> then(Callback&& cb) {
-        set_then(std::forward<Callback>(cb));
-        return AsyncContinuation<T>(this);
-    }
-
-    template <typename ErrorCallback>
-    AsyncContinuation<T> or_else(ErrorCallback&& cb) {
-        set_or_else(std::forward<ErrorCallback>(cb));
-        return AsyncContinuation<T>(this);
-    }
-
-    T get() {
-        if (!is_valid_) return T{};
-        if (dispatched_) return T{};
-        auto res = future_.get();
-        if (res.HasValue()) {
-            return res.Value();
-        }
-        return T{};
-    }
-
-    reaktar::Future<T>& raw_future() noexcept {
-        return future_;
-    }
-};
-
-template <typename T>
-class AsyncContinuation {
-private:
-    AsyncResult<T>* parent_{nullptr};
-public:
-    explicit AsyncContinuation(AsyncResult<T>* parent) noexcept : parent_(parent) {}
-    ~AsyncContinuation() {
-        if (parent_) parent_->dispatch();
-    }
-    AsyncContinuation(AsyncContinuation&& o) noexcept : parent_(o.parent_) {
-        o.parent_ = nullptr;
-    }
-    AsyncContinuation& operator=(AsyncContinuation&& o) noexcept {
-        if (this != &o) {
-            if (parent_) parent_->dispatch();
-            parent_ = o.parent_;
-            o.parent_ = nullptr;
-        }
-        return *this;
-    }
-    AsyncContinuation(const AsyncContinuation&) = delete;
-    AsyncContinuation& operator=(const AsyncContinuation&) = delete;
-
-    template <typename Callback>
-    AsyncContinuation& then(Callback&& cb) {
-        if (parent_) parent_->set_then(std::forward<Callback>(cb));
-        return *this;
-    }
-
-    template <typename ErrorCallback>
-    AsyncContinuation& or_else(ErrorCallback&& cb) {
-        if (parent_) parent_->set_or_else(std::forward<ErrorCallback>(cb));
-        return *this;
-    }
-
-    explicit operator bool() const noexcept { return parent_ ? bool(*parent_) : false; }
-    bool ok() const noexcept { return parent_ ? parent_->ok() : false; }
-
-    T get() {
-        if (parent_) {
-            parent_->dispatch();
-            return parent_->get();
-        }
-        return T{};
-    }
-
-    reaktar::Future<T>& raw_future() noexcept {
-        static reaktar::Future<T> s_empty{};
-        return parent_ ? parent_->raw_future() : s_empty;
-    }
-};
-
-// AsyncResult specialization for void RPC methods
-template <>
-class AsyncContinuation<void>;
-
-template <>
-class AsyncResult<void> {
-    friend class AsyncContinuation<void>;
-private:
-    reaktar::Future<void> future_{};
-    bool is_valid_{false};
-    bool dispatched_{false};
-    std::function<void()> on_success_{};
-    std::function<void(reaktar::ErrorCode)> on_error_{};
-    std::function<void()> on_error_void_{};
-
-    template <typename Callback>
-    void set_then(Callback&& cb) {
-        if (!is_valid_) return;
-        on_success_ = std::forward<Callback>(cb);
-    }
-
-    template <typename ErrorCallback>
-    void set_or_else(ErrorCallback&& cb) {
+    auto then(Callback&& cb) {
         if (!is_valid_) {
-            if constexpr (std::is_invocable_v<ErrorCallback, reaktar::ErrorCode>) {
-                cb(reaktar::ErrorCode{});
+            using RetType = decltype(std::declval<reaktar::Future<T>&>().then(std::forward<Callback>(cb)));
+            if constexpr (!std::is_void_v<RetType>) {
+                return RetType{};
             } else {
-                cb();
+                return;
             }
-            return;
         }
-        if constexpr (std::is_invocable_v<ErrorCallback, reaktar::ErrorCode>) {
-            on_error_ = std::forward<ErrorCallback>(cb);
-        } else {
-            on_error_void_ = [c = std::forward<ErrorCallback>(cb)]() mutable { c(); };
-        }
+        return future_.then(std::forward<Callback>(cb));
     }
 
-    void dispatch() {
-        if (!is_valid_ || dispatched_) return;
-        if (!on_success_ && !on_error_ && !on_error_void_) return;
-        dispatched_ = true;
-        future_.then([s = std::move(on_success_),
-                      e = std::move(on_error_),
-                      ev = std::move(on_error_void_)](reaktar::Future<void> f) mutable {
-            auto res = f.get();
+    /**
+     * @brief Sugar for handling only success (unwrapped T or void).
+     */
+    template <typename Callback>
+    void on_success(Callback&& cb) {
+        if (!is_valid_) return;
+        future_.then([c = std::forward<Callback>(cb)](reaktar::Future<T> f) mutable {
+            auto res = f.GetResult();
             if (res.HasValue()) {
-                if (s) s();
-            } else {
-                if (e) e(res.Error());
-                else if (ev) ev();
+                if constexpr (std::is_void_v<T>) {
+                    c();
+                } else {
+                    c(res.Value());
+                }
             }
         });
     }
 
-public:
-    AsyncResult() noexcept : is_valid_(false) {}
-
-    explicit AsyncResult(reaktar::Future<void> future)
-        : future_(std::move(future)), is_valid_(true) {}
-
-    ~AsyncResult() {
-        dispatch();
-    }
-
-    AsyncResult(AsyncResult&& other) noexcept
-        : future_(std::move(other.future_)),
-          is_valid_(other.is_valid_),
-          dispatched_(other.dispatched_),
-          on_success_(std::move(other.on_success_)),
-          on_error_(std::move(other.on_error_)),
-          on_error_void_(std::move(other.on_error_void_)) {
-        other.is_valid_ = false;
-        other.dispatched_ = true;
-    }
-
-    AsyncResult& operator=(AsyncResult&& other) noexcept {
-        if (this != &other) {
-            dispatch();
-            future_ = std::move(other.future_);
-            is_valid_ = other.is_valid_;
-            dispatched_ = other.dispatched_;
-            on_success_ = std::move(other.on_success_);
-            on_error_ = std::move(other.on_error_);
-            on_error_void_ = std::move(other.on_error_void_);
-            other.is_valid_ = false;
-            other.dispatched_ = true;
-        }
-        return *this;
-    }
-
-    AsyncResult(const AsyncResult&) = delete;
-    AsyncResult& operator=(const AsyncResult&) = delete;
-
-    static AsyncResult<void> Failed() noexcept {
-        return AsyncResult<void>{};
-    }
-
-    explicit operator bool() const noexcept { return is_valid_; }
-    bool ok() const noexcept { return is_valid_; }
-
-    template <typename Callback>
-    AsyncContinuation<void> then(Callback&& cb);
-
+    /**
+     * @brief Sugar for handling only failure (passes ErrorCode, or default/optional if invocable).
+     */
     template <typename ErrorCallback>
-    AsyncContinuation<void> or_else(ErrorCallback&& cb);
-
-    void get() {
-        if (!is_valid_) return;
-        if (dispatched_) return;
-        future_.get();
+    void on_failure(ErrorCallback&& cb) {
+        if (!is_valid_) {
+            auto err = ara::core::MakeErrorCode(ara::core::CoreErrc::kServiceNotAvailable);
+            if constexpr (std::is_invocable_v<ErrorCallback>) {
+                std::forward<ErrorCallback>(cb)();
+            } else if constexpr (std::is_invocable_v<ErrorCallback, std::optional<reaktar::ErrorCode>>) {
+                std::forward<ErrorCallback>(cb)(err);
+            } else if constexpr (std::is_invocable_v<ErrorCallback, reaktar::ErrorCode>) {
+                std::forward<ErrorCallback>(cb)(err);
+            }
+            return;
+        }
+        future_.then([c = std::forward<ErrorCallback>(cb)](reaktar::Future<T> f) mutable {
+            auto res = f.GetResult();
+            if (!res.HasValue()) {
+                if constexpr (std::is_invocable_v<ErrorCallback>) {
+                    c();
+                } else if constexpr (std::is_invocable_v<ErrorCallback, std::optional<reaktar::ErrorCode>>) {
+                    c(res.Error());
+                } else if constexpr (std::is_invocable_v<ErrorCallback, reaktar::ErrorCode>) {
+                    c(res.Error());
+                }
+            }
+        });
     }
 
-    reaktar::Future<void>& raw_future() noexcept {
+    T get() {
+        if (!is_valid_) {
+            if constexpr (!std::is_void_v<T>) {
+                return T{};
+            } else {
+                return;
+            }
+        }
+        auto res = future_.GetResult();
+        if constexpr (!std::is_void_v<T>) {
+            if (res.HasValue()) {
+                return res.Value();
+            }
+            return T{};
+        }
+    }
+
+    reaktar::Future<T>& raw_future() noexcept {
         return future_;
     }
 };
-
-template <>
-class AsyncContinuation<void> {
-private:
-    AsyncResult<void>* parent_{nullptr};
-public:
-    explicit AsyncContinuation(AsyncResult<void>* parent) noexcept : parent_(parent) {}
-    ~AsyncContinuation() {
-        if (parent_) parent_->dispatch();
-    }
-    AsyncContinuation(AsyncContinuation&& o) noexcept : parent_(o.parent_) {
-        o.parent_ = nullptr;
-    }
-    AsyncContinuation& operator=(AsyncContinuation&& o) noexcept {
-        if (this != &o) {
-            if (parent_) parent_->dispatch();
-            parent_ = o.parent_;
-            o.parent_ = nullptr;
-        }
-        return *this;
-    }
-    AsyncContinuation(const AsyncContinuation&) = delete;
-    AsyncContinuation& operator=(const AsyncContinuation&) = delete;
-
-    template <typename Callback>
-    AsyncContinuation& then(Callback&& cb) {
-        if (parent_) parent_->set_then(std::forward<Callback>(cb));
-        return *this;
-    }
-
-    template <typename ErrorCallback>
-    AsyncContinuation& or_else(ErrorCallback&& cb) {
-        if (parent_) parent_->set_or_else(std::forward<ErrorCallback>(cb));
-        return *this;
-    }
-
-    explicit operator bool() const noexcept { return parent_ ? bool(*parent_) : false; }
-    bool ok() const noexcept { return parent_ ? parent_->ok() : false; }
-
-    void get() {
-        if (parent_) {
-            parent_->dispatch();
-            parent_->get();
-        }
-    }
-
-    reaktar::Future<void>& raw_future() noexcept {
-        static reaktar::Future<void> s_empty{};
-        return parent_ ? parent_->raw_future() : s_empty;
-    }
-};
-
-template <typename Callback>
-inline AsyncContinuation<void> AsyncResult<void>::then(Callback&& cb) {
-    set_then(std::forward<Callback>(cb));
-    return AsyncContinuation<void>(this);
-}
-
-template <typename ErrorCallback>
-inline AsyncContinuation<void> AsyncResult<void>::or_else(ErrorCallback&& cb) {
-    set_or_else(std::forward<ErrorCallback>(cb));
-    return AsyncContinuation<void>(this);
-}
 
 // C++17 Deduction Guide for AsyncResult
 template <typename T>

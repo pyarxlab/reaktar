@@ -2,7 +2,8 @@
 // Reaktar - Reactive Actor Framework for AUTOSAR Adaptive
 // Part of the Pyarx project: https://github.com/pyarxlab/reaktar
 //
-// Copyright (c) 2026 Pyarx Lab. Licensed under the MIT License.
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 Pyarx Lab
 // ==============================================================================
 
 #pragma once
@@ -13,10 +14,11 @@
  */
 
 #include "reaktar/config.hpp"
-#include "reaktar/types.hpp"
 #include "reaktar/traits.hpp"
+#include "reaktar/types.hpp"
 #if __has_include("reaktar/tags.hpp")
 #include "reaktar/tags.hpp"
 #endif
-#include "reaktar/proxy_slot.hpp"
 #include "reaktar/actor_base.hpp"
+#include "reaktar/execution_policy.hpp"
+#include "reaktar/proxy_slot.hpp"

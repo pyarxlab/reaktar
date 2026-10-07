@@ -5,7 +5,7 @@
     public:
         explicit {{ skel.adapter_name }}(
             {{ model.exe_name }}Actor* a,
-            ara::core::InstanceSpecifier instance_spec,
+            reaktar::InstanceSpecifier instance_spec,
             ara::com::MethodCallProcessingMode mode
         )
             : {{ skel.cls }}(std::move(instance_spec), mode), actor_(a) {}
@@ -17,12 +17,30 @@
             using MethodTag = {{ m.tag }};
             if constexpr (has_method_handler_v<Derived, MethodTag{% for a in m.in_args %}, {{ a.pass_type }}{% endfor %}> ||
                           has_method_handler_v<Derived, MethodTag{% for a in m.in_args %}, {{ a.type }}{% endfor %}>) {
-                actor_->self().on(MethodTag{}{% for a in m.in_args %}, {{ a.name }}{% endfor %});
+                if constexpr (std::is_same_v<ExecutionPolicy, ::reaktar::DirectExecution>) {
+                    actor_->self().on(MethodTag{}{% for a in m.in_args %}, {{ a.name }}{% endfor %});
+                } else if constexpr (std::is_same_v<ExecutionPolicy, ::reaktar::SynchronizedExecution>) {
+                    std::lock_guard<std::mutex> lock(actor_->execution_policy_.mutex());
+                    actor_->self().on(MethodTag{}{% for a in m.in_args %}, {{ a.name }}{% endfor %});
+                } else {
+                    actor_->execution_policy_.execute([&] {
+                        actor_->self().on(MethodTag{}{% for a in m.in_args %}, {{ a.name }}{% endfor %});
+                    });
+                }
             }
 {% if m.is_unique_sig %}
             else if constexpr (has_direct_method_handler_v<Derived{% for a in m.in_args %}, {{ a.pass_type }}{% endfor %}> ||
                                has_direct_method_handler_v<Derived{% for a in m.in_args %}, {{ a.type }}{% endfor %}>) {
-                actor_->self().on({% for a in m.in_args %}{{ a.name }}{{ ", " if not loop.last else "" }}{% endfor %});
+                if constexpr (std::is_same_v<ExecutionPolicy, ::reaktar::DirectExecution>) {
+                    actor_->self().on({% for a in m.in_args %}{{ a.name }}{{ ", " if not loop.last else "" }}{% endfor %});
+                } else if constexpr (std::is_same_v<ExecutionPolicy, ::reaktar::SynchronizedExecution>) {
+                    std::lock_guard<std::mutex> lock(actor_->execution_policy_.mutex());
+                    actor_->self().on({% for a in m.in_args %}{{ a.name }}{{ ", " if not loop.last else "" }}{% endfor %});
+                } else {
+                    actor_->execution_policy_.execute([&] {
+                        actor_->self().on({% for a in m.in_args %}{{ a.name }}{{ ", " if not loop.last else "" }}{% endfor %});
+                    });
+                }
             }
 {% else %}
             else if constexpr (has_direct_method_handler_v<Derived{% for a in m.in_args %}, {{ a.pass_type }}{% endfor %}> ||
@@ -41,25 +59,71 @@
             using MethodTag = {{ m.tag }};
             if constexpr (has_method_handler_v<Derived, MethodTag{% for a in m.in_args %}, {{ a.pass_type }}{% endfor %}> ||
                           has_method_handler_v<Derived, MethodTag{% for a in m.in_args %}, {{ a.type }}{% endfor %}>) {
-                if constexpr (std::is_void_v<decltype(actor_->self().on(MethodTag{}{% for a in m.in_args %}, {{ a.name }}{% endfor %}))>) {
-                    actor_->self().on(MethodTag{}{% for a in m.in_args %}, {{ a.name }}{% endfor %});
-                    return result_adapter<{{ m.name }}RetType, void>::adapt();
+                if constexpr (std::is_same_v<ExecutionPolicy, ::reaktar::DirectExecution>) {
+                    if constexpr (std::is_void_v<decltype(actor_->self().on(MethodTag{}{% for a in m.in_args %}, {{ a.name }}{% endfor %}))>) {
+                        actor_->self().on(MethodTag{}{% for a in m.in_args %}, {{ a.name }}{% endfor %});
+                        return result_adapter<{{ m.name }}RetType, void>::adapt();
+                    } else {
+                        return result_adapter<{{ m.name }}RetType, decltype(actor_->self().on(MethodTag{}{% for a in m.in_args %}, {{ a.name }}{% endfor %}))>::adapt(
+                            actor_->self().on(MethodTag{}{% for a in m.in_args %}, {{ a.name }}{% endfor %})
+                        );
+                    }
+                } else if constexpr (std::is_same_v<ExecutionPolicy, ::reaktar::SynchronizedExecution>) {
+                    std::lock_guard<std::mutex> lock(actor_->execution_policy_.mutex());
+                    if constexpr (std::is_void_v<decltype(actor_->self().on(MethodTag{}{% for a in m.in_args %}, {{ a.name }}{% endfor %}))>) {
+                        actor_->self().on(MethodTag{}{% for a in m.in_args %}, {{ a.name }}{% endfor %});
+                        return result_adapter<{{ m.name }}RetType, void>::adapt();
+                    } else {
+                        return result_adapter<{{ m.name }}RetType, decltype(actor_->self().on(MethodTag{}{% for a in m.in_args %}, {{ a.name }}{% endfor %}))>::adapt(
+                            actor_->self().on(MethodTag{}{% for a in m.in_args %}, {{ a.name }}{% endfor %})
+                        );
+                    }
                 } else {
-                    return result_adapter<{{ m.name }}RetType, decltype(actor_->self().on(MethodTag{}{% for a in m.in_args %}, {{ a.name }}{% endfor %}))>::adapt(
-                        actor_->self().on(MethodTag{}{% for a in m.in_args %}, {{ a.name }}{% endfor %})
-                    );
+                    return actor_->execution_policy_.execute([&]() -> {{ m.name }}RetType {
+                        if constexpr (std::is_void_v<decltype(actor_->self().on(MethodTag{}{% for a in m.in_args %}, {{ a.name }}{% endfor %}))>) {
+                            actor_->self().on(MethodTag{}{% for a in m.in_args %}, {{ a.name }}{% endfor %});
+                            return result_adapter<{{ m.name }}RetType, void>::adapt();
+                        } else {
+                            return result_adapter<{{ m.name }}RetType, decltype(actor_->self().on(MethodTag{}{% for a in m.in_args %}, {{ a.name }}{% endfor %}))>::adapt(
+                                actor_->self().on(MethodTag{}{% for a in m.in_args %}, {{ a.name }}{% endfor %})
+                            );
+                        }
+                    });
                 }
             }
 {% if m.is_unique_sig %}
             else if constexpr (has_direct_method_handler_v<Derived{% for a in m.in_args %}, {{ a.pass_type }}{% endfor %}> ||
                                has_direct_method_handler_v<Derived{% for a in m.in_args %}, {{ a.type }}{% endfor %}>) {
-                if constexpr (std::is_void_v<decltype(actor_->self().on({% for a in m.in_args %}{{ a.name }}{{ ", " if not loop.last else "" }}{% endfor %}))>) {
-                    actor_->self().on({% for a in m.in_args %}{{ a.name }}{{ ", " if not loop.last else "" }}{% endfor %});
-                    return result_adapter<{{ m.name }}RetType, void>::adapt();
+                if constexpr (std::is_same_v<ExecutionPolicy, ::reaktar::DirectExecution>) {
+                    if constexpr (std::is_void_v<decltype(actor_->self().on({% for a in m.in_args %}{{ a.name }}{{ ", " if not loop.last else "" }}{% endfor %}))>) {
+                        actor_->self().on({% for a in m.in_args %}{{ a.name }}{{ ", " if not loop.last else "" }}{% endfor %});
+                        return result_adapter<{{ m.name }}RetType, void>::adapt();
+                    } else {
+                        return result_adapter<{{ m.name }}RetType, decltype(actor_->self().on({% for a in m.in_args %}{{ a.name }}{{ ", " if not loop.last else "" }}{% endfor %}))>::adapt(
+                            actor_->self().on({% for a in m.in_args %}{{ a.name }}{{ ", " if not loop.last else "" }}{% endfor %})
+                        );
+                    }
+                } else if constexpr (std::is_same_v<ExecutionPolicy, ::reaktar::SynchronizedExecution>) {
+                    std::lock_guard<std::mutex> lock(actor_->execution_policy_.mutex());
+                    if constexpr (std::is_void_v<decltype(actor_->self().on({% for a in m.in_args %}{{ a.name }}{{ ", " if not loop.last else "" }}{% endfor %}))>) {
+                        actor_->self().on({% for a in m.in_args %}{{ a.name }}{{ ", " if not loop.last else "" }}{% endfor %});
+                        return result_adapter<{{ m.name }}RetType, void>::adapt();
+                    } else {
+                        return result_adapter<{{ m.name }}RetType, decltype(actor_->self().on({% for a in m.in_args %}{{ a.name }}{{ ", " if not loop.last else "" }}{% endfor %}))>::adapt(
+                            actor_->self().on({% for a in m.in_args %}{{ a.name }}{{ ", " if not loop.last else "" }}{% endfor %})
+                        );
+                    }
                 } else {
-                    return result_adapter<{{ m.name }}RetType, decltype(actor_->self().on({% for a in m.in_args %}{{ a.name }}{{ ", " if not loop.last else "" }}{% endfor %}))>::adapt(
-                        actor_->self().on({% for a in m.in_args %}{{ a.name }}{{ ", " if not loop.last else "" }}{% endfor %})
-                    );
+                    return actor_->execution_policy_.execute([&]() -> {{ m.name }}RetType {
+                        if constexpr (std::is_void_v<decltype(actor_->self().on({% for a in m.in_args %}{{ a.name }}{{ ", " if not loop.last else "" }}{% endfor %}))>) {
+                            actor_->self().on({% for a in m.in_args %}{{ a.name }}{{ ", " if not loop.last else "" }}{% endfor %});
+                            return result_adapter<{{ m.name }}RetType, void>::adapt();
+                        } else {
+                            return result_adapter<{{ m.name }}RetType, decltype(actor_->self().on({% for a in m.in_args %}{{ a.name }}{{ ", " if not loop.last else "" }}{% endfor %}))>::adapt(
+                                actor_->self().on({% for a in m.in_args %}{{ a.name }}{{ ", " if not loop.last else "" }}{% endfor %})
+                            );
+                        }
+                    });
                 }
             }
 {% else %}
@@ -83,7 +147,7 @@
 {% endfor %}
     explicit {{ model.exe_name }}Actor(
 {% for skel in model.skeletons %}
-        ara::core::InstanceSpecifier {{ skel.port_name.lower() }}_instance = ara::core::InstanceSpecifier("{{ skel.instance_spec }}"),
+        reaktar::InstanceSpecifier {{ skel.port_name.lower() }}_instance = reaktar::InstanceSpecifier("{{ skel.instance_spec }}"),
 {% endfor %}
         ara::com::MethodCallProcessingMode mode = ara::com::MethodCallProcessingMode::kEvent
     )

@@ -2,7 +2,8 @@
 // Reaktar - Reactive Actor Framework for AUTOSAR Adaptive
 // Part of the Pyarx project: https://github.com/pyarxlab/reaktar
 //
-// Copyright (c) 2026 Pyarx Lab. Licensed under the MIT License.
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 Pyarx Lab
 // ==============================================================================
 
 #pragma once

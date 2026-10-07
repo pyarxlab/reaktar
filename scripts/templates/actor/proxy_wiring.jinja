@@ -6,13 +6,14 @@
 {% endfor %}
 
 {% for proxy in model.consumed_proxies %}
-        this->{{ proxy.find_handle_name }} = {{ proxy.cls }}::StartFindService(
+        auto find_res_{{ proxy.ident }} = {{ proxy.cls }}::StartFindService(
             [this](ara::com::ServiceHandleContainer<{{ proxy.cls }}::HandleType> handles, ara::com::FindServiceHandle) {
                 if (handles.empty()) {
                     teardown_{{ proxy.ident }}_proxy();
                 } else {
-                    if (auto* current = this->{{ proxy.slot_name }}.get()) {
-                        if (current->GetHandle() == handles[0]) {
+                    if (this->{{ proxy.slot_name }}.is_available()) {
+                        if (this->active_{{ proxy.ident }}_handle_.has_value() &&
+                            *this->active_{{ proxy.ident }}_handle_ == handles[0]) {
                             return; // Same handle, already active
                         }
                         teardown_{{ proxy.ident }}_proxy();
@@ -21,11 +22,19 @@
                     bind_{{ proxy.ident }}_events(new_proxy.get());
                     bind_{{ proxy.ident }}_fields(new_proxy.get());
                     this->{{ proxy.slot_name }}.publish(std::move(new_proxy));
+                    this->active_{{ proxy.ident }}_handle_ = handles[0];
                     this->notify_proxy_resolved();
                 }
             },
-            ara::core::InstanceSpecifier("{{ proxy.instance_spec }}")
+            reaktar::InstanceSpecifier("{{ proxy.instance_spec }}")
         );
+        if constexpr (reaktar::is_result_v<decltype(find_res_{{ proxy.ident }})>) {
+            if (find_res_{{ proxy.ident }}.HasValue()) {
+                this->{{ proxy.find_handle_name }} = find_res_{{ proxy.ident }}.Value();
+            }
+        } else {
+            this->{{ proxy.find_handle_name }} = find_res_{{ proxy.ident }};
+        }
 {% endfor %}
     }
 
@@ -55,6 +64,7 @@ private:
 {% endif %}
             this->{{ proxy.slot_name }}.reset();
         }
+        this->active_{{ proxy.ident }}_handle_.reset();
     }
 {% endfor %}
 
@@ -67,17 +77,43 @@ private:
 {% if f.has_setter %}
         if constexpr (has_on_field_set_v<Derived, {{ f.tag }}, {{ f.type }}>) {
             {{ f.var_name }}.{{ f.name }}.RegisterSetHandler([this](const {{ f.type }}& val) {
-                return result_adapter<{{ f.type }}, decltype(self().on_set({{ f.tag }}{}, val))>::adapt(
-                    self().on_set({{ f.tag }}{}, val)
-                );
+                if constexpr (std::is_same_v<ExecutionPolicy, ::reaktar::DirectExecution>) {
+                    return result_adapter<reaktar::Future<{{ f.type }}>, decltype(self().on_set({{ f.tag }}{}, val))>::adapt(
+                        self().on_set({{ f.tag }}{}, val)
+                    );
+                } else if constexpr (std::is_same_v<ExecutionPolicy, ::reaktar::SynchronizedExecution>) {
+                    std::lock_guard<std::mutex> lock(this->execution_policy_.mutex());
+                    return result_adapter<reaktar::Future<{{ f.type }}>, decltype(self().on_set({{ f.tag }}{}, val))>::adapt(
+                        self().on_set({{ f.tag }}{}, val)
+                    );
+                } else {
+                    return this->execution_policy_.execute([&] {
+                        return result_adapter<reaktar::Future<{{ f.type }}>, decltype(self().on_set({{ f.tag }}{}, val))>::adapt(
+                            self().on_set({{ f.tag }}{}, val)
+                        );
+                    });
+                }
             });
         }
 {% if f.is_unique_setter %}
         else if constexpr (has_on_direct_field_set_v<Derived, {{ f.type }}>) {
             {{ f.var_name }}.{{ f.name }}.RegisterSetHandler([this](const {{ f.type }}& val) {
-                return result_adapter<{{ f.type }}, decltype(self().on_set(val))>::adapt(
-                    self().on_set(val)
-                );
+                if constexpr (std::is_same_v<ExecutionPolicy, ::reaktar::DirectExecution>) {
+                    return result_adapter<reaktar::Future<{{ f.type }}>, decltype(self().on_set(val))>::adapt(
+                        self().on_set(val)
+                    );
+                } else if constexpr (std::is_same_v<ExecutionPolicy, ::reaktar::SynchronizedExecution>) {
+                    std::lock_guard<std::mutex> lock(this->execution_policy_.mutex());
+                    return result_adapter<reaktar::Future<{{ f.type }}>, decltype(self().on_set(val))>::adapt(
+                        self().on_set(val)
+                    );
+                } else {
+                    return this->execution_policy_.execute([&] {
+                        return result_adapter<reaktar::Future<{{ f.type }}>, decltype(self().on_set(val))>::adapt(
+                            self().on_set(val)
+                        );
+                    });
+                }
             });
         }
 {% endif %}
@@ -91,19 +127,43 @@ private:
 {% for ev in proxy.events %}
         // Event: {{ ev.name }} ({{ ev.type }})
         if constexpr (has_on_event_v<Derived, {{ ev.tag }}, {{ ev.type }}>) {
-            proxy->{{ ev.name }}.SetReceiveHandler([this, proxy]() {
-                proxy->{{ ev.name }}.GetNewSamples([this](auto&& s) {
-                    self().on({{ ev.tag }}{}, *s);
-                });
+            proxy->{{ ev.name }}.SetReceiveHandler([this]() {
+                auto lease = this->{{ proxy.slot_name }}.try_acquire();
+                if (lease) {
+                    lease->{{ ev.name }}.GetNewSamples([this](auto&& s) {
+                        if constexpr (std::is_same_v<ExecutionPolicy, ::reaktar::DirectExecution>) {
+                            self().on({{ ev.tag }}{}, *s);
+                        } else if constexpr (std::is_same_v<ExecutionPolicy, ::reaktar::SynchronizedExecution>) {
+                            std::lock_guard<std::mutex> lock(this->execution_policy_.mutex());
+                            self().on({{ ev.tag }}{}, *s);
+                        } else {
+                            this->execution_policy_.execute([&] {
+                                self().on({{ ev.tag }}{}, *s);
+                            });
+                        }
+                    });
+                }
             });
             proxy->{{ ev.name }}.Subscribe(10);
         }
 {% if ev.is_unique %}
         else if constexpr (has_on_direct_event_v<Derived, {{ ev.type }}>) {
-            proxy->{{ ev.name }}.SetReceiveHandler([this, proxy]() {
-                proxy->{{ ev.name }}.GetNewSamples([this](auto&& s) {
-                    self().on(*s);
-                });
+            proxy->{{ ev.name }}.SetReceiveHandler([this]() {
+                auto lease = this->{{ proxy.slot_name }}.try_acquire();
+                if (lease) {
+                    lease->{{ ev.name }}.GetNewSamples([this](auto&& s) {
+                        if constexpr (std::is_same_v<ExecutionPolicy, ::reaktar::DirectExecution>) {
+                            self().on(*s);
+                        } else if constexpr (std::is_same_v<ExecutionPolicy, ::reaktar::SynchronizedExecution>) {
+                            std::lock_guard<std::mutex> lock(this->execution_policy_.mutex());
+                            self().on(*s);
+                        } else {
+                            this->execution_policy_.execute([&] {
+                                self().on(*s);
+                            });
+                        }
+                    });
+                }
             });
             proxy->{{ ev.name }}.Subscribe(10);
         }
@@ -121,19 +181,43 @@ private:
 {% if f.has_notifier %}
         // Field Notifier: {{ f.name }} ({{ f.type }})
         if constexpr (has_on_event_v<Derived, {{ f.tag }}, {{ f.type }}>) {
-            proxy->{{ f.name }}.SetReceiveHandler([this, proxy]() {
-                proxy->{{ f.name }}.GetNewSamples([this](auto&& s) {
-                    self().on({{ f.tag }}{}, *s);
-                });
+            proxy->{{ f.name }}.SetReceiveHandler([this]() {
+                auto lease = this->{{ proxy.slot_name }}.try_acquire();
+                if (lease) {
+                    lease->{{ f.name }}.GetNewSamples([this](auto&& s) {
+                        if constexpr (std::is_same_v<ExecutionPolicy, ::reaktar::DirectExecution>) {
+                            self().on({{ f.tag }}{}, *s);
+                        } else if constexpr (std::is_same_v<ExecutionPolicy, ::reaktar::SynchronizedExecution>) {
+                            std::lock_guard<std::mutex> lock(this->execution_policy_.mutex());
+                            self().on({{ f.tag }}{}, *s);
+                        } else {
+                            this->execution_policy_.execute([&] {
+                                self().on({{ f.tag }}{}, *s);
+                            });
+                        }
+                    });
+                }
             });
             proxy->{{ f.name }}.Subscribe(10);
         }
 {% if f.is_unique %}
         else if constexpr (has_on_direct_event_v<Derived, {{ f.type }}>) {
-            proxy->{{ f.name }}.SetReceiveHandler([this, proxy]() {
-                proxy->{{ f.name }}.GetNewSamples([this](auto&& s) {
-                    self().on(*s);
-                });
+            proxy->{{ f.name }}.SetReceiveHandler([this]() {
+                auto lease = this->{{ proxy.slot_name }}.try_acquire();
+                if (lease) {
+                    lease->{{ f.name }}.GetNewSamples([this](auto&& s) {
+                        if constexpr (std::is_same_v<ExecutionPolicy, ::reaktar::DirectExecution>) {
+                            self().on(*s);
+                        } else if constexpr (std::is_same_v<ExecutionPolicy, ::reaktar::SynchronizedExecution>) {
+                            std::lock_guard<std::mutex> lock(this->execution_policy_.mutex());
+                            self().on(*s);
+                        } else {
+                            this->execution_policy_.execute([&] {
+                                self().on(*s);
+                            });
+                        }
+                    });
+                }
             });
             proxy->{{ f.name }}.Subscribe(10);
         }

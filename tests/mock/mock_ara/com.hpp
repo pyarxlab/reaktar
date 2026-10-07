@@ -1,3 +1,11 @@
+// ==============================================================================
+// Reaktar - Reactive Actor Framework for AUTOSAR Adaptive
+// Part of the Pyarx project: https://github.com/pyarxlab/reaktar
+//
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 Pyarx Lab
+// ==============================================================================
+
 #pragma once
 
 #include <functional>
@@ -142,8 +150,23 @@ public:
     Future() = default;
     explicit Future(std::future<Result<T>> fut) : fut_(std::move(fut)) {}
 
-    Result<T> get() {
+    Result<T> GetResult() {
         return fut_.get();
+    }
+
+    auto get() {
+        if constexpr (std::is_void_v<T>) {
+            auto res = fut_.get();
+            if (!res.HasValue()) {
+                throw std::runtime_error("Future contains error");
+            }
+        } else {
+            auto res = fut_.get();
+            if (res.HasValue()) {
+                return res.Value();
+            }
+            throw std::runtime_error("Future contains error");
+        }
     }
 
     template <typename F>
@@ -162,9 +185,9 @@ template <typename T>
 class Promise {
 public:
     Promise() = default;
-    void set_value(Result<T> res) { prom_.set_value(std::move(res)); }
     void set_value(const T& val) { prom_.set_value(Result<T>::FromValue(val)); }
-    void set_error(ErrorCode err) { prom_.set_value(Result<T>::FromError(std::move(err))); }
+    void set_value(T&& val) { prom_.set_value(Result<T>::FromValue(std::move(val))); }
+    void SetError(ErrorCode err) { prom_.set_value(Result<T>::FromError(std::move(err))); }
     Future<T> get_future() { return Future<T>(prom_.get_future()); }
 private:
     std::promise<Result<T>> prom_;
@@ -174,9 +197,8 @@ template <>
 class Promise<void> {
 public:
     Promise() = default;
-    void set_value(Result<void> res) { prom_.set_value(std::move(res)); }
     void set_value() { prom_.set_value(Result<void>::FromValue()); }
-    void set_error(ErrorCode err) { prom_.set_value(Result<void>::FromError(std::move(err))); }
+    void SetError(ErrorCode err) { prom_.set_value(Result<void>::FromError(std::move(err))); }
     Future<void> get_future() { return Future<void>(prom_.get_future()); }
 private:
     std::promise<Result<void>> prom_;
@@ -185,20 +207,20 @@ private:
 template <typename T>
 inline Future<std::decay_t<T>> MakeFuture(T&& val) {
     Promise<std::decay_t<T>> p;
-    p.set_value(Result<std::decay_t<T>>::FromValue(std::forward<T>(val)));
+    p.set_value(std::forward<T>(val));
     return p.get_future();
 }
 
 template <typename T>
 inline Future<T> MakeFuture(ErrorCode err) {
     Promise<T> p;
-    p.set_error(std::move(err));
+    p.SetError(std::move(err));
     return p.get_future();
 }
 
 inline Future<void> MakeFuture() {
     Promise<void> p;
-    p.set_value(Result<void>::FromValue());
+    p.set_value();
     return p.get_future();
 }
 
@@ -238,15 +260,6 @@ struct ServiceHandleType {
 
     bool operator==(const ServiceHandleType& other) const noexcept {
         return instance_specifier == other.instance_specifier && instance_id == other.instance_id;
-    }
-    bool operator!=(const ServiceHandleType& other) const noexcept {
-        return !(*this == other);
-    }
-    bool operator<(const ServiceHandleType& other) const noexcept {
-        if (instance_specifier == other.instance_specifier) {
-            return instance_id < other.instance_id;
-        }
-        return instance_specifier < other.instance_specifier;
     }
 };
 
@@ -356,8 +369,8 @@ private:
 template <typename FieldType>
 class SkeletonField : public SkeletonEvent<FieldType> {
 public:
-    using SetHandler = std::function<ara::core::Result<FieldType>(const FieldType&)>;
-    using GetHandler = std::function<ara::core::Result<FieldType>()>;
+    using SetHandler = std::function<ara::core::Future<FieldType>(const FieldType&)>;
+    using GetHandler = std::function<ara::core::Future<FieldType>()>;
 
     void Update(const FieldType& data) {
         current_val_ = data;
@@ -374,7 +387,8 @@ public:
 
     ara::core::Result<FieldType> InvokeSet(const FieldType& val) {
         if (set_handler_) {
-            auto res = set_handler_(val);
+            auto fut = set_handler_(val);
+            auto res = fut.GetResult();
             if (res.HasValue()) {
                 current_val_ = res.Value();
                 this->Send(current_val_);
@@ -387,7 +401,10 @@ public:
     }
 
     ara::core::Result<FieldType> InvokeGet() {
-        if (get_handler_) return get_handler_();
+        if (get_handler_) {
+            auto fut = get_handler_();
+            return fut.GetResult();
+        }
         return ara::core::Result<FieldType>::FromValue(current_val_);
     }
 
@@ -411,9 +428,14 @@ public:
     ara::core::Future<FieldType> Get() {
         ara::core::Promise<FieldType> p;
         if (skel_field_) {
-            p.set_value(skel_field_->InvokeGet());
+            auto res = skel_field_->InvokeGet();
+            if (res.HasValue()) {
+                p.set_value(res.Value());
+            } else {
+                p.SetError(res.Error());
+            }
         } else {
-            p.set_value(ara::core::Result<FieldType>::FromValue(FieldType{}));
+            p.set_value(FieldType{});
         }
         return p.get_future();
     }
@@ -421,9 +443,14 @@ public:
     ara::core::Future<FieldType> Set(const FieldType& val) {
         ara::core::Promise<FieldType> p;
         if (skel_field_) {
-            p.set_value(skel_field_->InvokeSet(val));
+            auto res = skel_field_->InvokeSet(val);
+            if (res.HasValue()) {
+                p.set_value(res.Value());
+            } else {
+                p.SetError(res.Error());
+            }
         } else {
-            p.set_value(ara::core::Result<FieldType>::FromValue(val));
+            p.set_value(val);
         }
         return p.get_future();
     }

@@ -1,3 +1,11 @@
+# ==============================================================================
+# Reaktar - Reactive Actor Framework for AUTOSAR Adaptive
+# Part of the Pyarx project: https://github.com/pyarxlab/reaktar
+#
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Pyarx Lab
+# ==============================================================================
+
 cmake_minimum_required(VERSION 3.16)
 project(reaktar VERSION 0.1.0 LANGUAGES CXX)
 
@@ -29,3 +37,5 @@ add_executable(reaktar_smoke_tests
 )
 target_link_libraries(reaktar_smoke_tests PRIVATE reaktar reaktar_test_mock)
 add_test(NAME core_smoke_tests COMMAND reaktar_smoke_tests)
+
+
