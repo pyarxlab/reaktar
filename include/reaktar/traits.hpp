@@ -11,7 +11,7 @@
 #include <type_traits>
 #include <utility>
 #include <memory>
-#include <functional>
+#include <optional>
 #include <mutex>
 #include <condition_variable>
 #include "reaktar/types.hpp"
@@ -439,13 +439,10 @@ public:
     template <typename ErrorCallback>
     void on_failure(ErrorCallback&& cb) {
         if (!is_valid_) {
-            auto err = ara::core::MakeErrorCode(ara::core::CoreErrc::kServiceNotAvailable);
             if constexpr (std::is_invocable_v<ErrorCallback>) {
                 std::forward<ErrorCallback>(cb)();
             } else if constexpr (std::is_invocable_v<ErrorCallback, std::optional<reaktar::ErrorCode>>) {
-                std::forward<ErrorCallback>(cb)(err);
-            } else if constexpr (std::is_invocable_v<ErrorCallback, reaktar::ErrorCode>) {
-                std::forward<ErrorCallback>(cb)(err);
+                std::forward<ErrorCallback>(cb)(std::nullopt);
             }
             return;
         }

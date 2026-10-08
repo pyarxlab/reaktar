@@ -183,7 +183,7 @@ def main():
         sys.exit(1)
 
     stem = arxml_path.stem
-    pkg_name = args.name if args.name else f"{stem}_rektar"
+    pkg_name = args.name if args.name else f"{stem}_reaktar"
 
     out_arg = Path(args.output)
     if args.dir_only:
