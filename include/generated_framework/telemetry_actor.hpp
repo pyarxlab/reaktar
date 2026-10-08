@@ -17,12 +17,15 @@
 #include "reaktar/traits.hpp"
 #include "reaktar/proxy_slot.hpp"
 #include "reaktar/actor_base.hpp"
+#include "reaktar/port.hpp"
 #include "reaktar/execution_policy.hpp"
 #include <string>
 #include <utility>
 #include <optional>
 #include <chrono>
 #include <type_traits>
+#include <atomic>
+#include <mutex>
 
 namespace reaktar {
 namespace generated {
@@ -47,6 +50,22 @@ public:
     using ResetTripMeter = ::reaktar::tags::vehicle_supervisor::methods::ResetTripMeter;
     using SetSpeedLimiter = ::reaktar::tags::vehicle_supervisor::methods::SetSpeedLimiter;
     using TriggerDiagnostic = ::reaktar::tags::vehicle_supervisor::methods::TriggerDiagnostic;
+
+    // ------------------------------------------------------------------------
+    // Generated AUTOSAR Port Tags
+    // ------------------------------------------------------------------------
+    struct ports {
+        struct SupervisorPort : public ::reaktar::ProvidedPortTag {
+            static constexpr std::string_view name = "SupervisorPort";
+            using port_tag = SupervisorPort;
+            using kind_type = ::reaktar::ProvidedPortTag;
+        };
+
+        // --------------------------------------------------------------------
+        // Ergonomic Port Aliases (affixes stripped when collision-free)
+        // --------------------------------------------------------------------
+        using Supervisor = SupervisorPort;
+    };
 
     TelemetryActorBase() = default;
     virtual ~TelemetryActorBase() = default;
@@ -332,6 +351,8 @@ public:
     };
 
     SupervisorPortSkeletonAdapter supervisorport_skeleton_;
+    std::atomic<bool> supervisorport_offered_{false};
+    mutable std::mutex supervisorport_port_mutex_{};
 
     vehicle_supervisor::skeleton::VehicleSupervisorSkeleton& get_supervisorport_skeleton() { return supervisorport_skeleton_; }
 
@@ -419,15 +440,103 @@ public:
             static_assert(!sizeof...(Args), "reaktar: emit(args...) failed! The argument list does not match any unique proxy RPC method in this Actor. Use emit<Tag>(args...) if ambiguous.");
         }
     }
+    // ------------------------------------------------------------------------
+    // Granular Port Lifecycle Controls
+    // ------------------------------------------------------------------------
+
+    /**
+     * @brief Open (activate) an individual AUTOSAR Port in a thread-safe manner.
+     * For a Provided Port (P-Port / Skeleton): Calls OfferService.
+     * For a Required Port (R-Port / Proxy): Calls StartFindService with ZERO locks held.
+     */
+    template <typename PortTag>
+    void open_port() {
+        static_assert(::reaktar::is_port_v<PortTag>, "open_port requires a valid generated Port Tag (e.g. ports::MyPort)!");
+        if constexpr (std::is_same_v<PortTag, typename Base::ports::SupervisorPort>) {
+            open_supervisorport_provided_port();
+        }
+    }
+
+    /**
+     * @brief Close (deactivate) an individual AUTOSAR Port in a thread-safe manner.
+     * For a Provided Port (P-Port / Skeleton): Calls StopOfferService.
+     * For a Required Port (R-Port / Proxy): Calls StopFindService with ZERO locks held, unsubscribes, and resets slot.
+     */
+    template <typename PortTag>
+    void close_port() {
+        static_assert(::reaktar::is_port_v<PortTag>, "close_port requires a valid generated Port Tag (e.g. ports::MyPort)!");
+        if constexpr (std::is_same_v<PortTag, typename Base::ports::SupervisorPort>) {
+            close_supervisorport_provided_port();
+        }
+    }
+
+    /**
+     * @brief Check whether an individual AUTOSAR Port is ready (wait-free and lock-free).
+     * For a Provided Port (P-Port / Skeleton): Returns true if currently offered.
+     * For a Required Port (R-Port / Proxy): Returns true if proxy is acquired and available.
+     */
+    template <typename PortTag>
+    bool is_ready() const noexcept {
+        static_assert(::reaktar::is_port_v<PortTag>, "is_ready requires a valid generated Port Tag (e.g. ports::MyPort)!");
+        if constexpr (std::is_same_v<PortTag, typename Base::ports::SupervisorPort>) {
+            return this->supervisorport_offered_.load(std::memory_order_acquire);
+        }
+    }
+
+    /**
+     * @brief Check whether an individual AUTOSAR Port has been requested open.
+     */
+    template <typename PortTag>
+    bool is_port_open() const noexcept {
+        static_assert(::reaktar::is_port_v<PortTag>, "is_port_open requires a valid generated Port Tag (e.g. ports::MyPort)!");
+        if constexpr (std::is_same_v<PortTag, typename Base::ports::SupervisorPort>) {
+            return this->supervisorport_offered_.load(std::memory_order_acquire);
+        }
+    }
+
+    /**
+     * @brief Generational ticket query for diagnostics and invariant testing.
+     */
+    template <typename PortTag>
+    uint64_t get_port_generation() const noexcept {
+        static_assert(::reaktar::is_port_v<PortTag>, "get_port_generation requires a valid generated Port Tag!");
+        if constexpr (std::is_same_v<PortTag, typename Base::ports::SupervisorPort>) {
+            return 0;
+        }
+    }
+
+    // Bring ActorBase::is_ready() (no-arg readiness check across all ports) into scope
+    using Base::is_ready;
+    using Base::wait_until_ready;
+
+    // ------------------------------------------------------------------------
+    // Process-Wide Lifecycle Controls (Granular Defaults)
+    // ------------------------------------------------------------------------
+
     void start() {
-        bind_skeleton_fields();
-
-        supervisorport_skeleton_.OfferService();
-
+        this->template open_port<typename Base::ports::SupervisorPort>();
     }
 
     void stop() {
-        supervisorport_skeleton_.StopOfferService();
+        this->template close_port<typename Base::ports::SupervisorPort>();
+    }
+
+private:
+    void open_supervisorport_provided_port() {
+        std::lock_guard<std::mutex> lock(this->supervisorport_port_mutex_);
+        if (!this->supervisorport_offered_.load(std::memory_order_relaxed)) {
+            bind_skeleton_fields();
+            this->supervisorport_skeleton_.OfferService();
+            this->supervisorport_offered_.store(true, std::memory_order_release);
+        }
+    }
+
+    void close_supervisorport_provided_port() {
+        std::lock_guard<std::mutex> lock(this->supervisorport_port_mutex_);
+        if (this->supervisorport_offered_.load(std::memory_order_relaxed)) {
+            this->supervisorport_skeleton_.StopOfferService();
+            this->supervisorport_offered_.store(false, std::memory_order_release);
+        }
     }
 
 private:

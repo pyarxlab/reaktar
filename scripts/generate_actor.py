@@ -13,10 +13,48 @@ Walks the ARXML model directly and generates C++ Actor, TestBench, and Tags head
 """
 
 import sys
+import re
 from pathlib import Path
-from collections import Counter
+from collections import Counter, defaultdict
 import jinja2
 from pyarx.domain import load_domain
+
+# Reserved C++ keywords to prevent generating invalid identifier aliases
+CPP_KEYWORDS = {
+    "alignas", "alignof", "and", "and_eq", "asm", "auto", "bitand", "bitor",
+    "bool", "break", "case", "catch", "char", "char8_t", "char16_t", "char32_t",
+    "class", "compl", "concept", "const", "consteval", "constexpr", "constinit",
+    "const_cast", "continue", "co_await", "co_return", "co_yield", "decltype",
+    "default", "delete", "do", "double", "dynamic_cast", "else", "enum",
+    "explicit", "export", "extern", "false", "float", "for", "friend", "goto",
+    "if", "inline", "int", "long", "mutable", "namespace", "new", "noexcept",
+    "not", "not_eq", "nullptr", "operator", "or", "or_eq", "private", "protected",
+    "public", "register", "reinterpret_cast", "requires", "return", "short",
+    "signed", "sizeof", "static", "static_assert", "static_cast", "struct",
+    "switch", "template", "this", "thread_local", "throw", "true", "try",
+    "typedef", "typeid", "typename", "union", "unsigned", "using", "virtual",
+    "void", "volatile", "wchar_t", "while", "xor", "xor_eq"
+}
+
+
+def strip_port_affixes(name: str) -> str:
+    """
+    Strips conventional AUTOSAR port affixes (e.g. PPort_, RPort_, _Port, Port, In, Out)
+    returning a candidate ergonomic alias if valid and non-empty.
+    """
+    original = name
+    # Prefixes with underscores (case-insensitive): PPort_, RPort_, pp_, rp_, p_, r_, provided_, required_
+    candidate = re.sub(r'^(?:pport|rport|pp|rp|p|r|provided|required)_+', '', name, flags=re.IGNORECASE)
+    # PascalCase prefixes: PPort, RPort, Provided, Required followed by uppercase/digit
+    candidate = re.sub(r'^(?:PPort|RPort|Provided|Required)(?=[A-Z0-9])', '', candidate)
+    # Suffixes with underscores (case-insensitive): _pport, _rport, _provided, _required, _port, _in, _out
+    candidate = re.sub(r'_+(?:pport|rport|provided|required|port|in|out)$', '', candidate, flags=re.IGNORECASE)
+    # PascalCase suffixes: PortProvided, PortRequired, ProvidedPort, RequiredPort, Provided, Required, Port, In, Out
+    candidate = re.sub(r'(?:PortProvided|PortRequired|ProvidedPort|RequiredPort|Provided|Required|Port|In|Out)$', '', candidate)
+
+    if candidate and candidate != original and len(candidate) >= 2 and candidate.isidentifier() and candidate not in CPP_KEYWORDS:
+        return candidate
+    return ""
 
 # Primitive/fundamental types defined by C++ / AUTOSAR
 FUNDAMENTAL_CPP_TYPES = {
@@ -698,12 +736,61 @@ def build_actor_model(app, domain, analysis, pass_by="const_ref"):
                         "service_ident": sident,
                     })
 
+    all_ports = []
+    for p in skeletons:
+        all_ports.append({
+            "port_name": p["port_name"],
+            "kind": "Provided",
+            "kind_tag": "::reaktar::ProvidedPortTag",
+            "intf_name": p["intf_name"],
+            "cls": p["cls"],
+            "var_name": p["var_name"],
+            "ident": p["port_name"].lower(),
+        })
+    for cp in consumed_proxies:
+        all_ports.append({
+            "port_name": cp["port_name"],
+            "kind": "Required",
+            "kind_tag": "::reaktar::RequiredPortTag",
+            "cls": cp["cls"],
+            "slot_name": cp["slot_name"],
+            "find_handle_name": cp["find_handle_name"],
+            "instance_spec": cp["instance_spec"],
+            "ident": cp["ident"],
+            "all_unsubscribe_targets": cp["all_unsubscribe_targets"],
+        })
+
+    # Determine collision-free ergonomic port aliases
+    canonical_port_names = {p["port_name"] for p in all_ports}
+    alias_map = defaultdict(list)
+    for p in all_ports:
+        candidate = strip_port_affixes(p["port_name"])
+        if candidate and candidate not in canonical_port_names:
+            alias_map[candidate].append(p["port_name"])
+
+    port_aliases = []
+    for alias, origins in sorted(alias_map.items()):
+        if len(origins) == 1:
+            port_aliases.append({
+                "alias": alias,
+                "target": origins[0],
+                "is_ambiguous": False,
+            })
+        else:
+            port_aliases.append({
+                "alias": alias,
+                "conflicts": ", ".join(origins),
+                "is_ambiguous": True,
+            })
+
     return {
         "exe_name": exe_name,
         "app_short_name": app_short_name,
         "skeleton_headers": skeleton_headers,
         "proxy_headers": proxy_headers,
         "tag_aliases": analysis["tag_aliases"],
+        "ports": all_ports,
+        "port_aliases": port_aliases,
         "consumed_proxies": consumed_proxies,
         "consumed_proxy_count": len(consumed_proxies),
         "skeletons": skeletons,

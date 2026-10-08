@@ -18,14 +18,44 @@ public:
 {% endif %}
 {% endfor %}
 
+    // ------------------------------------------------------------------------
+    // Generated AUTOSAR Port Tags
+    // ------------------------------------------------------------------------
+    struct ports {
+{% for port in model.ports %}
+        struct {{ port.port_name }} : public {{ port.kind_tag }} {
+            static constexpr std::string_view name = "{{ port.port_name }}";
+            using port_tag = {{ port.port_name }};
+            using kind_type = {{ port.kind_tag }};
+        };
+{% endfor %}
+{% if model.port_aliases %}
+
+        // --------------------------------------------------------------------
+        // Ergonomic Port Aliases (affixes stripped when collision-free)
+        // --------------------------------------------------------------------
+{% for alias in model.port_aliases %}
+{% if not alias.is_ambiguous %}
+        using {{ alias.alias }} = {{ alias.target }};
+{% else %}
+        // Ambiguous port alias '{{ alias.alias }}' between: {{ alias.conflicts }} -> use canonical names
+{% endif %}
+{% endfor %}
+{% endif %}
+    };
+
     {{ model.exe_name }}ActorBase() = default;
     virtual ~{{ model.exe_name }}ActorBase() = default;
 
 {% for proxy in model.consumed_proxies %}
     {{ proxy.cls }}* get_{{ proxy.ident }}_proxy() const noexcept { return {{ proxy.slot_name }}.get(); }
-    bool is_{{ proxy.ident }}_ready() const noexcept { return {{ proxy.slot_name }}.is_available(); }
+    bool is_{{ proxy.ident }}_ready() const noexcept { 
+        return {{ proxy.ident }}_open_.load(std::memory_order_acquire) && {{ proxy.slot_name }}.is_available(); 
+    }
     reaktar::ProxyLease<{{ proxy.cls }}> acquire_{{ proxy.ident }}_proxy() { return {{ proxy.slot_name }}.acquire("{{ proxy.ident }}"); }
-    const std::optional<typename {{ proxy.cls }}::HandleType>& get_{{ proxy.ident }}_handle() const noexcept { return active_{{ proxy.ident }}_handle_; }
+    std::optional<typename {{ proxy.cls }}::HandleType> get_{{ proxy.ident }}_handle() const noexcept { 
+        return {{ proxy.slot_name }}.get_handle(); 
+    }
 {% endfor %}
 
     static constexpr size_t kConsumedProxyCount = {{ model.consumed_proxy_count }};
@@ -84,7 +114,9 @@ protected:
 {% endif %}
 {% for proxy in model.consumed_proxies %}
     reaktar::ProxySlot<{{ proxy.cls }}> {{ proxy.slot_name }}{};
+    mutable std::mutex {{ proxy.ident }}_port_mutex_{};
     std::optional<ara::com::FindServiceHandle> {{ proxy.find_handle_name }}{std::nullopt};
-    std::optional<typename {{ proxy.cls }}::HandleType> active_{{ proxy.ident }}_handle_{std::nullopt};
+    std::atomic<bool> {{ proxy.ident }}_open_{false};
+    uint64_t {{ proxy.ident }}_generation_{0};
 {% endfor %}
 };

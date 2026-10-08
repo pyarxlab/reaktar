@@ -21,12 +21,15 @@
 #include "reaktar/traits.hpp"
 #include "reaktar/proxy_slot.hpp"
 #include "reaktar/actor_base.hpp"
+#include "reaktar/port.hpp"
 #include "reaktar/execution_policy.hpp"
 #include <string>
 #include <utility>
 #include <optional>
 #include <chrono>
 #include <type_traits>
+#include <atomic>
+#include <mutex>
 
 namespace reaktar {
 namespace generated {
@@ -64,21 +67,73 @@ public:
     using VehicleSpeed = ::reaktar::tags::powertrain::events::VehicleSpeed;
     using WindowPosition = ::reaktar::tags::body_control::fields::WindowPosition;
 
+    // ------------------------------------------------------------------------
+    // Generated AUTOSAR Port Tags
+    // ------------------------------------------------------------------------
+    struct ports {
+        struct HmiPort : public ::reaktar::ProvidedPortTag {
+            static constexpr std::string_view name = "HmiPort";
+            using port_tag = HmiPort;
+            using kind_type = ::reaktar::ProvidedPortTag;
+        };
+        struct SupervisorPort : public ::reaktar::ProvidedPortTag {
+            static constexpr std::string_view name = "SupervisorPort";
+            using port_tag = SupervisorPort;
+            using kind_type = ::reaktar::ProvidedPortTag;
+        };
+        struct BodyControlIn : public ::reaktar::RequiredPortTag {
+            static constexpr std::string_view name = "BodyControlIn";
+            using port_tag = BodyControlIn;
+            using kind_type = ::reaktar::RequiredPortTag;
+        };
+        struct NavigationIn : public ::reaktar::RequiredPortTag {
+            static constexpr std::string_view name = "NavigationIn";
+            using port_tag = NavigationIn;
+            using kind_type = ::reaktar::RequiredPortTag;
+        };
+        struct PowertrainIn : public ::reaktar::RequiredPortTag {
+            static constexpr std::string_view name = "PowertrainIn";
+            using port_tag = PowertrainIn;
+            using kind_type = ::reaktar::RequiredPortTag;
+        };
+
+        // --------------------------------------------------------------------
+        // Ergonomic Port Aliases (affixes stripped when collision-free)
+        // --------------------------------------------------------------------
+        using BodyControl = BodyControlIn;
+        using Hmi = HmiPort;
+        using Navigation = NavigationIn;
+        using Powertrain = PowertrainIn;
+        using Supervisor = SupervisorPort;
+    };
+
     CockpitDomainActorBase() = default;
     virtual ~CockpitDomainActorBase() = default;
 
     body_control::proxy::BodyControlProxy* get_body_control_proxy() const noexcept { return body_control_slot_.get(); }
-    bool is_body_control_ready() const noexcept { return body_control_slot_.is_available(); }
+    bool is_body_control_ready() const noexcept { 
+        return body_control_open_.load(std::memory_order_acquire) && body_control_slot_.is_available(); 
+    }
     reaktar::ProxyLease<body_control::proxy::BodyControlProxy> acquire_body_control_proxy() { return body_control_slot_.acquire("body_control"); }
-    const std::optional<typename body_control::proxy::BodyControlProxy::HandleType>& get_body_control_handle() const noexcept { return active_body_control_handle_; }
+    std::optional<typename body_control::proxy::BodyControlProxy::HandleType> get_body_control_handle() const noexcept { 
+        return body_control_slot_.get_handle(); 
+    }
     infotainment::geo::navigation::proxy::NavigationProxy* get_navigation_proxy() const noexcept { return navigation_slot_.get(); }
-    bool is_navigation_ready() const noexcept { return navigation_slot_.is_available(); }
+    bool is_navigation_ready() const noexcept { 
+        return navigation_open_.load(std::memory_order_acquire) && navigation_slot_.is_available(); 
+    }
     reaktar::ProxyLease<infotainment::geo::navigation::proxy::NavigationProxy> acquire_navigation_proxy() { return navigation_slot_.acquire("navigation"); }
-    const std::optional<typename infotainment::geo::navigation::proxy::NavigationProxy::HandleType>& get_navigation_handle() const noexcept { return active_navigation_handle_; }
+    std::optional<typename infotainment::geo::navigation::proxy::NavigationProxy::HandleType> get_navigation_handle() const noexcept { 
+        return navigation_slot_.get_handle(); 
+    }
     powertrain::proxy::PowertrainProxy* get_powertrain_proxy() const noexcept { return powertrain_slot_.get(); }
-    bool is_powertrain_ready() const noexcept { return powertrain_slot_.is_available(); }
+    bool is_powertrain_ready() const noexcept { 
+        return powertrain_open_.load(std::memory_order_acquire) && powertrain_slot_.is_available(); 
+    }
     reaktar::ProxyLease<powertrain::proxy::PowertrainProxy> acquire_powertrain_proxy() { return powertrain_slot_.acquire("powertrain"); }
-    const std::optional<typename powertrain::proxy::PowertrainProxy::HandleType>& get_powertrain_handle() const noexcept { return active_powertrain_handle_; }
+    std::optional<typename powertrain::proxy::PowertrainProxy::HandleType> get_powertrain_handle() const noexcept { 
+        return powertrain_slot_.get_handle(); 
+    }
 
     static constexpr size_t kConsumedProxyCount = 3;
 
@@ -120,14 +175,20 @@ protected:
 
     reaktar::ReadinessTracker<kConsumedProxyCount> readiness_{};
     reaktar::ProxySlot<body_control::proxy::BodyControlProxy> body_control_slot_{};
+    mutable std::mutex body_control_port_mutex_{};
     std::optional<ara::com::FindServiceHandle> body_control_find_handle_{std::nullopt};
-    std::optional<typename body_control::proxy::BodyControlProxy::HandleType> active_body_control_handle_{std::nullopt};
+    std::atomic<bool> body_control_open_{false};
+    uint64_t body_control_generation_{0};
     reaktar::ProxySlot<infotainment::geo::navigation::proxy::NavigationProxy> navigation_slot_{};
+    mutable std::mutex navigation_port_mutex_{};
     std::optional<ara::com::FindServiceHandle> navigation_find_handle_{std::nullopt};
-    std::optional<typename infotainment::geo::navigation::proxy::NavigationProxy::HandleType> active_navigation_handle_{std::nullopt};
+    std::atomic<bool> navigation_open_{false};
+    uint64_t navigation_generation_{0};
     reaktar::ProxySlot<powertrain::proxy::PowertrainProxy> powertrain_slot_{};
+    mutable std::mutex powertrain_port_mutex_{};
     std::optional<ara::com::FindServiceHandle> powertrain_find_handle_{std::nullopt};
-    std::optional<typename powertrain::proxy::PowertrainProxy::HandleType> active_powertrain_handle_{std::nullopt};
+    std::atomic<bool> powertrain_open_{false};
+    uint64_t powertrain_generation_{0};
 };
 /**
  * @brief Code-generated CRTP Actor for CockpitDomain
@@ -258,6 +319,8 @@ public:
     };
 
     HmiPortSkeletonAdapter hmiport_skeleton_;
+    std::atomic<bool> hmiport_offered_{false};
+    mutable std::mutex hmiport_port_mutex_{};
 
     hmi::skeleton::HmiServiceSkeleton& get_hmiport_skeleton() { return hmiport_skeleton_; }
 
@@ -476,6 +539,8 @@ public:
     };
 
     SupervisorPortSkeletonAdapter supervisorport_skeleton_;
+    std::atomic<bool> supervisorport_offered_{false};
+    mutable std::mutex supervisorport_port_mutex_{};
 
     vehicle_supervisor::skeleton::VehicleSupervisorSkeleton& get_supervisorport_skeleton() { return supervisorport_skeleton_; }
 
@@ -665,147 +730,541 @@ public:
             }
         }
     }
+    // ------------------------------------------------------------------------
+    // Granular Port Lifecycle Controls
+    // ------------------------------------------------------------------------
+
+    /**
+     * @brief Open (activate) an individual AUTOSAR Port in a thread-safe manner.
+     * For a Provided Port (P-Port / Skeleton): Calls OfferService.
+     * For a Required Port (R-Port / Proxy): Calls StartFindService with ZERO locks held.
+     */
+    template <typename PortTag>
+    void open_port() {
+        static_assert(::reaktar::is_port_v<PortTag>, "open_port requires a valid generated Port Tag (e.g. ports::MyPort)!");
+        if constexpr (std::is_same_v<PortTag, typename Base::ports::HmiPort>) {
+            open_hmiport_provided_port();
+        }
+        else if constexpr (std::is_same_v<PortTag, typename Base::ports::SupervisorPort>) {
+            open_supervisorport_provided_port();
+        }
+        else if constexpr (std::is_same_v<PortTag, typename Base::ports::BodyControlIn>) {
+            open_body_control_required_port();
+        }
+        else if constexpr (std::is_same_v<PortTag, typename Base::ports::NavigationIn>) {
+            open_navigation_required_port();
+        }
+        else if constexpr (std::is_same_v<PortTag, typename Base::ports::PowertrainIn>) {
+            open_powertrain_required_port();
+        }
+    }
+
+    /**
+     * @brief Close (deactivate) an individual AUTOSAR Port in a thread-safe manner.
+     * For a Provided Port (P-Port / Skeleton): Calls StopOfferService.
+     * For a Required Port (R-Port / Proxy): Calls StopFindService with ZERO locks held, unsubscribes, and resets slot.
+     */
+    template <typename PortTag>
+    void close_port() {
+        static_assert(::reaktar::is_port_v<PortTag>, "close_port requires a valid generated Port Tag (e.g. ports::MyPort)!");
+        if constexpr (std::is_same_v<PortTag, typename Base::ports::HmiPort>) {
+            close_hmiport_provided_port();
+        }
+        else if constexpr (std::is_same_v<PortTag, typename Base::ports::SupervisorPort>) {
+            close_supervisorport_provided_port();
+        }
+        else if constexpr (std::is_same_v<PortTag, typename Base::ports::BodyControlIn>) {
+            close_body_control_required_port();
+        }
+        else if constexpr (std::is_same_v<PortTag, typename Base::ports::NavigationIn>) {
+            close_navigation_required_port();
+        }
+        else if constexpr (std::is_same_v<PortTag, typename Base::ports::PowertrainIn>) {
+            close_powertrain_required_port();
+        }
+    }
+
+    /**
+     * @brief Check whether an individual AUTOSAR Port is ready (wait-free and lock-free).
+     * For a Provided Port (P-Port / Skeleton): Returns true if currently offered.
+     * For a Required Port (R-Port / Proxy): Returns true if proxy is acquired and available.
+     */
+    template <typename PortTag>
+    bool is_ready() const noexcept {
+        static_assert(::reaktar::is_port_v<PortTag>, "is_ready requires a valid generated Port Tag (e.g. ports::MyPort)!");
+        if constexpr (std::is_same_v<PortTag, typename Base::ports::HmiPort>) {
+            return this->hmiport_offered_.load(std::memory_order_acquire);
+        }
+        else if constexpr (std::is_same_v<PortTag, typename Base::ports::SupervisorPort>) {
+            return this->supervisorport_offered_.load(std::memory_order_acquire);
+        }
+        else if constexpr (std::is_same_v<PortTag, typename Base::ports::BodyControlIn>) {
+            return this->body_control_open_.load(std::memory_order_acquire) && this->body_control_slot_.is_available();
+        }
+        else if constexpr (std::is_same_v<PortTag, typename Base::ports::NavigationIn>) {
+            return this->navigation_open_.load(std::memory_order_acquire) && this->navigation_slot_.is_available();
+        }
+        else if constexpr (std::is_same_v<PortTag, typename Base::ports::PowertrainIn>) {
+            return this->powertrain_open_.load(std::memory_order_acquire) && this->powertrain_slot_.is_available();
+        }
+    }
+
+    /**
+     * @brief Check whether an individual AUTOSAR Port has been requested open.
+     */
+    template <typename PortTag>
+    bool is_port_open() const noexcept {
+        static_assert(::reaktar::is_port_v<PortTag>, "is_port_open requires a valid generated Port Tag (e.g. ports::MyPort)!");
+        if constexpr (std::is_same_v<PortTag, typename Base::ports::HmiPort>) {
+            return this->hmiport_offered_.load(std::memory_order_acquire);
+        }
+        else if constexpr (std::is_same_v<PortTag, typename Base::ports::SupervisorPort>) {
+            return this->supervisorport_offered_.load(std::memory_order_acquire);
+        }
+        else if constexpr (std::is_same_v<PortTag, typename Base::ports::BodyControlIn>) {
+            return this->body_control_open_.load(std::memory_order_acquire);
+        }
+        else if constexpr (std::is_same_v<PortTag, typename Base::ports::NavigationIn>) {
+            return this->navigation_open_.load(std::memory_order_acquire);
+        }
+        else if constexpr (std::is_same_v<PortTag, typename Base::ports::PowertrainIn>) {
+            return this->powertrain_open_.load(std::memory_order_acquire);
+        }
+    }
+
+    /**
+     * @brief Generational ticket query for diagnostics and invariant testing.
+     */
+    template <typename PortTag>
+    uint64_t get_port_generation() const noexcept {
+        static_assert(::reaktar::is_port_v<PortTag>, "get_port_generation requires a valid generated Port Tag!");
+        if constexpr (std::is_same_v<PortTag, typename Base::ports::HmiPort>) {
+            return 0;
+        }
+        else if constexpr (std::is_same_v<PortTag, typename Base::ports::SupervisorPort>) {
+            return 0;
+        }
+        else if constexpr (std::is_same_v<PortTag, typename Base::ports::BodyControlIn>) {
+            std::lock_guard<std::mutex> lock(this->body_control_port_mutex_);
+            return this->body_control_generation_;
+        }
+        else if constexpr (std::is_same_v<PortTag, typename Base::ports::NavigationIn>) {
+            std::lock_guard<std::mutex> lock(this->navigation_port_mutex_);
+            return this->navigation_generation_;
+        }
+        else if constexpr (std::is_same_v<PortTag, typename Base::ports::PowertrainIn>) {
+            std::lock_guard<std::mutex> lock(this->powertrain_port_mutex_);
+            return this->powertrain_generation_;
+        }
+    }
+
+    // Bring ActorBase::is_ready() (no-arg readiness check across all ports) into scope
+    using Base::is_ready;
+    using Base::wait_until_ready;
+
+    // ------------------------------------------------------------------------
+    // Process-Wide Lifecycle Controls (Granular Defaults)
+    // ------------------------------------------------------------------------
+
     void start() {
-        bind_skeleton_fields();
+        this->template open_port<typename Base::ports::HmiPort>();
+        this->template open_port<typename Base::ports::SupervisorPort>();
+        this->template open_port<typename Base::ports::BodyControlIn>();
+        this->template open_port<typename Base::ports::NavigationIn>();
+        this->template open_port<typename Base::ports::PowertrainIn>();
+    }
 
-        hmiport_skeleton_.OfferService();
-        supervisorport_skeleton_.OfferService();
+    void stop() {
+        this->template close_port<typename Base::ports::HmiPort>();
+        this->template close_port<typename Base::ports::SupervisorPort>();
+        this->template close_port<typename Base::ports::BodyControlIn>();
+        this->template close_port<typename Base::ports::NavigationIn>();
+        this->template close_port<typename Base::ports::PowertrainIn>();
+    }
 
-        auto find_res_body_control = body_control::proxy::BodyControlProxy::StartFindService(
-            [this](ara::com::ServiceHandleContainer<body_control::proxy::BodyControlProxy::HandleType> handles, ara::com::FindServiceHandle) {
-                if (handles.empty()) {
-                    teardown_body_control_proxy();
-                } else {
-                    if (this->body_control_slot_.is_available()) {
-                        if (this->active_body_control_handle_.has_value() &&
-                            *this->active_body_control_handle_ == handles[0]) {
-                            return; // Same handle, already active
-                        }
-                        teardown_body_control_proxy();
+private:
+    void open_hmiport_provided_port() {
+        std::lock_guard<std::mutex> lock(this->hmiport_port_mutex_);
+        if (!this->hmiport_offered_.load(std::memory_order_relaxed)) {
+            bind_skeleton_fields();
+            this->hmiport_skeleton_.OfferService();
+            this->hmiport_offered_.store(true, std::memory_order_release);
+        }
+    }
+    void open_supervisorport_provided_port() {
+        std::lock_guard<std::mutex> lock(this->supervisorport_port_mutex_);
+        if (!this->supervisorport_offered_.load(std::memory_order_relaxed)) {
+            bind_skeleton_fields();
+            this->supervisorport_skeleton_.OfferService();
+            this->supervisorport_offered_.store(true, std::memory_order_release);
+        }
+    }
+    void open_body_control_required_port() {
+        uint64_t my_gen{0};
+        {
+            std::lock_guard<std::mutex> lock(this->body_control_port_mutex_);
+            if (this->body_control_open_.load(std::memory_order_acquire)) {
+                return; // Already open or opening
+            }
+            this->body_control_open_.store(true, std::memory_order_release);
+            my_gen = ++this->body_control_generation_;
+        }
+
+        bool find_started = false;
+        struct ExceptionRollbackGuard {
+            std::atomic<bool>& open_flag;
+            bool& ok;
+            ~ExceptionRollbackGuard() {
+                if (!ok) {
+                    open_flag.store(false, std::memory_order_release);
+                }
+            }
+        } rollback_guard{this->body_control_open_, find_started};
+
+        // Call StartFindService with ZERO locks held
+        auto find_res = body_control::proxy::BodyControlProxy::StartFindService(
+            [this, my_gen](ara::com::ServiceHandleContainer<typename body_control::proxy::BodyControlProxy::HandleType> handles, ara::com::FindServiceHandle) {
+                if (!this->body_control_open_.load(std::memory_order_acquire)) {
+                    return; // Port was closed
+                }
+                {
+                    std::lock_guard<std::mutex> h_lock(this->body_control_port_mutex_);
+                    if (this->body_control_generation_ != my_gen) {
+                        return; // Stale callback from an earlier generation
                     }
+                }
+                if (handles.empty()) {
+                    std::lock_guard<std::mutex> h_lock(this->body_control_port_mutex_);
+                    if (!this->body_control_open_.load(std::memory_order_acquire) ||
+                        this->body_control_generation_ != my_gen) {
+                        return; // Closed or generation shifted concurrently
+                    }
+                    this->body_control_slot_.reset();
+                } else {
+                    if (auto cur_h = this->body_control_slot_.get_handle(); cur_h.has_value() && *cur_h == handles[0]) {
+                        return; // Same handle, already active
+                    }
+                    // Zero-downtime update: do NOT wipe slot before creating new proxy!
+                    // ProxySlot::publish handles atomic cell exchange, bounded reader drain, and teardown hook cleanly.
                     auto new_proxy = std::make_unique<body_control::proxy::BodyControlProxy>(handles[0]);
                     bind_body_control_events(new_proxy.get());
                     bind_body_control_fields(new_proxy.get());
-                    this->body_control_slot_.publish(std::move(new_proxy));
-                    this->active_body_control_handle_ = handles[0];
+
+                    auto teardown_hook = []([[maybe_unused]] body_control::proxy::BodyControlProxy& p) {
+                        p.OutsideAirQuality.Unsubscribe();
+                        p.RainSensorLevel.Unsubscribe();
+                        p.TargetCabinTemperature.Unsubscribe();
+                        p.WindowPosition.Unsubscribe();
+                    };
+
+                    {
+                        std::lock_guard<std::mutex> h_lock(this->body_control_port_mutex_);
+                        if (!this->body_control_open_.load(std::memory_order_acquire) ||
+                            this->body_control_generation_ != my_gen) {
+                            return; // Closed or generation shifted concurrently
+                        }
+                        this->body_control_slot_.publish(std::move(new_proxy), handles[0], teardown_hook);
+                    }
                     this->notify_proxy_resolved();
                 }
             },
             reaktar::InstanceSpecifier("CockpitDomain/RootSwComponent/BodyControlIn")
         );
-        if constexpr (reaktar::is_result_v<decltype(find_res_body_control)>) {
-            if (find_res_body_control.HasValue()) {
-                this->body_control_find_handle_ = find_res_body_control.Value();
+
+        std::optional<ara::com::FindServiceHandle> handle;
+        if constexpr (reaktar::is_result_v<decltype(find_res)>) {
+            if (find_res.HasValue()) {
+                handle = find_res.Value();
             }
         } else {
-            this->body_control_find_handle_ = find_res_body_control;
+            handle = find_res;
         }
-        auto find_res_navigation = infotainment::geo::navigation::proxy::NavigationProxy::StartFindService(
-            [this](ara::com::ServiceHandleContainer<infotainment::geo::navigation::proxy::NavigationProxy::HandleType> handles, ara::com::FindServiceHandle) {
-                if (handles.empty()) {
-                    teardown_navigation_proxy();
-                } else {
-                    if (this->navigation_slot_.is_available()) {
-                        if (this->active_navigation_handle_.has_value() &&
-                            *this->active_navigation_handle_ == handles[0]) {
-                            return; // Same handle, already active
-                        }
-                        teardown_navigation_proxy();
+
+        if (!handle.has_value()) {
+            std::lock_guard<std::mutex> lock(this->body_control_port_mutex_);
+            if (this->body_control_generation_ == my_gen) {
+                this->body_control_open_.store(false, std::memory_order_release);
+            }
+            return;
+        }
+
+        find_started = true; // Successfully started, prevent rollback
+
+        std::unique_lock<std::mutex> lock(this->body_control_port_mutex_);
+        if (!this->body_control_open_.load(std::memory_order_acquire) || this->body_control_generation_ != my_gen) {
+            // Port was closed or generation shifted while StartFindService was executing!
+            lock.unlock();
+            body_control::proxy::BodyControlProxy::StopFindService(*handle);
+            return;
+        }
+        this->body_control_find_handle_ = *handle;
+    }
+    void open_navigation_required_port() {
+        uint64_t my_gen{0};
+        {
+            std::lock_guard<std::mutex> lock(this->navigation_port_mutex_);
+            if (this->navigation_open_.load(std::memory_order_acquire)) {
+                return; // Already open or opening
+            }
+            this->navigation_open_.store(true, std::memory_order_release);
+            my_gen = ++this->navigation_generation_;
+        }
+
+        bool find_started = false;
+        struct ExceptionRollbackGuard {
+            std::atomic<bool>& open_flag;
+            bool& ok;
+            ~ExceptionRollbackGuard() {
+                if (!ok) {
+                    open_flag.store(false, std::memory_order_release);
+                }
+            }
+        } rollback_guard{this->navigation_open_, find_started};
+
+        // Call StartFindService with ZERO locks held
+        auto find_res = infotainment::geo::navigation::proxy::NavigationProxy::StartFindService(
+            [this, my_gen](ara::com::ServiceHandleContainer<typename infotainment::geo::navigation::proxy::NavigationProxy::HandleType> handles, ara::com::FindServiceHandle) {
+                if (!this->navigation_open_.load(std::memory_order_acquire)) {
+                    return; // Port was closed
+                }
+                {
+                    std::lock_guard<std::mutex> h_lock(this->navigation_port_mutex_);
+                    if (this->navigation_generation_ != my_gen) {
+                        return; // Stale callback from an earlier generation
                     }
+                }
+                if (handles.empty()) {
+                    std::lock_guard<std::mutex> h_lock(this->navigation_port_mutex_);
+                    if (!this->navigation_open_.load(std::memory_order_acquire) ||
+                        this->navigation_generation_ != my_gen) {
+                        return; // Closed or generation shifted concurrently
+                    }
+                    this->navigation_slot_.reset();
+                } else {
+                    if (auto cur_h = this->navigation_slot_.get_handle(); cur_h.has_value() && *cur_h == handles[0]) {
+                        return; // Same handle, already active
+                    }
+                    // Zero-downtime update: do NOT wipe slot before creating new proxy!
+                    // ProxySlot::publish handles atomic cell exchange, bounded reader drain, and teardown hook cleanly.
                     auto new_proxy = std::make_unique<infotainment::geo::navigation::proxy::NavigationProxy>(handles[0]);
                     bind_navigation_events(new_proxy.get());
                     bind_navigation_fields(new_proxy.get());
-                    this->navigation_slot_.publish(std::move(new_proxy));
-                    this->active_navigation_handle_ = handles[0];
+
+                    auto teardown_hook = []([[maybe_unused]] infotainment::geo::navigation::proxy::NavigationProxy& p) {
+                        p.CurrentLocation.Unsubscribe();
+                    };
+
+                    {
+                        std::lock_guard<std::mutex> h_lock(this->navigation_port_mutex_);
+                        if (!this->navigation_open_.load(std::memory_order_acquire) ||
+                            this->navigation_generation_ != my_gen) {
+                            return; // Closed or generation shifted concurrently
+                        }
+                        this->navigation_slot_.publish(std::move(new_proxy), handles[0], teardown_hook);
+                    }
                     this->notify_proxy_resolved();
                 }
             },
             reaktar::InstanceSpecifier("CockpitDomain/RootSwComponent/NavigationIn")
         );
-        if constexpr (reaktar::is_result_v<decltype(find_res_navigation)>) {
-            if (find_res_navigation.HasValue()) {
-                this->navigation_find_handle_ = find_res_navigation.Value();
+
+        std::optional<ara::com::FindServiceHandle> handle;
+        if constexpr (reaktar::is_result_v<decltype(find_res)>) {
+            if (find_res.HasValue()) {
+                handle = find_res.Value();
             }
         } else {
-            this->navigation_find_handle_ = find_res_navigation;
+            handle = find_res;
         }
-        auto find_res_powertrain = powertrain::proxy::PowertrainProxy::StartFindService(
-            [this](ara::com::ServiceHandleContainer<powertrain::proxy::PowertrainProxy::HandleType> handles, ara::com::FindServiceHandle) {
-                if (handles.empty()) {
-                    teardown_powertrain_proxy();
-                } else {
-                    if (this->powertrain_slot_.is_available()) {
-                        if (this->active_powertrain_handle_.has_value() &&
-                            *this->active_powertrain_handle_ == handles[0]) {
-                            return; // Same handle, already active
-                        }
-                        teardown_powertrain_proxy();
+
+        if (!handle.has_value()) {
+            std::lock_guard<std::mutex> lock(this->navigation_port_mutex_);
+            if (this->navigation_generation_ == my_gen) {
+                this->navigation_open_.store(false, std::memory_order_release);
+            }
+            return;
+        }
+
+        find_started = true; // Successfully started, prevent rollback
+
+        std::unique_lock<std::mutex> lock(this->navigation_port_mutex_);
+        if (!this->navigation_open_.load(std::memory_order_acquire) || this->navigation_generation_ != my_gen) {
+            // Port was closed or generation shifted while StartFindService was executing!
+            lock.unlock();
+            infotainment::geo::navigation::proxy::NavigationProxy::StopFindService(*handle);
+            return;
+        }
+        this->navigation_find_handle_ = *handle;
+    }
+    void open_powertrain_required_port() {
+        uint64_t my_gen{0};
+        {
+            std::lock_guard<std::mutex> lock(this->powertrain_port_mutex_);
+            if (this->powertrain_open_.load(std::memory_order_acquire)) {
+                return; // Already open or opening
+            }
+            this->powertrain_open_.store(true, std::memory_order_release);
+            my_gen = ++this->powertrain_generation_;
+        }
+
+        bool find_started = false;
+        struct ExceptionRollbackGuard {
+            std::atomic<bool>& open_flag;
+            bool& ok;
+            ~ExceptionRollbackGuard() {
+                if (!ok) {
+                    open_flag.store(false, std::memory_order_release);
+                }
+            }
+        } rollback_guard{this->powertrain_open_, find_started};
+
+        // Call StartFindService with ZERO locks held
+        auto find_res = powertrain::proxy::PowertrainProxy::StartFindService(
+            [this, my_gen](ara::com::ServiceHandleContainer<typename powertrain::proxy::PowertrainProxy::HandleType> handles, ara::com::FindServiceHandle) {
+                if (!this->powertrain_open_.load(std::memory_order_acquire)) {
+                    return; // Port was closed
+                }
+                {
+                    std::lock_guard<std::mutex> h_lock(this->powertrain_port_mutex_);
+                    if (this->powertrain_generation_ != my_gen) {
+                        return; // Stale callback from an earlier generation
                     }
+                }
+                if (handles.empty()) {
+                    std::lock_guard<std::mutex> h_lock(this->powertrain_port_mutex_);
+                    if (!this->powertrain_open_.load(std::memory_order_acquire) ||
+                        this->powertrain_generation_ != my_gen) {
+                        return; // Closed or generation shifted concurrently
+                    }
+                    this->powertrain_slot_.reset();
+                } else {
+                    if (auto cur_h = this->powertrain_slot_.get_handle(); cur_h.has_value() && *cur_h == handles[0]) {
+                        return; // Same handle, already active
+                    }
+                    // Zero-downtime update: do NOT wipe slot before creating new proxy!
+                    // ProxySlot::publish handles atomic cell exchange, bounded reader drain, and teardown hook cleanly.
                     auto new_proxy = std::make_unique<powertrain::proxy::PowertrainProxy>(handles[0]);
                     bind_powertrain_events(new_proxy.get());
                     bind_powertrain_fields(new_proxy.get());
-                    this->powertrain_slot_.publish(std::move(new_proxy));
-                    this->active_powertrain_handle_ = handles[0];
+
+                    auto teardown_hook = []([[maybe_unused]] powertrain::proxy::PowertrainProxy& p) {
+                        p.CabinSensors.Unsubscribe();
+                        p.VehicleSpeed.Unsubscribe();
+                    };
+
+                    {
+                        std::lock_guard<std::mutex> h_lock(this->powertrain_port_mutex_);
+                        if (!this->powertrain_open_.load(std::memory_order_acquire) ||
+                            this->powertrain_generation_ != my_gen) {
+                            return; // Closed or generation shifted concurrently
+                        }
+                        this->powertrain_slot_.publish(std::move(new_proxy), handles[0], teardown_hook);
+                    }
                     this->notify_proxy_resolved();
                 }
             },
             reaktar::InstanceSpecifier("CockpitDomain/RootSwComponent/PowertrainIn")
         );
-        if constexpr (reaktar::is_result_v<decltype(find_res_powertrain)>) {
-            if (find_res_powertrain.HasValue()) {
-                this->powertrain_find_handle_ = find_res_powertrain.Value();
+
+        std::optional<ara::com::FindServiceHandle> handle;
+        if constexpr (reaktar::is_result_v<decltype(find_res)>) {
+            if (find_res.HasValue()) {
+                handle = find_res.Value();
             }
         } else {
-            this->powertrain_find_handle_ = find_res_powertrain;
+            handle = find_res;
         }
+
+        if (!handle.has_value()) {
+            std::lock_guard<std::mutex> lock(this->powertrain_port_mutex_);
+            if (this->powertrain_generation_ == my_gen) {
+                this->powertrain_open_.store(false, std::memory_order_release);
+            }
+            return;
+        }
+
+        find_started = true; // Successfully started, prevent rollback
+
+        std::unique_lock<std::mutex> lock(this->powertrain_port_mutex_);
+        if (!this->powertrain_open_.load(std::memory_order_acquire) || this->powertrain_generation_ != my_gen) {
+            // Port was closed or generation shifted while StartFindService was executing!
+            lock.unlock();
+            powertrain::proxy::PowertrainProxy::StopFindService(*handle);
+            return;
+        }
+        this->powertrain_find_handle_ = *handle;
     }
 
-    void stop() {
-        hmiport_skeleton_.StopOfferService();
-        supervisorport_skeleton_.StopOfferService();
-        if (this->body_control_find_handle_.has_value()) {
-            body_control::proxy::BodyControlProxy::StopFindService(*this->body_control_find_handle_);
+    void close_hmiport_provided_port() {
+        std::lock_guard<std::mutex> lock(this->hmiport_port_mutex_);
+        if (this->hmiport_offered_.load(std::memory_order_relaxed)) {
+            this->hmiport_skeleton_.StopOfferService();
+            this->hmiport_offered_.store(false, std::memory_order_release);
+        }
+    }
+    void close_supervisorport_provided_port() {
+        std::lock_guard<std::mutex> lock(this->supervisorport_port_mutex_);
+        if (this->supervisorport_offered_.load(std::memory_order_relaxed)) {
+            this->supervisorport_skeleton_.StopOfferService();
+            this->supervisorport_offered_.store(false, std::memory_order_release);
+        }
+    }
+    void close_body_control_required_port() {
+        std::optional<ara::com::FindServiceHandle> handle_to_stop;
+        {
+            std::lock_guard<std::mutex> lock(this->body_control_port_mutex_);
+            if (!this->body_control_open_.load(std::memory_order_relaxed) && !this->body_control_find_handle_.has_value()) {
+                return;
+            }
+            this->body_control_open_.store(false, std::memory_order_release);
+            ++this->body_control_generation_;
+            handle_to_stop = this->body_control_find_handle_;
             this->body_control_find_handle_.reset();
+            this->body_control_slot_.reset();
         }
-        teardown_body_control_proxy();
-        if (this->navigation_find_handle_.has_value()) {
-            infotainment::geo::navigation::proxy::NavigationProxy::StopFindService(*this->navigation_find_handle_);
+
+        if (handle_to_stop.has_value()) {
+            body_control::proxy::BodyControlProxy::StopFindService(*handle_to_stop);
+        }
+    }
+    void close_navigation_required_port() {
+        std::optional<ara::com::FindServiceHandle> handle_to_stop;
+        {
+            std::lock_guard<std::mutex> lock(this->navigation_port_mutex_);
+            if (!this->navigation_open_.load(std::memory_order_relaxed) && !this->navigation_find_handle_.has_value()) {
+                return;
+            }
+            this->navigation_open_.store(false, std::memory_order_release);
+            ++this->navigation_generation_;
+            handle_to_stop = this->navigation_find_handle_;
             this->navigation_find_handle_.reset();
+            this->navigation_slot_.reset();
         }
-        teardown_navigation_proxy();
-        if (this->powertrain_find_handle_.has_value()) {
-            powertrain::proxy::PowertrainProxy::StopFindService(*this->powertrain_find_handle_);
+
+        if (handle_to_stop.has_value()) {
+            infotainment::geo::navigation::proxy::NavigationProxy::StopFindService(*handle_to_stop);
+        }
+    }
+    void close_powertrain_required_port() {
+        std::optional<ara::com::FindServiceHandle> handle_to_stop;
+        {
+            std::lock_guard<std::mutex> lock(this->powertrain_port_mutex_);
+            if (!this->powertrain_open_.load(std::memory_order_relaxed) && !this->powertrain_find_handle_.has_value()) {
+                return;
+            }
+            this->powertrain_open_.store(false, std::memory_order_release);
+            ++this->powertrain_generation_;
+            handle_to_stop = this->powertrain_find_handle_;
             this->powertrain_find_handle_.reset();
+            this->powertrain_slot_.reset();
         }
-        teardown_powertrain_proxy();
+
+        if (handle_to_stop.has_value()) {
+            powertrain::proxy::PowertrainProxy::StopFindService(*handle_to_stop);
+        }
     }
 
 private:
-    void teardown_body_control_proxy() {
-        if (auto* p = this->body_control_slot_.get()) {
-            p->OutsideAirQuality.Unsubscribe();
-            p->RainSensorLevel.Unsubscribe();
-            p->TargetCabinTemperature.Unsubscribe();
-            p->WindowPosition.Unsubscribe();
-            this->body_control_slot_.reset();
-        }
-        this->active_body_control_handle_.reset();
-    }
-    void teardown_navigation_proxy() {
-        if (auto* p = this->navigation_slot_.get()) {
-            p->CurrentLocation.Unsubscribe();
-            this->navigation_slot_.reset();
-        }
-        this->active_navigation_handle_.reset();
-    }
-    void teardown_powertrain_proxy() {
-        if (auto* p = this->powertrain_slot_.get()) {
-            p->CabinSensors.Unsubscribe();
-            p->VehicleSpeed.Unsubscribe();
-            this->powertrain_slot_.reset();
-        }
-        this->active_powertrain_handle_.reset();
-    }
 
     void bind_skeleton_fields() {
         if constexpr (has_on_field_set_v<Derived, vehicle_supervisor::fields::CalibrationKey, uint32_t>) {

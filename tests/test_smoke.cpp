@@ -60,8 +60,8 @@ public:
 class SupervisorSmokeApp
     : public reaktar::generated::VehicleSupervisorActor<SupervisorSmokeApp> {
 public:
-  bool speed_received{false};
-  bool alert_emitted{false};
+  std::atomic<bool> speed_received{false};
+  std::atomic<bool> alert_emitted{false};
 
   // Consumed event handler
   void on(const vehicle_data::SpeedData &speed) {
@@ -77,6 +77,76 @@ public:
 
   // Method handler with bare tag TriggerDiagnostic
   bool on(TriggerDiagnostic, uint32_t code) { return (code != 0xDEAD); }
+};
+
+// -----------------------------------------------------------------------------
+// High-Level Demonstration: Actor with Custom Phased Port Lifecycle State Machine
+// Demonstrates:
+// 1. App developer writing open_port(), close_port(), is_ready() directly
+//    WITHOUT writing this->
+// 2. Realistic AUTOSAR ECU state machine:
+//    - Boot -> Sensor Monitoring (only open BodyControl port)
+//    - Monitoring -> Full Drive (open Powertrain port, then offer Supervisor service)
+//    - Critical event -> Limp-home mode (dynamically close Supervisor service
+//      and disconnect Powertrain, keeping BodyControl alive for hazard lights)
+// -----------------------------------------------------------------------------
+class DynamicLifecycleSupervisorApp
+    : public reaktar::generated::VehicleSupervisorActor<DynamicLifecycleSupervisorApp> {
+public:
+  enum class SystemMode {
+    Standby,
+    Monitoring,
+    ActiveDrive,
+    LimpHomeSafeHalt
+  };
+
+  std::atomic<SystemMode> mode{SystemMode::Standby};
+  std::atomic<bool> emergency_alert_emitted{false};
+  std::atomic<bool> doors_locked{false};
+
+  // Phase 1: Boot into low-power sensor monitoring (only open BodyControl proxy port)
+  void enter_monitoring() {
+    open_port<ports::BodyControl>();
+    mode = SystemMode::Monitoring;
+  }
+
+  // Phase 2: Enter active driving state: connect powertrain telemetry and offer public service
+  void enter_active_drive() {
+    if (is_ready<ports::BodyControl>()) {
+      open_port<ports::Powertrain>();
+      open_port<ports::Supervisor>(); // Offer skeleton to external ECUs
+      mode = SystemMode::ActiveDrive;
+    }
+  }
+
+  // Phase 3: Condition-driven dynamic port control: Limp-home safety shutdown
+  void trigger_limp_home() {
+    close_port<ports::Supervisor>(); // Stop offering service on vehicle bus
+    close_port<ports::Powertrain>();   // Isolate powertrain telemetry
+    mode = SystemMode::LimpHomeSafeHalt;
+  }
+
+  // Reactive event handler demonstrating condition-driven dynamic port lifecycle
+  void on(const vehicle_data::SpeedData &speed) {
+    if (speed.speed_kmh > 15.0f && is_ready<ports::BodyControl>()) {
+      emit(true); // LockDoors RPC to BodyControl proxy
+      doors_locked = true;
+    }
+    if (speed.speed_kmh > 180.0f) {
+      emit(vehicle_data::EmergencyAlert{1001, "Overspeed safety limit exceeded"});
+      emergency_alert_emitted = true;
+      // Dynamically degrade ports: revoke public service and isolate powertrain
+      trigger_limp_home();
+    }
+  }
+
+  // Method handler
+  bool on(TriggerDiagnostic, uint32_t code) { return (code != 0xDEAD); }
+
+  // High-level port status queries - all without this->
+  bool is_body_connected() const noexcept { return is_ready<ports::BodyControl>(); }
+  bool is_powertrain_connected() const noexcept { return is_ready<ports::Powertrain>(); }
+  bool is_service_offered() const noexcept { return is_ready<ports::Supervisor>(); }
 };
 
 // -----------------------------------------------------------------------------
@@ -200,6 +270,47 @@ int main() {
         bench.last_emitted<vehicle_supervisor::events::EmergencyAlert>();
     assert(alert.has_value());
     assert(alert->alert_id == 1001);
+  }
+  // 8. High-level Demonstration: Actor with custom Port lifecycle state machine
+  std::cout << "  - Demonstrating Actor-driven Port lifecycle state machine... ";
+  {
+    DynamicLifecycleSupervisorApp app;
+
+    // Initially in Standby: no ports are opened
+    assert(app.mode == DynamicLifecycleSupervisorApp::SystemMode::Standby);
+    assert(!app.is_body_connected());
+    assert(!app.is_powertrain_connected());
+    assert(!app.is_service_offered());
+
+    // Step 1: Phased startup - wake up into sensor monitoring (only opens BodyControl)
+    app.enter_monitoring();
+    assert(app.mode == DynamicLifecycleSupervisorApp::SystemMode::Monitoring);
+    assert(app.is_body_connected());
+    assert(!app.is_powertrain_connected());
+    assert(!app.is_service_offered());
+
+    // Step 2: Transition to Active Drive - connects powertrain & offers supervisor skeleton
+    app.enter_active_drive();
+    assert(app.mode == DynamicLifecycleSupervisorApp::SystemMode::ActiveDrive);
+    assert(app.is_body_connected());
+    assert(app.is_powertrain_connected());
+    assert(app.is_service_offered());
+    assert(app.is_ready());
+
+    // Step 3: Normal event handling while fully operational
+    app.on(vehicle_data::SpeedData{30.0f, 100});
+    assert(app.doors_locked);
+    assert(!app.emergency_alert_emitted);
+    assert(app.mode == DynamicLifecycleSupervisorApp::SystemMode::ActiveDrive);
+
+    // Step 4: Reactive condition-driven port degradation (overspeed triggers limp-home)
+    app.on(vehicle_data::SpeedData{195.0f, 200});
+    assert(app.emergency_alert_emitted);
+    assert(app.mode == DynamicLifecycleSupervisorApp::SystemMode::LimpHomeSafeHalt);
+    // Verified dynamic port state:
+    assert(!app.is_service_offered());      // Service unoffered from network
+    assert(!app.is_powertrain_connected()); // Powertrain telemetry isolated
+    assert(app.is_body_connected());        // Body control kept alive for hazard/safety
   }
   std::cout << "PASSED\n";
 

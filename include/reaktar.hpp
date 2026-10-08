@@ -20,5 +20,7 @@
 #include "reaktar/tags.hpp"
 #endif
 #include "reaktar/actor_base.hpp"
+#include "reaktar/port.hpp"
 #include "reaktar/execution_policy.hpp"
 #include "reaktar/proxy_slot.hpp"
+

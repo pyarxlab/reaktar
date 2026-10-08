@@ -19,6 +19,8 @@
 #include <string>
 #include <cstdint>
 #include <map>
+#include <vector>
+#include <mutex>
 #include <functional>
 
 
@@ -47,25 +49,54 @@ public:
     // Methods
 
 
+    /// Test hook: intercept StartFindService to simulate middleware initialization failures / exceptions
+    static std::function<void()>& on_start_find_service_hook() {
+        static std::function<void()> hook{nullptr};
+        return hook;
+    }
+
     static ara::com::FindServiceHandle StartFindService(
         ara::com::FindServiceHandler<PowertrainProxy> handler,
         ara::core::InstanceSpecifier instance_specifier)
     {
+        if (auto& hook = on_start_find_service_hook()) {
+            hook();
+        }
         ara::com::FindServiceHandle find_handle(ara::com::detail::next_find_handle_id());
-        active_find_handlers()[find_handle.id()] = handler;
+        {
+            std::lock_guard<std::mutex> lock(find_handlers_mutex());
+            active_find_handlers()[find_handle.id()] = handler;
+        }
         ara::com::ServiceHandleContainer<HandleType> handles;
         handles.push_back(HandleType{instance_specifier, 1});
         handler(handles, find_handle);
         return find_handle;
     }
 
+    /// Test hook: intercept StopFindService to simulate concurrent operations during middleware teardown
+    static std::function<void()>& on_stop_find_service_hook() {
+        static std::function<void()> hook{nullptr};
+        return hook;
+    }
+
     static void StopFindService(ara::com::FindServiceHandle handle) {
+        if (auto& hook = on_stop_find_service_hook()) {
+            hook();
+        }
+        std::lock_guard<std::mutex> lock(find_handlers_mutex());
         active_find_handlers().erase(handle.id());
     }
 
     /// Simulation / Test-Bench helper: trigger service availability update across active find handlers
     static void TriggerFindService(const ara::com::ServiceHandleContainer<HandleType>& handles) {
-        for (const auto& kv : active_find_handlers()) {
+        std::vector<std::pair<uint64_t, ara::com::FindServiceHandler<PowertrainProxy>>> snapshot;
+        {
+            std::lock_guard<std::mutex> lock(find_handlers_mutex());
+            for (const auto& kv : active_find_handlers()) {
+                snapshot.push_back(kv);
+            }
+        }
+        for (const auto& kv : snapshot) {
             kv.second(handles, ara::com::FindServiceHandle(kv.first));
         }
     }
@@ -77,6 +108,11 @@ public:
 
 private:
     HandleType handle_{};
+
+    static std::mutex& find_handlers_mutex() {
+        static std::mutex mtx;
+        return mtx;
+    }
 
     static std::map<uint64_t, ara::com::FindServiceHandler<PowertrainProxy>>& active_find_handlers() {
         static std::map<uint64_t, ara::com::FindServiceHandler<PowertrainProxy>> handlers;

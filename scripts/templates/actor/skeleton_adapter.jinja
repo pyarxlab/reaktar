@@ -141,6 +141,8 @@
     };
 
     {{ skel.adapter_name }} {{ skel.var_name }};
+    std::atomic<bool> {{ skel.port_name.lower() }}_offered_{false};
+    mutable std::mutex {{ skel.port_name.lower() }}_port_mutex_{};
 
     {{ skel.cls }}& {{ skel.getter_name }}() { return {{ skel.var_name }}; }
 

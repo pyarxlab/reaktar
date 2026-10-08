@@ -1,72 +1,265 @@
-    void start() {
-        bind_skeleton_fields();
+    // ------------------------------------------------------------------------
+    // Granular Port Lifecycle Controls
+    // ------------------------------------------------------------------------
 
-{% for skel in model.skeletons %}
-        {{ skel.var_name }}.OfferService();
-{% endfor %}
-
-{% for proxy in model.consumed_proxies %}
-        auto find_res_{{ proxy.ident }} = {{ proxy.cls }}::StartFindService(
-            [this](ara::com::ServiceHandleContainer<{{ proxy.cls }}::HandleType> handles, ara::com::FindServiceHandle) {
-                if (handles.empty()) {
-                    teardown_{{ proxy.ident }}_proxy();
-                } else {
-                    if (this->{{ proxy.slot_name }}.is_available()) {
-                        if (this->active_{{ proxy.ident }}_handle_.has_value() &&
-                            *this->active_{{ proxy.ident }}_handle_ == handles[0]) {
-                            return; // Same handle, already active
-                        }
-                        teardown_{{ proxy.ident }}_proxy();
-                    }
-                    auto new_proxy = std::make_unique<{{ proxy.cls }}>(handles[0]);
-                    bind_{{ proxy.ident }}_events(new_proxy.get());
-                    bind_{{ proxy.ident }}_fields(new_proxy.get());
-                    this->{{ proxy.slot_name }}.publish(std::move(new_proxy));
-                    this->active_{{ proxy.ident }}_handle_ = handles[0];
-                    this->notify_proxy_resolved();
-                }
-            },
-            reaktar::InstanceSpecifier("{{ proxy.instance_spec }}")
-        );
-        if constexpr (reaktar::is_result_v<decltype(find_res_{{ proxy.ident }})>) {
-            if (find_res_{{ proxy.ident }}.HasValue()) {
-                this->{{ proxy.find_handle_name }} = find_res_{{ proxy.ident }}.Value();
-            }
-        } else {
-            this->{{ proxy.find_handle_name }} = find_res_{{ proxy.ident }};
+    /**
+     * @brief Open (activate) an individual AUTOSAR Port in a thread-safe manner.
+     * For a Provided Port (P-Port / Skeleton): Calls OfferService.
+     * For a Required Port (R-Port / Proxy): Calls StartFindService with ZERO locks held.
+     */
+    template <typename PortTag>
+    void open_port() {
+        static_assert(::reaktar::is_port_v<PortTag>, "open_port requires a valid generated Port Tag (e.g. ports::MyPort)!");
+{% for port in model.ports %}
+        {{ "if" if loop.first else "else if" }} constexpr (std::is_same_v<PortTag, typename Base::ports::{{ port.port_name }}>) {
+{% if port.kind == "Provided" %}
+            open_{{ port.ident }}_provided_port();
+{% else %}
+            open_{{ port.ident }}_required_port();
+{% endif %}
         }
+{% endfor %}
+    }
+
+    /**
+     * @brief Close (deactivate) an individual AUTOSAR Port in a thread-safe manner.
+     * For a Provided Port (P-Port / Skeleton): Calls StopOfferService.
+     * For a Required Port (R-Port / Proxy): Calls StopFindService with ZERO locks held, unsubscribes, and resets slot.
+     */
+    template <typename PortTag>
+    void close_port() {
+        static_assert(::reaktar::is_port_v<PortTag>, "close_port requires a valid generated Port Tag (e.g. ports::MyPort)!");
+{% for port in model.ports %}
+        {{ "if" if loop.first else "else if" }} constexpr (std::is_same_v<PortTag, typename Base::ports::{{ port.port_name }}>) {
+{% if port.kind == "Provided" %}
+            close_{{ port.ident }}_provided_port();
+{% else %}
+            close_{{ port.ident }}_required_port();
+{% endif %}
+        }
+{% endfor %}
+    }
+
+    /**
+     * @brief Check whether an individual AUTOSAR Port is ready (wait-free and lock-free).
+     * For a Provided Port (P-Port / Skeleton): Returns true if currently offered.
+     * For a Required Port (R-Port / Proxy): Returns true if proxy is acquired and available.
+     */
+    template <typename PortTag>
+    bool is_ready() const noexcept {
+        static_assert(::reaktar::is_port_v<PortTag>, "is_ready requires a valid generated Port Tag (e.g. ports::MyPort)!");
+{% for port in model.ports %}
+        {{ "if" if loop.first else "else if" }} constexpr (std::is_same_v<PortTag, typename Base::ports::{{ port.port_name }}>) {
+{% if port.kind == "Provided" %}
+            return this->{{ port.ident }}_offered_.load(std::memory_order_acquire);
+{% else %}
+            return this->{{ port.ident }}_open_.load(std::memory_order_acquire) && this->{{ port.slot_name }}.is_available();
+{% endif %}
+        }
+{% endfor %}
+    }
+
+    /**
+     * @brief Check whether an individual AUTOSAR Port has been requested open.
+     */
+    template <typename PortTag>
+    bool is_port_open() const noexcept {
+        static_assert(::reaktar::is_port_v<PortTag>, "is_port_open requires a valid generated Port Tag (e.g. ports::MyPort)!");
+{% for port in model.ports %}
+        {{ "if" if loop.first else "else if" }} constexpr (std::is_same_v<PortTag, typename Base::ports::{{ port.port_name }}>) {
+{% if port.kind == "Provided" %}
+            return this->{{ port.ident }}_offered_.load(std::memory_order_acquire);
+{% else %}
+            return this->{{ port.ident }}_open_.load(std::memory_order_acquire);
+{% endif %}
+        }
+{% endfor %}
+    }
+
+    /**
+     * @brief Generational ticket query for diagnostics and invariant testing.
+     */
+    template <typename PortTag>
+    uint64_t get_port_generation() const noexcept {
+        static_assert(::reaktar::is_port_v<PortTag>, "get_port_generation requires a valid generated Port Tag!");
+{% for port in model.ports %}
+        {{ "if" if loop.first else "else if" }} constexpr (std::is_same_v<PortTag, typename Base::ports::{{ port.port_name }}>) {
+{% if port.kind == "Provided" %}
+            return 0;
+{% else %}
+            std::lock_guard<std::mutex> lock(this->{{ port.ident }}_port_mutex_);
+            return this->{{ port.ident }}_generation_;
+{% endif %}
+        }
+{% endfor %}
+    }
+
+    // Bring ActorBase::is_ready() (no-arg readiness check across all ports) into scope
+    using Base::is_ready;
+    using Base::wait_until_ready;
+
+    // ------------------------------------------------------------------------
+    // Process-Wide Lifecycle Controls (Granular Defaults)
+    // ------------------------------------------------------------------------
+
+    void start() {
+{% for port in model.ports %}
+        this->template open_port<typename Base::ports::{{ port.port_name }}>();
 {% endfor %}
     }
 
     void stop() {
-{% for skel in model.skeletons %}
-        {{ skel.var_name }}.StopOfferService();
-{% endfor %}
-{% for proxy in model.consumed_proxies %}
-        if (this->{{ proxy.find_handle_name }}.has_value()) {
-            {{ proxy.cls }}::StopFindService(*this->{{ proxy.find_handle_name }});
-            this->{{ proxy.find_handle_name }}.reset();
-        }
-        teardown_{{ proxy.ident }}_proxy();
+{% for port in model.ports %}
+        this->template close_port<typename Base::ports::{{ port.port_name }}>();
 {% endfor %}
     }
 
 private:
-{% for proxy in model.consumed_proxies %}
-    void teardown_{{ proxy.ident }}_proxy() {
-        if (auto* p = this->{{ proxy.slot_name }}.get()) {
-{% if proxy.all_unsubscribe_targets | length > 0 %}
-{% for target in proxy.all_unsubscribe_targets %}
-            p->{{ target }}.Unsubscribe();
-{% endfor %}
-{% else %}
-            (void)p;
-{% endif %}
-            this->{{ proxy.slot_name }}.reset();
+{% for port in model.ports %}
+{% if port.kind == "Provided" %}
+    void open_{{ port.ident }}_provided_port() {
+        std::lock_guard<std::mutex> lock(this->{{ port.ident }}_port_mutex_);
+        if (!this->{{ port.ident }}_offered_.load(std::memory_order_relaxed)) {
+            bind_skeleton_fields();
+            this->{{ port.var_name }}.OfferService();
+            this->{{ port.ident }}_offered_.store(true, std::memory_order_release);
         }
-        this->active_{{ proxy.ident }}_handle_.reset();
     }
+{% else %}
+    void open_{{ port.ident }}_required_port() {
+        uint64_t my_gen{0};
+        {
+            std::lock_guard<std::mutex> lock(this->{{ port.ident }}_port_mutex_);
+            if (this->{{ port.ident }}_open_.load(std::memory_order_acquire)) {
+                return; // Already open or opening
+            }
+            this->{{ port.ident }}_open_.store(true, std::memory_order_release);
+            my_gen = ++this->{{ port.ident }}_generation_;
+        }
+
+        bool find_started = false;
+        struct ExceptionRollbackGuard {
+            std::atomic<bool>& open_flag;
+            bool& ok;
+            ~ExceptionRollbackGuard() {
+                if (!ok) {
+                    open_flag.store(false, std::memory_order_release);
+                }
+            }
+        } rollback_guard{this->{{ port.ident }}_open_, find_started};
+
+        // Call StartFindService with ZERO locks held
+        auto find_res = {{ port.cls }}::StartFindService(
+            [this, my_gen](ara::com::ServiceHandleContainer<typename {{ port.cls }}::HandleType> handles, ara::com::FindServiceHandle) {
+                if (!this->{{ port.ident }}_open_.load(std::memory_order_acquire)) {
+                    return; // Port was closed
+                }
+                {
+                    std::lock_guard<std::mutex> h_lock(this->{{ port.ident }}_port_mutex_);
+                    if (this->{{ port.ident }}_generation_ != my_gen) {
+                        return; // Stale callback from an earlier generation
+                    }
+                }
+                if (handles.empty()) {
+                    std::lock_guard<std::mutex> h_lock(this->{{ port.ident }}_port_mutex_);
+                    if (!this->{{ port.ident }}_open_.load(std::memory_order_acquire) ||
+                        this->{{ port.ident }}_generation_ != my_gen) {
+                        return; // Closed or generation shifted concurrently
+                    }
+                    this->{{ port.slot_name }}.reset();
+                } else {
+                    if (auto cur_h = this->{{ port.slot_name }}.get_handle(); cur_h.has_value() && *cur_h == handles[0]) {
+                        return; // Same handle, already active
+                    }
+                    // Zero-downtime update: do NOT wipe slot before creating new proxy!
+                    // ProxySlot::publish handles atomic cell exchange, bounded reader drain, and teardown hook cleanly.
+                    auto new_proxy = std::make_unique<{{ port.cls }}>(handles[0]);
+                    bind_{{ port.ident }}_events(new_proxy.get());
+                    bind_{{ port.ident }}_fields(new_proxy.get());
+
+                    auto teardown_hook = []([[maybe_unused]] {{ port.cls }}& p) {
+{% for target in port.all_unsubscribe_targets %}
+                        p.{{ target }}.Unsubscribe();
 {% endfor %}
+                    };
+
+                    {
+                        std::lock_guard<std::mutex> h_lock(this->{{ port.ident }}_port_mutex_);
+                        if (!this->{{ port.ident }}_open_.load(std::memory_order_acquire) ||
+                            this->{{ port.ident }}_generation_ != my_gen) {
+                            return; // Closed or generation shifted concurrently
+                        }
+                        this->{{ port.slot_name }}.publish(std::move(new_proxy), handles[0], teardown_hook);
+                    }
+                    this->notify_proxy_resolved();
+                }
+            },
+            reaktar::InstanceSpecifier("{{ port.instance_spec }}")
+        );
+
+        std::optional<ara::com::FindServiceHandle> handle;
+        if constexpr (reaktar::is_result_v<decltype(find_res)>) {
+            if (find_res.HasValue()) {
+                handle = find_res.Value();
+            }
+        } else {
+            handle = find_res;
+        }
+
+        if (!handle.has_value()) {
+            std::lock_guard<std::mutex> lock(this->{{ port.ident }}_port_mutex_);
+            if (this->{{ port.ident }}_generation_ == my_gen) {
+                this->{{ port.ident }}_open_.store(false, std::memory_order_release);
+            }
+            return;
+        }
+
+        find_started = true; // Successfully started, prevent rollback
+
+        std::unique_lock<std::mutex> lock(this->{{ port.ident }}_port_mutex_);
+        if (!this->{{ port.ident }}_open_.load(std::memory_order_acquire) || this->{{ port.ident }}_generation_ != my_gen) {
+            // Port was closed or generation shifted while StartFindService was executing!
+            lock.unlock();
+            {{ port.cls }}::StopFindService(*handle);
+            return;
+        }
+        this->{{ port.find_handle_name }} = *handle;
+    }
+{% endif %}
+{% endfor %}
+
+{% for port in model.ports %}
+{% if port.kind == "Provided" %}
+    void close_{{ port.ident }}_provided_port() {
+        std::lock_guard<std::mutex> lock(this->{{ port.ident }}_port_mutex_);
+        if (this->{{ port.ident }}_offered_.load(std::memory_order_relaxed)) {
+            this->{{ port.var_name }}.StopOfferService();
+            this->{{ port.ident }}_offered_.store(false, std::memory_order_release);
+        }
+    }
+{% else %}
+    void close_{{ port.ident }}_required_port() {
+        std::optional<ara::com::FindServiceHandle> handle_to_stop;
+        {
+            std::lock_guard<std::mutex> lock(this->{{ port.ident }}_port_mutex_);
+            if (!this->{{ port.ident }}_open_.load(std::memory_order_relaxed) && !this->{{ port.find_handle_name }}.has_value()) {
+                return;
+            }
+            this->{{ port.ident }}_open_.store(false, std::memory_order_release);
+            ++this->{{ port.ident }}_generation_;
+            handle_to_stop = this->{{ port.find_handle_name }};
+            this->{{ port.find_handle_name }}.reset();
+            this->{{ port.slot_name }}.reset();
+        }
+
+        if (handle_to_stop.has_value()) {
+            {{ port.cls }}::StopFindService(*handle_to_stop);
+        }
+    }
+{% endif %}
+{% endfor %}
+
+private:
 
     void bind_skeleton_fields() {
 {% for f in model.skeleton_fields %}
