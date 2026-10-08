@@ -498,14 +498,17 @@ auto make_async_result(reaktar::Future<T> future) {
 // Compile-time Rogue / Orphan Handler Detection
 // ============================================================================
 
-enum class StrictValidation {
-    kEnabled,
-    kDisabled
-};
-
 // Signature descriptor
 template <typename... Args>
 struct sig {};
+
+template <typename Sig>
+struct decay_sig;
+
+template <typename... Args>
+struct decay_sig<sig<Args...>> {
+    using type = sig<std::decay_t<Args>...>;
+};
 
 // Check if a signature exists in LegalSigs
 template <typename Candidate, typename LegalSigsTuple>
@@ -513,8 +516,34 @@ struct is_legal_signature;
 
 template <typename... CandidateArgs, typename... LegalSigs>
 struct is_legal_signature<sig<CandidateArgs...>, std::tuple<LegalSigs...>> {
-    static constexpr bool value = (std::is_same_v<sig<std::decay_t<CandidateArgs>...>, LegalSigs> || ...);
+    static constexpr bool value = (std::is_same_v<
+        sig<std::decay_t<CandidateArgs>...>,
+        typename decay_sig<LegalSigs>::type
+    > || ...);
 };
+
+// Check if a call signature or arguments are legal for an actor or signature tuple
+template <typename SigsOrActor, typename... Args>
+struct is_legal_call {
+private:
+    template <typename T, typename = void>
+    struct extract_sigs {
+        using type = T;
+    };
+    template <typename T>
+    struct extract_sigs<T, std::void_t<typename T::legal_signatures>> {
+        using type = typename T::legal_signatures;
+    };
+    using Sigs = typename extract_sigs<SigsOrActor>::type;
+public:
+    static constexpr bool value = is_legal_signature<sig<std::decay_t<Args>...>, Sigs>::value;
+};
+
+template <typename SigsOrActor, typename... Args>
+inline constexpr bool is_legal_call_v = is_legal_call<SigsOrActor, Args...>::value;
+
+template <typename SigsOrActor, typename... Args>
+inline constexpr bool is_legal_signature_v = is_legal_call<SigsOrActor, Args...>::value;
 
 // Check if LegalSigs has any signature with arity N
 template <std::size_t N, typename LegalSigsTuple>
@@ -536,12 +565,84 @@ struct illegal_probe {
     template <typename T,
               typename = std::enable_if_t<(!std::is_same_v<std::decay_t<T>, LegalTypes> && ...)>>
     operator T() const;
+
+    template <typename T,
+              typename = std::enable_if_t<(!std::is_same_v<std::decay_t<T>, LegalTypes> && ...)>>
+    operator T&();
 };
 
 // Universal probe type that converts to anything
 struct universal_probe {
     template <typename T>
     operator T() const;
+
+    template <typename T>
+    operator T&();
+};
+
+// Domain partitioning: distinguish tag types (empty structs) from payload types
+template <typename T>
+struct is_tag_type : std::bool_constant<std::is_empty_v<T> && !std::is_arithmetic_v<T> && !std::is_enum_v<T>> {};
+
+template <typename T>
+inline constexpr bool is_tag_type_v = is_tag_type<T>::value;
+
+template <typename... Ts>
+struct type_list {};
+
+template <typename List, typename T>
+struct list_append;
+
+template <typename... Ts, typename T>
+struct list_append<type_list<Ts...>, T> {
+    using type = type_list<Ts..., T>;
+};
+
+template <typename InList, typename FilterList = type_list<>, typename RestList = type_list<>>
+struct partition_tags;
+
+template <typename FilterList, typename RestList>
+struct partition_tags<type_list<>, FilterList, RestList> {
+    using tags = FilterList;
+    using payloads = RestList;
+};
+
+template <typename Head, typename... Tail, typename FilterList, typename RestList>
+struct partition_tags<type_list<Head, Tail...>, FilterList, RestList> {
+private:
+    using next_tags = std::conditional_t<
+        is_tag_type_v<Head>,
+        typename list_append<FilterList, Head>::type,
+        FilterList>;
+    using next_payloads = std::conditional_t<
+        !is_tag_type_v<Head>,
+        typename list_append<RestList, Head>::type,
+        RestList>;
+public:
+    using tags = typename partition_tags<type_list<Tail...>, next_tags, next_payloads>::tags;
+    using payloads = typename partition_tags<type_list<Tail...>, next_tags, next_payloads>::payloads;
+};
+
+// SFINAE test for 1 argument with strict values
+template <typename App, typename T, typename = void>
+struct is_callable_1arg : std::false_type {};
+
+template <typename App, typename T>
+struct is_callable_1arg<App, T,
+    std::void_t<decltype(std::declval<App&>().on(std::declval<strict_val<T>&>()))>>
+    : std::true_type {};
+
+template <typename App, typename LegalSigsTuple, typename T>
+constexpr bool check_single_rogue() {
+    if constexpr (is_callable_1arg<App, T>::value) {
+        return !is_legal_signature<sig<T>, LegalSigsTuple>::value;
+    }
+    return false;
+}
+
+template <typename App, typename LegalSigsTuple, typename... Ts>
+struct illegal_combo_checker_1arg {
+    static constexpr bool value = (check_single_rogue<App, LegalSigsTuple, Ts>() || ...);
 };
 
 // SFINAE test for 2 arguments with strict values
@@ -561,15 +662,51 @@ constexpr bool check_pair_rogue() {
     return false;
 }
 
-template <typename App, typename LegalSigsTuple, typename... Ts>
-struct illegal_combo_checker_2arg {
-    template <typename T1>
-    static constexpr bool check_row() {
-        return (check_pair_rogue<App, LegalSigsTuple, T1, Ts>() || ...);
-    }
+template <typename App, typename Tag, typename = void>
+struct has_arg2_tag_handler : std::false_type {};
 
-    static constexpr bool value = (check_row<Ts>() || ...);
+template <typename App, typename Tag>
+struct has_arg2_tag_handler<App, Tag,
+    std::void_t<decltype(std::declval<App&>().on(std::declval<universal_probe>(), std::declval<strict_val<Tag>&>()))>>
+    : std::true_type {};
+
+template <typename App, typename LegalSigsTuple, typename TagList, typename PayloadList>
+struct illegal_combo_checker_2arg_partitioned;
+
+template <typename App, typename LegalSigsTuple, typename... Tags, typename... Payloads>
+struct illegal_combo_checker_2arg_partitioned<App, LegalSigsTuple, type_list<Tags...>, type_list<Payloads...>> {
+    static constexpr bool has_arg2_tag = (has_arg2_tag_handler<App, Tags>::value || ...);
+
+    template <typename Tag>
+    static constexpr bool check_tag_row() {
+        return (check_pair_rogue<App, LegalSigsTuple, Tag, Payloads>() || ...);
+    }
+    static constexpr bool has_bad_tag_payload = (check_tag_row<Tags>() || ...);
+
+    template <typename P1>
+    static constexpr bool check_payload_row() {
+        return (check_pair_rogue<App, LegalSigsTuple, P1, Payloads>() || ...);
+    }
+    static constexpr bool has_bad_payload_payload = (check_payload_row<Payloads>() || ...);
+
+    static constexpr bool value = has_arg2_tag || has_bad_tag_payload || has_bad_payload_payload;
 };
+
+template <typename App, typename LegalSigsTuple, typename... Ts>
+struct fast_combo_checker_2arg {
+    static constexpr bool value = []() constexpr {
+        if constexpr (!has_signature_with_arity<2, LegalSigsTuple>::value) {
+            return false;
+        } else {
+            using P = partition_tags<type_list<Ts...>>;
+            return illegal_combo_checker_2arg_partitioned<
+                App, LegalSigsTuple, typename P::tags, typename P::payloads>::value;
+        }
+    }();
+};
+
+template <typename App, typename LegalSigsTuple, typename... Ts>
+using illegal_combo_checker_2arg = fast_combo_checker_2arg<App, LegalSigsTuple, Ts...>;
 
 // SFINAE test for 3 arguments with strict values
 template <typename App, typename T1, typename T2, typename T3, typename = void>
@@ -588,20 +725,62 @@ constexpr bool check_triplet_rogue() {
     return false;
 }
 
-template <typename App, typename LegalSigsTuple, typename... Ts>
-struct illegal_combo_checker_3arg {
-    template <typename T1, typename T2>
-    static constexpr bool check_plane() {
-        return (check_triplet_rogue<App, LegalSigsTuple, T1, T2, Ts>() || ...);
-    }
+template <typename App, typename Tag, typename = void>
+struct has_arg2_tag_handler_3arg : std::false_type {};
 
+template <typename App, typename Tag>
+struct has_arg2_tag_handler_3arg<App, Tag,
+    std::void_t<decltype(
+        std::declval<App&>().on(std::declval<universal_probe>(), std::declval<strict_val<Tag>&>(), std::declval<universal_probe>())
+    )>>
+    : std::true_type {};
+
+template <typename App, typename Tag, typename = void>
+struct has_arg3_tag_handler_3arg : std::false_type {};
+
+template <typename App, typename Tag>
+struct has_arg3_tag_handler_3arg<App, Tag,
+    std::void_t<decltype(
+        std::declval<App&>().on(std::declval<universal_probe>(), std::declval<universal_probe>(), std::declval<strict_val<Tag>&>())
+    )>>
+    : std::true_type {};
+
+template <typename App, typename LegalSigsTuple, typename AllTypesList, typename TagList, typename PayloadList>
+struct illegal_combo_checker_3arg_partitioned;
+
+template <typename App, typename LegalSigsTuple, typename... AllTypes, typename... Tags, typename... Payloads>
+struct illegal_combo_checker_3arg_partitioned<App, LegalSigsTuple, type_list<AllTypes...>, type_list<Tags...>, type_list<Payloads...>> {
+    static constexpr bool has_bad_tag_pos = (has_arg2_tag_handler_3arg<App, Tags>::value || ...) ||
+                                            (has_arg3_tag_handler_3arg<App, Tags>::value || ...);
+
+    template <typename T1, typename P2>
+    static constexpr bool check_col() {
+        return (check_triplet_rogue<App, LegalSigsTuple, T1, P2, Payloads>() || ...);
+    }
     template <typename T1>
-    static constexpr bool check_row() {
-        return (check_plane<T1, Ts>() || ...);
+    static constexpr bool check_plane() {
+        return (check_col<T1, Payloads>() || ...);
     }
+    static constexpr bool has_bad_triplets = (check_plane<AllTypes>() || ...);
 
-    static constexpr bool value = (check_row<Ts>() || ...);
+    static constexpr bool value = has_bad_tag_pos || has_bad_triplets;
 };
+
+template <typename App, typename LegalSigsTuple, typename... Ts>
+struct fast_combo_checker_3arg {
+    static constexpr bool value = []() constexpr {
+        if constexpr (!has_signature_with_arity<3, LegalSigsTuple>::value) {
+            return false;
+        } else {
+            using P = partition_tags<type_list<Ts...>>;
+            return illegal_combo_checker_3arg_partitioned<
+                App, LegalSigsTuple, type_list<Ts...>, typename P::tags, typename P::payloads>::value;
+        }
+    }();
+};
+
+template <typename App, typename LegalSigsTuple, typename... Ts>
+using illegal_combo_checker_3arg = fast_combo_checker_3arg<App, LegalSigsTuple, Ts...>;
 
 // SFINAE detector for rogue / orphan on(...) declarations
 template <typename App, typename LegalSigsTuple, typename... LegalTypes>
@@ -611,9 +790,9 @@ class rogue_handler_detector {
 
     // Test 1: Single argument on(Bad) - catches rogue event/field types, primitives, typos
     template <typename A>
-    static auto test_1arg(int) -> decltype(std::declval<A&>().on(std::declval<Bad>()), std::true_type{});
+    static auto test_1arg_bad(int) -> decltype(std::declval<A&>().on(std::declval<Bad>()), std::true_type{});
     template <typename>
-    static auto test_1arg(...) -> std::false_type;
+    static auto test_1arg_bad(...) -> std::false_type;
 
     // Test 2: Two arguments with rogue type: on(Bad, Any), on(Any, Bad)
     template <typename A>
@@ -626,9 +805,15 @@ class rogue_handler_detector {
     template <typename>
     static auto test_2arg_bad2(...) -> std::false_type;
 
+    // Test 2b: Any 2-argument handler (used when actor has zero legal 2-arg signatures)
+    template <typename A>
+    static auto test_2arg_any(int) -> decltype(std::declval<A&>().on(std::declval<Any>(), std::declval<Any>()), std::true_type{});
+    template <typename>
+    static auto test_2arg_any(...) -> std::false_type;
+
     // Test 3: Three arguments with rogue type: on(Bad, Any, Any), on(Any, Bad, Any), on(Any, Any, Bad)
     template <typename A>
-    static auto test_3arg_bad1(int) -> decltype(std::declval<A&>().on(std::declval<Bad>(), std::declval<Any>(), std::declval<Any>()), std::true_type{});
+    static auto test_3arg_bad1(int) -> decltype(std::declval<A&>().on(std::declval<Bad>(), std::declval<Any>()), std::true_type{});
     template <typename>
     static auto test_3arg_bad1(...) -> std::false_type;
 
@@ -642,7 +827,7 @@ class rogue_handler_detector {
     template <typename>
     static auto test_3arg_bad3(...) -> std::false_type;
 
-    // Test 3b: Any 3-argument handler
+    // Test 3b: Any 3-argument handler (used when actor has zero legal 3-arg signatures)
     template <typename A>
     static auto test_3arg_any(int) -> decltype(std::declval<A&>().on(std::declval<Any>(), std::declval<Any>(), std::declval<Any>()), std::true_type{});
     template <typename>
@@ -654,17 +839,36 @@ class rogue_handler_detector {
     template <typename>
     static auto test_4arg_bad(...) -> std::false_type;
 
+    static constexpr bool check_rogue() {
+        if (decltype(test_1arg_bad<App>(0))::value) return true;
+        if (illegal_combo_checker_1arg<App, LegalSigsTuple, LegalTypes...>::value) return true;
+
+        if constexpr (!has_signature_with_arity<2, LegalSigsTuple>::value) {
+            if (decltype(test_2arg_any<App>(0))::value) return true;
+        } else {
+            if (decltype(test_2arg_bad1<App>(0))::value) return true;
+            if (decltype(test_2arg_bad2<App>(0))::value) return true;
+            if (fast_combo_checker_2arg<App, LegalSigsTuple, LegalTypes...>::value) return true;
+        }
+
+        if constexpr (!has_signature_with_arity<3, LegalSigsTuple>::value) {
+            if (decltype(test_3arg_any<App>(0))::value) return true;
+        } else {
+            if (decltype(test_3arg_bad1<App>(0))::value) return true;
+            if (decltype(test_3arg_bad2<App>(0))::value) return true;
+            if (decltype(test_3arg_bad3<App>(0))::value) return true;
+            if (fast_combo_checker_3arg<App, LegalSigsTuple, LegalTypes...>::value) return true;
+        }
+
+        if constexpr (!has_signature_with_arity<4, LegalSigsTuple>::value) {
+            if (decltype(test_4arg_bad<App>(0))::value) return true;
+        }
+
+        return false;
+    }
+
 public:
-    static constexpr bool has_rogue = decltype(test_1arg<App>(0))::value ||
-                                      decltype(test_2arg_bad1<App>(0))::value ||
-                                      decltype(test_2arg_bad2<App>(0))::value ||
-                                      decltype(test_3arg_bad1<App>(0))::value ||
-                                      decltype(test_3arg_bad2<App>(0))::value ||
-                                      decltype(test_3arg_bad3<App>(0))::value ||
-                                      (!has_signature_with_arity<3, LegalSigsTuple>::value && decltype(test_3arg_any<App>(0))::value) ||
-                                      decltype(test_4arg_bad<App>(0))::value ||
-                                      illegal_combo_checker_2arg<App, LegalSigsTuple, LegalTypes...>::value ||
-                                      illegal_combo_checker_3arg<App, LegalSigsTuple, LegalTypes...>::value;
+    static constexpr bool has_rogue = check_rogue();
 };
 
 template <typename App, typename LegalSigsTuple, typename... LegalTypes>

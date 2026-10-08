@@ -132,7 +132,7 @@ protected:
 /**
  * @brief Code-generated CRTP Actor for CockpitDomain
  */
-template <typename Derived, reaktar::StrictValidation Validation = reaktar::StrictValidation::kDisabled, typename ExecutionPolicy = ::reaktar::DirectExecution>
+template <typename Derived, typename ExecutionPolicy = ::reaktar::DirectExecution>
 class CockpitDomainActor : public CockpitDomainActorBase {
 public:
     using Base = CockpitDomainActorBase;
@@ -479,6 +479,32 @@ public:
 
     vehicle_supervisor::skeleton::VehicleSupervisorSkeleton& get_supervisorport_skeleton() { return supervisorport_skeleton_; }
 
+    using legal_signatures = std::tuple<
+        reaktar::sig<>,
+        reaktar::sig<::reaktar::tags::vehicle_supervisor::methods::ResetTripMeter>,
+        reaktar::sig<float>,
+        reaktar::sig<uint32_t>,
+        reaktar::sig<vehicle_data::CabinSensorData>,
+        reaktar::sig<vehicle_data::DriveMode>,
+        reaktar::sig<vehicle_data::LocationPoint>,
+        reaktar::sig<vehicle_data::SpeedData>,
+        reaktar::sig<::reaktar::tags::body_control::fields::OutsideAirQuality, uint32_t>,
+        reaktar::sig<::reaktar::tags::body_control::fields::RainSensorLevel, uint32_t>,
+        reaktar::sig<::reaktar::tags::body_control::fields::TargetCabinTemperature, float>,
+        reaktar::sig<::reaktar::tags::body_control::fields::WindowPosition, uint32_t>,
+        reaktar::sig<::reaktar::tags::infotainment::geo::navigation::events::CurrentLocation, vehicle_data::LocationPoint>,
+        reaktar::sig<::reaktar::tags::powertrain::events::CabinSensors, vehicle_data::CabinSensorData>,
+        reaktar::sig<::reaktar::tags::powertrain::events::VehicleSpeed, vehicle_data::SpeedData>,
+        reaktar::sig<::reaktar::tags::vehicle_supervisor::fields::CalibrationKey, uint32_t>,
+        reaktar::sig<::reaktar::tags::vehicle_supervisor::fields::CurrentDriveMode, vehicle_data::DriveMode>,
+        reaktar::sig<::reaktar::tags::vehicle_supervisor::methods::CalibrateOdometer, uint32_t>,
+        reaktar::sig<::reaktar::tags::vehicle_supervisor::methods::TriggerDiagnostic, uint32_t>,
+        reaktar::sig<ara::core::String, uint32_t>,
+        reaktar::sig<float, bool>,
+        reaktar::sig<::reaktar::tags::hmi::methods::ShowPopup, ara::core::String, uint32_t>,
+        reaktar::sig<::reaktar::tags::vehicle_supervisor::methods::SetSpeedLimiter, float, bool>
+    >;
+
     explicit CockpitDomainActor(
         reaktar::InstanceSpecifier hmiport_instance = reaktar::InstanceSpecifier("CockpitDomain/RootSwComponent/HmiPort"),
         reaktar::InstanceSpecifier supervisorport_instance = reaktar::InstanceSpecifier("CockpitDomain/RootSwComponent/SupervisorPort"),
@@ -488,32 +514,8 @@ public:
         , hmiport_skeleton_(this, std::move(hmiport_instance), mode)
         , supervisorport_skeleton_(this, std::move(supervisorport_instance), mode)
     {
-        if constexpr (Validation == reaktar::StrictValidation::kEnabled) {
-            using LegalSignaturesTuple = std::tuple<
-                reaktar::sig<>,
-                reaktar::sig<::reaktar::tags::vehicle_supervisor::methods::ResetTripMeter>,
-                reaktar::sig<float>,
-                reaktar::sig<uint32_t>,
-                reaktar::sig<vehicle_data::CabinSensorData>,
-                reaktar::sig<vehicle_data::DriveMode>,
-                reaktar::sig<vehicle_data::LocationPoint>,
-                reaktar::sig<vehicle_data::SpeedData>,
-                reaktar::sig<::reaktar::tags::body_control::fields::OutsideAirQuality, uint32_t>,
-                reaktar::sig<::reaktar::tags::body_control::fields::RainSensorLevel, uint32_t>,
-                reaktar::sig<::reaktar::tags::body_control::fields::TargetCabinTemperature, float>,
-                reaktar::sig<::reaktar::tags::body_control::fields::WindowPosition, uint32_t>,
-                reaktar::sig<::reaktar::tags::infotainment::geo::navigation::events::CurrentLocation, vehicle_data::LocationPoint>,
-                reaktar::sig<::reaktar::tags::powertrain::events::CabinSensors, vehicle_data::CabinSensorData>,
-                reaktar::sig<::reaktar::tags::powertrain::events::VehicleSpeed, vehicle_data::SpeedData>,
-                reaktar::sig<::reaktar::tags::vehicle_supervisor::fields::CalibrationKey, uint32_t>,
-                reaktar::sig<::reaktar::tags::vehicle_supervisor::fields::CurrentDriveMode, vehicle_data::DriveMode>,
-                reaktar::sig<::reaktar::tags::vehicle_supervisor::methods::CalibrateOdometer, uint32_t>,
-                reaktar::sig<::reaktar::tags::vehicle_supervisor::methods::TriggerDiagnostic, uint32_t>,
-                reaktar::sig<ara::core::String, uint32_t>,
-                reaktar::sig<float, bool>,
-                reaktar::sig<::reaktar::tags::hmi::methods::ShowPopup, ara::core::String, uint32_t>,
-                reaktar::sig<::reaktar::tags::vehicle_supervisor::methods::SetSpeedLimiter, float, bool>
-            >;
+        if constexpr (::reaktar::strict_validation_enabled) {
+            using LegalSignaturesTuple = legal_signatures;
 
             static_assert(!reaktar::has_rogue_handler_v<Derived, LegalSignaturesTuple
                 , ara::core::String
@@ -541,11 +543,10 @@ public:
             >,
             "\n"
             "====================================================================================\n"
-            " ReaktAR Compile Error: Rogue/orphan on(...) handler detected in CockpitDomain!\n"
+            " Reaktar Compile Error: Rogue/orphan on(...) handler detected in CockpitDomain!\n"
             " You declared an on(...) method taking a parameter type or signature combination that\n"
             " does NOT exist in this ARXML interface (or is a typo/dead handler).\n"
-            " To disable strict ARXML compile-time validation, inherit from:\n"
-            "   reaktar::generated::CockpitDomainActor<CockpitDomain, reaktar::StrictValidation::kDisabled>\n"
+            " To disable strict ARXML compile-time validation, build without -DREAKTAR_STRICT_VALIDATION\n"
             "====================================================================================\n"
             );
         }
@@ -642,7 +643,7 @@ public:
             }
         }
         else {
-            using SigTuple [[maybe_unused]] = std::tuple<std::decay_t<Args>...>;
+            using SigTuple = std::tuple<std::decay_t<Args>...>;
             if constexpr (std::is_same_v<SigTuple, std::tuple<uint32_t, uint32_t>>) {
                 auto proxy_lease = this->body_control_slot_.acquire("body_control");
                 if (proxy_lease) {
@@ -1153,16 +1154,16 @@ private:
 };
 
 // Convenience alias mapping Component name to Executable Actor
-template <typename Derived, reaktar::StrictValidation Validation = reaktar::StrictValidation::kDisabled, typename ExecutionPolicy = ::reaktar::DirectExecution>
-using CockpitDomainAppActor = CockpitDomainActor<Derived, Validation, ExecutionPolicy>;
+template <typename Derived, typename ExecutionPolicy = ::reaktar::DirectExecution>
+using CockpitDomainAppActor = CockpitDomainActor<Derived, ExecutionPolicy>;
 using CockpitDomainAppActorBase = CockpitDomainActorBase;
 
 // Convenience aliases for specifying ExecutionPolicy first
-template <typename Derived, typename ExecutionPolicy = ::reaktar::SynchronizedExecution, reaktar::StrictValidation Validation = reaktar::StrictValidation::kDisabled>
-using CockpitDomainActorWithPolicy = CockpitDomainActor<Derived, Validation, ExecutionPolicy>;
+template <typename Derived, typename ExecutionPolicy = ::reaktar::SynchronizedExecution>
+using CockpitDomainActorWithPolicy = CockpitDomainActor<Derived, ExecutionPolicy>;
 
-template <typename Derived, typename ExecutionPolicy = ::reaktar::SynchronizedExecution, reaktar::StrictValidation Validation = reaktar::StrictValidation::kDisabled>
-using CockpitDomainAppActorWithPolicy = CockpitDomainActor<Derived, Validation, ExecutionPolicy>;
+template <typename Derived, typename ExecutionPolicy = ::reaktar::SynchronizedExecution>
+using CockpitDomainAppActorWithPolicy = CockpitDomainActor<Derived, ExecutionPolicy>;
 
 } // namespace generated
 } // namespace reaktar

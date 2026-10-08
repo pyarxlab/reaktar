@@ -119,7 +119,7 @@ include/
 scripts/
   generate_actor.py     # Code generator (ARXML -> Actor & TestBench)
   templates/            # Jinja2 code generation templates
-  package_reactar.py    # Bundler for redistributable framework packages
+  package_reaktar.py    # Bundler for redistributable framework packages
 tests/
   test_smoke.cpp        # Smoke tests for core primitives and generated actors
   mock/                 # Mock AUTOSAR Adaptive environment for testing
@@ -134,7 +134,7 @@ To package only the core Reaktar library and generated headers into a clean redi
 ```bash
 make package
 # Or with a custom ARXML model:
-python3 scripts/package_reactar.py path/to/model.arxml -o dist/
+python3 scripts/package_reaktar.py path/to/model.arxml -o dist/
 ```
 
 ---

@@ -37,7 +37,7 @@ namespace generated {
 /**
  * @brief Code-generated CRTP Actor for {{ model.exe_name }}
  */
-template <typename Derived, reaktar::StrictValidation Validation = reaktar::StrictValidation::kDisabled, typename ExecutionPolicy = ::reaktar::DirectExecution>
+template <typename Derived, typename ExecutionPolicy = ::reaktar::DirectExecution>
 class {{ model.exe_name }}Actor : public {{ model.exe_name }}ActorBase {
 public:
     using Base = {{ model.exe_name }}ActorBase;
@@ -80,16 +80,16 @@ public:
 };
 
 // Convenience alias mapping Component name to Executable Actor
-template <typename Derived, reaktar::StrictValidation Validation = reaktar::StrictValidation::kDisabled, typename ExecutionPolicy = ::reaktar::DirectExecution>
-using {{ model.app_short_name }}Actor = {{ model.exe_name }}Actor<Derived, Validation, ExecutionPolicy>;
+template <typename Derived, typename ExecutionPolicy = ::reaktar::DirectExecution>
+using {{ model.app_short_name }}Actor = {{ model.exe_name }}Actor<Derived, ExecutionPolicy>;
 using {{ model.app_short_name }}ActorBase = {{ model.exe_name }}ActorBase;
 
 // Convenience aliases for specifying ExecutionPolicy first
-template <typename Derived, typename ExecutionPolicy = ::reaktar::SynchronizedExecution, reaktar::StrictValidation Validation = reaktar::StrictValidation::kDisabled>
-using {{ model.exe_name }}ActorWithPolicy = {{ model.exe_name }}Actor<Derived, Validation, ExecutionPolicy>;
+template <typename Derived, typename ExecutionPolicy = ::reaktar::SynchronizedExecution>
+using {{ model.exe_name }}ActorWithPolicy = {{ model.exe_name }}Actor<Derived, ExecutionPolicy>;
 
-template <typename Derived, typename ExecutionPolicy = ::reaktar::SynchronizedExecution, reaktar::StrictValidation Validation = reaktar::StrictValidation::kDisabled>
-using {{ model.app_short_name }}ActorWithPolicy = {{ model.exe_name }}Actor<Derived, Validation, ExecutionPolicy>;
+template <typename Derived, typename ExecutionPolicy = ::reaktar::SynchronizedExecution>
+using {{ model.app_short_name }}ActorWithPolicy = {{ model.exe_name }}Actor<Derived, ExecutionPolicy>;
 
 } // namespace generated
 } // namespace reaktar

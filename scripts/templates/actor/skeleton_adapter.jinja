@@ -145,6 +145,12 @@
     {{ skel.cls }}& {{ skel.getter_name }}() { return {{ skel.var_name }}; }
 
 {% endfor %}
+    using legal_signatures = std::tuple<
+{% for sig in model.legal_signatures %}
+        reaktar::sig<{{ sig | join(', ') }}>{{ "," if not loop.last else "" }}
+{% endfor %}
+    >;
+
     explicit {{ model.exe_name }}Actor(
 {% for skel in model.skeletons %}
         reaktar::InstanceSpecifier {{ skel.port_name.lower() }}_instance = reaktar::InstanceSpecifier("{{ skel.instance_spec }}"),
@@ -156,12 +162,8 @@
         , {{ skel.var_name }}(this, std::move({{ skel.port_name.lower() }}_instance), mode)
 {% endfor %}
     {
-        if constexpr (Validation == reaktar::StrictValidation::kEnabled) {
-            using LegalSignaturesTuple = std::tuple<
-{% for sig in model.legal_signatures %}
-                reaktar::sig<{{ sig | join(', ') }}>{{ "," if not loop.last else "" }}
-{% endfor %}
-            >;
+        if constexpr (::reaktar::strict_validation_enabled) {
+            using LegalSignaturesTuple = legal_signatures;
 
             static_assert(!reaktar::has_rogue_handler_v<Derived, LegalSignaturesTuple
 {% for t in model.legal_types %}
@@ -173,11 +175,10 @@
             >,
             "\n"
             "====================================================================================\n"
-            " ReaktAR Compile Error: Rogue/orphan on(...) handler detected in {{ model.exe_name }}!\n"
+            " Reaktar Compile Error: Rogue/orphan on(...) handler detected in {{ model.exe_name }}!\n"
             " You declared an on(...) method taking a parameter type or signature combination that\n"
             " does NOT exist in this ARXML interface (or is a typo/dead handler).\n"
-            " To disable strict ARXML compile-time validation, inherit from:\n"
-            "   reaktar::generated::{{ model.exe_name }}Actor<{{ model.exe_name }}, reaktar::StrictValidation::kDisabled>\n"
+            " To disable strict ARXML compile-time validation, build without -DREAKTAR_STRICT_VALIDATION\n"
             "====================================================================================\n"
             );
         }

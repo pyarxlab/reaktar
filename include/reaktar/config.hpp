@@ -31,3 +31,36 @@
     !defined(REAKTAR_AUTO_DISCOVER)
     #define REAKTAR_AUTO_DISCOVER 1
 #endif
+
+// ============================================================================
+// Compile-time Strict Validation Configuration
+// ============================================================================
+
+/**
+ * Compile-time Strict Validation Control:
+ *
+ * Can be enabled or disabled via build system flags (-D):
+ *   -DREAKTAR_STRICT_VALIDATION=1 (or bare -DREAKTAR_STRICT_VALIDATION)
+ *   -DREAKTAR_ENABLE_STRICT_VALIDATION
+ *   -DREAKTAR_DISABLE_STRICT_VALIDATION
+ *
+ * Never overrides flags supplied by the build system.
+ * Defaults to 0 (disabled) for maximum compilation speed during development.
+ */
+#ifndef REAKTAR_STRICT_VALIDATION
+#  if defined(REAKTAR_DISABLE_STRICT_VALIDATION)
+#    define REAKTAR_STRICT_VALIDATION 0
+#  elif defined(REAKTAR_ENABLE_STRICT_VALIDATION)
+#    define REAKTAR_STRICT_VALIDATION 1
+#  else
+#    define REAKTAR_STRICT_VALIDATION 0
+#  endif
+#endif
+
+namespace reaktar {
+
+inline constexpr bool strict_validation_enabled = (REAKTAR_STRICT_VALIDATION != 0);
+
+} // namespace reaktar
+
+

@@ -15,7 +15,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 find_package(Threads REQUIRED)
 
-# Interface library for consumer applications (pure ReaktAR headers)
+# Interface library for consumer applications (pure Reaktar headers)
 add_library(reaktar INTERFACE)
 target_include_directories(reaktar INTERFACE
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
@@ -37,5 +37,4 @@ add_executable(reaktar_smoke_tests
 )
 target_link_libraries(reaktar_smoke_tests PRIVATE reaktar reaktar_test_mock)
 add_test(NAME core_smoke_tests COMMAND reaktar_smoke_tests)
-
 

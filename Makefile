@@ -22,7 +22,7 @@ help:
 	@echo "                   Usage: make generate [ARXML=arxml/vehicle_system.arxml] [PASS_BY=const_ref|value]"
 	@echo "  make build     - Configure and build all C++ targets (Release)"
 	@echo "  make test      - Run all smoke test suites via CTest"
-	@echo "  make package   - Build portable package containing only ReaktAR & generated headers"
+	@echo "  make package   - Build portable package containing only Reaktar & generated headers"
 	@echo "                   Usage: make package [ARXML=arxml/vehicle_system.arxml] [OUTPUT=dist]"
 	@echo "  make clean     - Remove build artifacts and package archives"
 
@@ -40,7 +40,7 @@ $(BUILD_DIR)/CMakeCache.txt: CMakeLists.txt
 	@cmake -B $(BUILD_DIR) -DCMAKE_BUILD_TYPE=Release
 
 build: $(BUILD_DIR)/CMakeCache.txt
-	@echo "==> Building ReaktAR..."
+	@echo "==> Building Reaktar..."
 	@cmake --build $(BUILD_DIR)
 
 test: build
@@ -48,8 +48,8 @@ test: build
 	@ctest --test-dir $(BUILD_DIR) --output-on-failure
 
 package:
-	@echo "==> Packaging ReaktAR framework..."
-	@$(PYTHON) scripts/package_reactar.py $(ARXML) $(if $(OUTPUT),-o $(OUTPUT),)
+	@echo "==> Packaging Reaktar framework..."
+	@$(PYTHON) scripts/package_reaktar.py $(ARXML) $(if $(OUTPUT),-o $(OUTPUT),)
 
 clean:
 	@echo "==> Cleaning build artifacts..."

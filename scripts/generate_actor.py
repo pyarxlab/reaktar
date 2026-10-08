@@ -7,7 +7,7 @@
 # Copyright (c) 2026 Pyarx Lab
 # ==============================================================================
 """
-ReactAR Code Generator:
+Reaktar Code Generator:
 Directly processes pyarx domain nodes without intermediate dataclasses.
 Walks the ARXML model directly and generates C++ Actor, TestBench, and Tags headers.
 """
@@ -813,7 +813,7 @@ def generate_code(arxml_path: Path, output_dir: Path, pass_by: str = "const_ref"
 
 if __name__ == "__main__":
     import argparse
-    parser = argparse.ArgumentParser(description="ReactAR Actor & TestBench Generator")
+    parser = argparse.ArgumentParser(description="Reaktar Actor & TestBench Generator")
     parser.add_argument("arxml", nargs="?", default="arxml/vehicle_system.arxml",
                         help="Path to input ARXML model file (.arxml) [default: arxml/vehicle_system.arxml]")
     parser.add_argument("-o", "--output", default="include/generated_framework", help="Output directory for generated headers")

@@ -50,12 +50,12 @@
     }
 
     template <typename... Args>
-    auto emit(Args&&... args) {
+    auto emit({% if model.outbound_by_type | length > 0 or model.outbound_multi | length > 0 %}Args&&... args{% else %}Args&&...{% endif %}) {
         if constexpr (sizeof...(Args) == 1) {
-            using PayloadType = std::decay_t<typename std::tuple_element<0, std::tuple<Args...>>::type>;
 {% if model.outbound_by_type | length == 0 %}
             static_assert(!sizeof...(Args), "reaktar: emit(payload) failed! The payload type is not produced by any skeleton event, field, or single-arg RPC method in this Actor.");
 {% else %}
+            using PayloadType = std::decay_t<typename std::tuple_element<0, std::tuple<Args...>>::type>;
 {% for item in model.outbound_by_type %}
             {{ "if" if loop.first else "else if" }} constexpr (std::is_same_v<PayloadType, {{ item.type }}>) {
 {% if item.kind == "skeleton_event" %}
@@ -97,7 +97,7 @@
 {% if model.outbound_multi | length == 0 %}
             static_assert(!sizeof...(Args), "reaktar: emit(args...) failed! The argument list does not match any unique proxy RPC method in this Actor. Use emit<Tag>(args...) if ambiguous.");
 {% else %}
-            using SigTuple [[maybe_unused]] = std::tuple<std::decay_t<Args>...>;
+            using SigTuple = std::tuple<std::decay_t<Args>...>;
 {% for item in model.outbound_multi %}
             {{ "if" if loop.first else "else if" }} constexpr (std::is_same_v<SigTuple, std::tuple<{% for t in item.sig_types %}{{ t }}{{ ", " if not loop.last else "" }}{% endfor %}>>) {
                 auto proxy_lease = this->{{ item.service_ident }}_slot_.acquire("{{ item.service_ident }}");

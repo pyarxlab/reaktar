@@ -85,7 +85,7 @@ protected:
 /**
  * @brief Code-generated CRTP Actor for Telemetry
  */
-template <typename Derived, reaktar::StrictValidation Validation = reaktar::StrictValidation::kDisabled, typename ExecutionPolicy = ::reaktar::DirectExecution>
+template <typename Derived, typename ExecutionPolicy = ::reaktar::DirectExecution>
 class TelemetryActor : public TelemetryActorBase {
 public:
     using Base = TelemetryActorBase;
@@ -335,6 +335,19 @@ public:
 
     vehicle_supervisor::skeleton::VehicleSupervisorSkeleton& get_supervisorport_skeleton() { return supervisorport_skeleton_; }
 
+    using legal_signatures = std::tuple<
+        reaktar::sig<>,
+        reaktar::sig<::reaktar::tags::vehicle_supervisor::methods::ResetTripMeter>,
+        reaktar::sig<uint32_t>,
+        reaktar::sig<vehicle_data::DriveMode>,
+        reaktar::sig<::reaktar::tags::vehicle_supervisor::fields::CalibrationKey, uint32_t>,
+        reaktar::sig<::reaktar::tags::vehicle_supervisor::fields::CurrentDriveMode, vehicle_data::DriveMode>,
+        reaktar::sig<::reaktar::tags::vehicle_supervisor::methods::CalibrateOdometer, uint32_t>,
+        reaktar::sig<::reaktar::tags::vehicle_supervisor::methods::TriggerDiagnostic, uint32_t>,
+        reaktar::sig<float, bool>,
+        reaktar::sig<::reaktar::tags::vehicle_supervisor::methods::SetSpeedLimiter, float, bool>
+    >;
+
     explicit TelemetryActor(
         reaktar::InstanceSpecifier supervisorport_instance = reaktar::InstanceSpecifier("Telemetry/RootSwComponent/SupervisorPort"),
         ara::com::MethodCallProcessingMode mode = ara::com::MethodCallProcessingMode::kEvent
@@ -342,19 +355,8 @@ public:
         : TelemetryActorBase()
         , supervisorport_skeleton_(this, std::move(supervisorport_instance), mode)
     {
-        if constexpr (Validation == reaktar::StrictValidation::kEnabled) {
-            using LegalSignaturesTuple = std::tuple<
-                reaktar::sig<>,
-                reaktar::sig<::reaktar::tags::vehicle_supervisor::methods::ResetTripMeter>,
-                reaktar::sig<uint32_t>,
-                reaktar::sig<vehicle_data::DriveMode>,
-                reaktar::sig<::reaktar::tags::vehicle_supervisor::fields::CalibrationKey, uint32_t>,
-                reaktar::sig<::reaktar::tags::vehicle_supervisor::fields::CurrentDriveMode, vehicle_data::DriveMode>,
-                reaktar::sig<::reaktar::tags::vehicle_supervisor::methods::CalibrateOdometer, uint32_t>,
-                reaktar::sig<::reaktar::tags::vehicle_supervisor::methods::TriggerDiagnostic, uint32_t>,
-                reaktar::sig<float, bool>,
-                reaktar::sig<::reaktar::tags::vehicle_supervisor::methods::SetSpeedLimiter, float, bool>
-            >;
+        if constexpr (::reaktar::strict_validation_enabled) {
+            using LegalSignaturesTuple = legal_signatures;
 
             static_assert(!reaktar::has_rogue_handler_v<Derived, LegalSignaturesTuple
                 , bool
@@ -370,11 +372,10 @@ public:
             >,
             "\n"
             "====================================================================================\n"
-            " ReaktAR Compile Error: Rogue/orphan on(...) handler detected in Telemetry!\n"
+            " Reaktar Compile Error: Rogue/orphan on(...) handler detected in Telemetry!\n"
             " You declared an on(...) method taking a parameter type or signature combination that\n"
             " does NOT exist in this ARXML interface (or is a typo/dead handler).\n"
-            " To disable strict ARXML compile-time validation, inherit from:\n"
-            "   reaktar::generated::TelemetryActor<Telemetry, reaktar::StrictValidation::kDisabled>\n"
+            " To disable strict ARXML compile-time validation, build without -DREAKTAR_STRICT_VALIDATION\n"
             "====================================================================================\n"
             );
         }
@@ -521,16 +522,16 @@ private:
 };
 
 // Convenience alias mapping Component name to Executable Actor
-template <typename Derived, reaktar::StrictValidation Validation = reaktar::StrictValidation::kDisabled, typename ExecutionPolicy = ::reaktar::DirectExecution>
-using TelemetryAppActor = TelemetryActor<Derived, Validation, ExecutionPolicy>;
+template <typename Derived, typename ExecutionPolicy = ::reaktar::DirectExecution>
+using TelemetryAppActor = TelemetryActor<Derived, ExecutionPolicy>;
 using TelemetryAppActorBase = TelemetryActorBase;
 
 // Convenience aliases for specifying ExecutionPolicy first
-template <typename Derived, typename ExecutionPolicy = ::reaktar::SynchronizedExecution, reaktar::StrictValidation Validation = reaktar::StrictValidation::kDisabled>
-using TelemetryActorWithPolicy = TelemetryActor<Derived, Validation, ExecutionPolicy>;
+template <typename Derived, typename ExecutionPolicy = ::reaktar::SynchronizedExecution>
+using TelemetryActorWithPolicy = TelemetryActor<Derived, ExecutionPolicy>;
 
-template <typename Derived, typename ExecutionPolicy = ::reaktar::SynchronizedExecution, reaktar::StrictValidation Validation = reaktar::StrictValidation::kDisabled>
-using TelemetryAppActorWithPolicy = TelemetryActor<Derived, Validation, ExecutionPolicy>;
+template <typename Derived, typename ExecutionPolicy = ::reaktar::SynchronizedExecution>
+using TelemetryAppActorWithPolicy = TelemetryActor<Derived, ExecutionPolicy>;
 
 } // namespace generated
 } // namespace reaktar
