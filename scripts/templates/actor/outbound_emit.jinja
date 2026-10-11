@@ -3,9 +3,131 @@
     // ------------------------------------------------------------------------
     template <typename Tag, typename... Args>
     auto emit(Args&&... args) {
-{% if model.outbound_tagged | length == 0 %}
-        static_assert(!sizeof(Tag*), "reaktar: emit called with unknown tag (no outgoing events/methods available)!");
+{% if model.ports_outbound | length > 0 %}
+{% for port in model.ports_outbound %}
+        {{ "if" if loop.first else "else if" }} constexpr (std::is_same_v<Tag, typename Base::ports::{{ port.name }}>) {
+{% if port.total_outbound_count == 0 %}
+            static_assert(!sizeof(Tag*), "reaktar: Port '{{ port.name }}' has no outbound events, notifiers, or RPC methods!");
 {% else %}
+            if constexpr (sizeof...(Args) == 1) {
+{% if port.single_arg_items | length == 0 %}
+                static_assert(!sizeof(Tag*), "reaktar: emit<Port>(payload) failed! Port '{{ port.name }}' has no outbound single-argument items.");
+{% else %}
+                using PayloadType = std::decay_t<typename std::tuple_element<0, std::tuple<Args...>>::type>;
+{% for item in port.single_arg_items %}
+                {{ "if" if loop.first else "else if" }} constexpr (std::is_same_v<PayloadType, {{ item.type }}>) {
+{% if item.is_ambiguous %}
+                    static_assert(!sizeof(Tag*), "reaktar: emit<Port>(payload) is ambiguous on port '{{ port.name }}'! Multiple items accept type '{{ item.type }}'. Use emit<ports::{{ port.name }}::ItemTag>(...) instead.");
+{% elif item.kind == "skeleton_event" %}
+                    {{ item.var_name }}.{{ item.member }}.Send(std::forward<Args>(args)...);
+                    return ::reaktar::EmitStatus{true};
+{% elif item.kind == "skeleton_field_update" %}
+                    {{ item.var_name }}.{{ item.member }}.Update(std::forward<Args>(args)...);
+                    return ::reaktar::EmitStatus{true};
+{% elif item.kind == "proxy_faf" %}
+                    auto proxy_lease = this->{{ item.slot_name }}.acquire("{{ item.port_name }}");
+                    if (proxy_lease) {
+                        proxy_lease->{{ item.member }}(std::forward<Args>(args)...);
+                        return ::reaktar::EmitStatus{true};
+                    }
+                    return ::reaktar::EmitStatus{false};
+{% elif item.kind == "proxy_rpc" %}
+                    auto proxy_lease = this->{{ item.slot_name }}.acquire("{{ item.port_name }}");
+                    using AsyncResType = decltype(make_async_result(proxy_lease->{{ item.member }}(std::forward<Args>(args)...)));
+                    if (proxy_lease) {
+                        return make_async_result(proxy_lease->{{ item.member }}(std::forward<Args>(args)...));
+                    }
+                    return AsyncResType::Failed();
+{% elif item.kind == "proxy_field_set" %}
+                    auto proxy_lease = this->{{ item.slot_name }}.acquire("{{ item.port_name }}");
+                    using AsyncResType = decltype(make_async_result(proxy_lease->{{ item.member }}.Set(std::forward<Args>(args)...)));
+                    if (proxy_lease) {
+                        return make_async_result(proxy_lease->{{ item.member }}.Set(std::forward<Args>(args)...));
+                    }
+                    return AsyncResType::Failed();
+{% endif %}
+                }
+{% endfor %}
+                else {
+                    static_assert(!sizeof(Tag*), "reaktar: emit<Port>(payload) failed! The payload type does not match any outbound event, notifier, or single-arg method on port '{{ port.name }}'.");
+                }
+{% endif %}
+            }
+            else {
+{% if port.multi_arg_items | length == 0 %}
+                static_assert(!sizeof(Tag*), "reaktar: emit<Port>(args...) failed! Port '{{ port.name }}' has no outbound multi-argument methods.");
+{% else %}
+                using SigTuple = std::tuple<std::decay_t<Args>...>;
+{% for item in port.multi_arg_items %}
+                {{ "if" if loop.first else "else if" }} constexpr (std::is_same_v<SigTuple, std::tuple<{% for t in item.sig_types %}{{ t }}{{ ", " if not loop.last else "" }}{% endfor %}>>) {
+{% if item.is_ambiguous %}
+                    static_assert(!sizeof(Tag*), "reaktar: emit<Port>(args...) is ambiguous on port '{{ port.name }}'! Multiple methods on port '{{ port.name }}' accept this signature. Use explicit method tag instead.");
+{% elif item.is_faf %}
+                    auto proxy_lease = this->{{ item.slot_name }}.acquire("{{ item.port_name }}");
+                    if (proxy_lease) {
+                        proxy_lease->{{ item.member }}(std::forward<Args>(args)...);
+                        return ::reaktar::EmitStatus{true};
+                    }
+                    return ::reaktar::EmitStatus{false};
+{% else %}
+                    auto proxy_lease = this->{{ item.slot_name }}.acquire("{{ item.port_name }}");
+                    using AsyncResType = decltype(make_async_result(proxy_lease->{{ item.member }}(std::forward<Args>(args)...)));
+                    if (proxy_lease) {
+                        return make_async_result(proxy_lease->{{ item.member }}(std::forward<Args>(args)...));
+                    }
+                    return AsyncResType::Failed();
+{% endif %}
+                }
+{% endfor %}
+                else {
+                    static_assert(!sizeof(Tag*), "reaktar: emit<Port>(args...) failed! The argument signature does not match any outbound method on port '{{ port.name }}'.");
+                }
+{% endif %}
+            }
+{% endif %}
+        }
+{% endfor %}
+{% for item in model.outbound_tagged %}
+        else if constexpr (std::is_same_v<Tag, {{ item.tag }}>) {
+{% if item.kind == "skeleton_event" %}
+            {{ item.var_name }}.{{ item.member }}.Send(std::forward<Args>(args)...);
+            return ::reaktar::EmitStatus{true};
+{% elif item.kind == "skeleton_field_update" %}
+            {{ item.var_name }}.{{ item.member }}.Update(std::forward<Args>(args)...);
+            return ::reaktar::EmitStatus{true};
+{% elif item.kind == "proxy_faf" %}
+            auto proxy_lease = this->{{ item.slot_name }}.acquire("{{ item.port_name }}");
+            if (proxy_lease) {
+                proxy_lease->{{ item.member }}(std::forward<Args>(args)...);
+                return ::reaktar::EmitStatus{true};
+            }
+            return ::reaktar::EmitStatus{false};
+{% elif item.kind == "proxy_rpc" %}
+            auto proxy_lease = this->{{ item.slot_name }}.acquire("{{ item.port_name }}");
+            using AsyncResType = decltype(make_async_result(proxy_lease->{{ item.member }}(std::forward<Args>(args)...)));
+            if (proxy_lease) {
+                return make_async_result(proxy_lease->{{ item.member }}(std::forward<Args>(args)...));
+            }
+            return AsyncResType::Failed();
+{% elif item.kind == "proxy_field_set" %}
+            auto proxy_lease = this->{{ item.slot_name }}.acquire("{{ item.port_name }}");
+            using AsyncResType = decltype(make_async_result(proxy_lease->{{ item.member }}.Set(std::forward<Args>(args)...)));
+            if (proxy_lease) {
+                return make_async_result(proxy_lease->{{ item.member }}.Set(std::forward<Args>(args)...));
+            }
+            return AsyncResType::Failed();
+{% endif %}
+        }
+{% endfor %}
+{% for ambig in model.outbound_ambiguous_tags %}
+        else if constexpr (std::is_same_v<Tag, {{ ambig.tag }}>) {
+            static_assert(!sizeof(Tag*), "reaktar: emit<Tag>(...) is ambiguous across multiple ports sharing the '{{ ambig.service }}' interface! Use emit<ports::PortName::Tag>(...) or emit<ports::PortName>(...) instead.");
+        }
+{% endfor %}
+        else {
+            static_assert(!sizeof(Tag*), "reaktar: emit called with unknown tag or port!");
+        }
+{% elif model.outbound_tagged | length > 0 %}
 {% for item in model.outbound_tagged %}
         {{ "if" if loop.first else "else if" }} constexpr (std::is_same_v<Tag, {{ item.tag }}>) {
 {% if item.kind == "skeleton_event" %}
@@ -15,21 +137,21 @@
             {{ item.var_name }}.{{ item.member }}.Update(std::forward<Args>(args)...);
             return ::reaktar::EmitStatus{true};
 {% elif item.kind == "proxy_faf" %}
-            auto proxy_lease = this->{{ item.service_ident }}_slot_.acquire("{{ item.service_ident }}");
+            auto proxy_lease = this->{{ item.slot_name }}.acquire("{{ item.port_name }}");
             if (proxy_lease) {
                 proxy_lease->{{ item.member }}(std::forward<Args>(args)...);
                 return ::reaktar::EmitStatus{true};
             }
             return ::reaktar::EmitStatus{false};
 {% elif item.kind == "proxy_rpc" %}
-            auto proxy_lease = this->{{ item.service_ident }}_slot_.acquire("{{ item.service_ident }}");
+            auto proxy_lease = this->{{ item.slot_name }}.acquire("{{ item.port_name }}");
             using AsyncResType = decltype(make_async_result(proxy_lease->{{ item.member }}(std::forward<Args>(args)...)));
             if (proxy_lease) {
                 return make_async_result(proxy_lease->{{ item.member }}(std::forward<Args>(args)...));
             }
             return AsyncResType::Failed();
 {% elif item.kind == "proxy_field_set" %}
-            auto proxy_lease = this->{{ item.service_ident }}_slot_.acquire("{{ item.service_ident }}");
+            auto proxy_lease = this->{{ item.slot_name }}.acquire("{{ item.port_name }}");
             using AsyncResType = decltype(make_async_result(proxy_lease->{{ item.member }}.Set(std::forward<Args>(args)...)));
             if (proxy_lease) {
                 return make_async_result(proxy_lease->{{ item.member }}.Set(std::forward<Args>(args)...));
@@ -38,9 +160,16 @@
 {% endif %}
         }
 {% endfor %}
+{% for ambig in model.outbound_ambiguous_tags %}
+        else if constexpr (std::is_same_v<Tag, {{ ambig.tag }}>) {
+            static_assert(!sizeof(Tag*), "reaktar: emit<Tag>(...) is ambiguous across multiple ports sharing the '{{ ambig.service }}' interface! Use emit<ports::PortName::Tag>(...) or emit<ports::PortName>(...) instead.");
+        }
+{% endfor %}
         else {
             static_assert(!sizeof(Tag*), "reaktar: emit called with unknown tag!");
         }
+{% else %}
+        static_assert(!sizeof(Tag*), "reaktar: emit called with unknown tag (no outgoing events/methods available)!");
 {% endif %}
     }
 
@@ -65,21 +194,21 @@
                 {{ item.var_name }}.{{ item.member }}.Update(std::forward<Args>(args)...);
                 return ::reaktar::EmitStatus{true};
 {% elif item.kind == "proxy_faf" %}
-                auto proxy_lease = this->{{ item.service_ident }}_slot_.acquire("{{ item.service_ident }}");
+                auto proxy_lease = this->{{ item.slot_name }}.acquire("{{ item.port_name }}");
                 if (proxy_lease) {
                     proxy_lease->{{ item.member }}(std::forward<Args>(args)...);
                     return ::reaktar::EmitStatus{true};
                 }
                 return ::reaktar::EmitStatus{false};
 {% elif item.kind == "proxy_rpc" %}
-                auto proxy_lease = this->{{ item.service_ident }}_slot_.acquire("{{ item.service_ident }}");
+                auto proxy_lease = this->{{ item.slot_name }}.acquire("{{ item.port_name }}");
                 using AsyncResType = decltype(make_async_result(proxy_lease->{{ item.member }}(std::forward<Args>(args)...)));
                 if (proxy_lease) {
                     return make_async_result(proxy_lease->{{ item.member }}(std::forward<Args>(args)...));
                 }
                 return AsyncResType::Failed();
 {% elif item.kind == "proxy_field_set" %}
-                auto proxy_lease = this->{{ item.service_ident }}_slot_.acquire("{{ item.service_ident }}");
+                auto proxy_lease = this->{{ item.slot_name }}.acquire("{{ item.port_name }}");
                 using AsyncResType = decltype(make_async_result(proxy_lease->{{ item.member }}.Set(std::forward<Args>(args)...)));
                 if (proxy_lease) {
                     return make_async_result(proxy_lease->{{ item.member }}.Set(std::forward<Args>(args)...));
@@ -100,7 +229,7 @@
             using SigTuple = std::tuple<std::decay_t<Args>...>;
 {% for item in model.outbound_multi %}
             {{ "if" if loop.first else "else if" }} constexpr (std::is_same_v<SigTuple, std::tuple<{% for t in item.sig_types %}{{ t }}{{ ", " if not loop.last else "" }}{% endfor %}>>) {
-                auto proxy_lease = this->{{ item.service_ident }}_slot_.acquire("{{ item.service_ident }}");
+                auto proxy_lease = this->{{ item.slot_name }}.acquire("{{ item.port_name }}");
 {% if item.is_faf %}
                 if (proxy_lease) {
                     proxy_lease->{{ item.member }}(std::forward<Args>(args)...);

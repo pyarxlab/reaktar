@@ -11,6 +11,7 @@
 void run_vehicle_supervisor_example();
 void run_cockpit_domain_example();
 void run_telemetry_example();
+void run_multi_port_radar_example();
 
 int main() {
     std::cout << "=== Reaktar Reference Example Applications ===\n";
@@ -23,6 +24,9 @@ int main() {
 
     // 3. TelemetryExample
     run_telemetry_example();
+
+    // 4. MultiPortRadarExample
+    run_multi_port_radar_example();
 
     std::cout << "=== All Example Applications Completed Successfully ===\n";
     return 0;

@@ -40,29 +40,50 @@ public:
 
     TelemetryTestBench()
         : app_{}
+        , supervisorport_ActiveDiagnosticMap(app_.get_supervisorport_skeleton().ActiveDiagnosticMap)
         , ActiveDiagnosticMap(app_.get_supervisorport_skeleton().ActiveDiagnosticMap)
+        , supervisorport_DiagnosticsReport(app_.get_supervisorport_skeleton().DiagnosticsReport)
         , DiagnosticsReport(app_.get_supervisorport_skeleton().DiagnosticsReport)
+        , supervisorport_DriveHistory(app_.get_supervisorport_skeleton().DriveHistory)
         , DriveHistory(app_.get_supervisorport_skeleton().DriveHistory)
+        , supervisorport_EmergencyAlert(app_.get_supervisorport_skeleton().EmergencyAlert)
         , EmergencyAlert(app_.get_supervisorport_skeleton().EmergencyAlert)
+        , supervisorport_PrimaryWarning(app_.get_supervisorport_skeleton().PrimaryWarning)
+        , PrimaryWarning(app_.get_supervisorport_skeleton().PrimaryWarning)
+        , supervisorport_SecondaryWarning(app_.get_supervisorport_skeleton().SecondaryWarning)
+        , SecondaryWarning(app_.get_supervisorport_skeleton().SecondaryWarning)
+        , supervisorport_ActiveAlerts(app_.get_supervisorport_skeleton().ActiveAlerts)
         , ActiveAlerts(app_.get_supervisorport_skeleton().ActiveAlerts)
+        , supervisorport_CalibrationKey(app_.get_supervisorport_skeleton().CalibrationKey)
         , CalibrationKey(app_.get_supervisorport_skeleton().CalibrationKey)
+        , supervisorport_CurrentDriveMode(app_.get_supervisorport_skeleton().CurrentDriveMode)
         , CurrentDriveMode(app_.get_supervisorport_skeleton().CurrentDriveMode)
+        , supervisorport_FeatureFlags(app_.get_supervisorport_skeleton().FeatureFlags)
         , FeatureFlags(app_.get_supervisorport_skeleton().FeatureFlags)
+        , supervisorport_HardwareRevision(app_.get_supervisorport_skeleton().HardwareRevision)
         , HardwareRevision(app_.get_supervisorport_skeleton().HardwareRevision)
+        , supervisorport_SystemMatrix(app_.get_supervisorport_skeleton().SystemMatrix)
         , SystemMatrix(app_.get_supervisorport_skeleton().SystemMatrix)
+        , supervisorport_VehicleConfig(app_.get_supervisorport_skeleton().VehicleConfig)
         , VehicleConfig(app_.get_supervisorport_skeleton().VehicleConfig)
     {
         app_.get_supervisorport_skeleton().ActiveDiagnosticMap.Connect([this](auto&& val) {
-            emitted_ActiveDiagnosticMap_.push_back(*val);
+            emitted_supervisorport_ActiveDiagnosticMap_.push_back(*val);
         });
         app_.get_supervisorport_skeleton().DiagnosticsReport.Connect([this](auto&& val) {
-            emitted_DiagnosticsReport_.push_back(*val);
+            emitted_supervisorport_DiagnosticsReport_.push_back(*val);
         });
         app_.get_supervisorport_skeleton().DriveHistory.Connect([this](auto&& val) {
-            emitted_DriveHistory_.push_back(*val);
+            emitted_supervisorport_DriveHistory_.push_back(*val);
         });
         app_.get_supervisorport_skeleton().EmergencyAlert.Connect([this](auto&& val) {
-            emitted_EmergencyAlert_.push_back(*val);
+            emitted_supervisorport_EmergencyAlert_.push_back(*val);
+        });
+        app_.get_supervisorport_skeleton().PrimaryWarning.Connect([this](auto&& val) {
+            emitted_supervisorport_PrimaryWarning_.push_back(*val);
+        });
+        app_.get_supervisorport_skeleton().SecondaryWarning.Connect([this](auto&& val) {
+            emitted_supervisorport_SecondaryWarning_.push_back(*val);
         });
 
         // Start actor (offers skeletons, initiates StartFindService, instantiates proxies)
@@ -74,31 +95,63 @@ public:
     App& app() { return app_; }
 
     vehicle_supervisor::skeleton::VehicleSupervisorSkeleton& supervisorport_skeleton() { return app_.get_supervisorport_skeleton(); }
+    decltype(std::declval<vehicle_supervisor::skeleton::VehicleSupervisorSkeleton>().ActiveDiagnosticMap)& supervisorport_ActiveDiagnosticMap;
     decltype(std::declval<vehicle_supervisor::skeleton::VehicleSupervisorSkeleton>().ActiveDiagnosticMap)& ActiveDiagnosticMap;
+    decltype(std::declval<vehicle_supervisor::skeleton::VehicleSupervisorSkeleton>().DiagnosticsReport)& supervisorport_DiagnosticsReport;
     decltype(std::declval<vehicle_supervisor::skeleton::VehicleSupervisorSkeleton>().DiagnosticsReport)& DiagnosticsReport;
+    decltype(std::declval<vehicle_supervisor::skeleton::VehicleSupervisorSkeleton>().DriveHistory)& supervisorport_DriveHistory;
     decltype(std::declval<vehicle_supervisor::skeleton::VehicleSupervisorSkeleton>().DriveHistory)& DriveHistory;
+    decltype(std::declval<vehicle_supervisor::skeleton::VehicleSupervisorSkeleton>().EmergencyAlert)& supervisorport_EmergencyAlert;
     decltype(std::declval<vehicle_supervisor::skeleton::VehicleSupervisorSkeleton>().EmergencyAlert)& EmergencyAlert;
+    decltype(std::declval<vehicle_supervisor::skeleton::VehicleSupervisorSkeleton>().PrimaryWarning)& supervisorport_PrimaryWarning;
+    decltype(std::declval<vehicle_supervisor::skeleton::VehicleSupervisorSkeleton>().PrimaryWarning)& PrimaryWarning;
+    decltype(std::declval<vehicle_supervisor::skeleton::VehicleSupervisorSkeleton>().SecondaryWarning)& supervisorport_SecondaryWarning;
+    decltype(std::declval<vehicle_supervisor::skeleton::VehicleSupervisorSkeleton>().SecondaryWarning)& SecondaryWarning;
+    decltype(std::declval<vehicle_supervisor::skeleton::VehicleSupervisorSkeleton>().ActiveAlerts)& supervisorport_ActiveAlerts;
     decltype(std::declval<vehicle_supervisor::skeleton::VehicleSupervisorSkeleton>().ActiveAlerts)& ActiveAlerts;
+    decltype(std::declval<vehicle_supervisor::skeleton::VehicleSupervisorSkeleton>().CalibrationKey)& supervisorport_CalibrationKey;
     decltype(std::declval<vehicle_supervisor::skeleton::VehicleSupervisorSkeleton>().CalibrationKey)& CalibrationKey;
+    decltype(std::declval<vehicle_supervisor::skeleton::VehicleSupervisorSkeleton>().CurrentDriveMode)& supervisorport_CurrentDriveMode;
     decltype(std::declval<vehicle_supervisor::skeleton::VehicleSupervisorSkeleton>().CurrentDriveMode)& CurrentDriveMode;
+    decltype(std::declval<vehicle_supervisor::skeleton::VehicleSupervisorSkeleton>().FeatureFlags)& supervisorport_FeatureFlags;
     decltype(std::declval<vehicle_supervisor::skeleton::VehicleSupervisorSkeleton>().FeatureFlags)& FeatureFlags;
+    decltype(std::declval<vehicle_supervisor::skeleton::VehicleSupervisorSkeleton>().HardwareRevision)& supervisorport_HardwareRevision;
     decltype(std::declval<vehicle_supervisor::skeleton::VehicleSupervisorSkeleton>().HardwareRevision)& HardwareRevision;
+    decltype(std::declval<vehicle_supervisor::skeleton::VehicleSupervisorSkeleton>().SystemMatrix)& supervisorport_SystemMatrix;
     decltype(std::declval<vehicle_supervisor::skeleton::VehicleSupervisorSkeleton>().SystemMatrix)& SystemMatrix;
+    decltype(std::declval<vehicle_supervisor::skeleton::VehicleSupervisorSkeleton>().VehicleConfig)& supervisorport_VehicleConfig;
     decltype(std::declval<vehicle_supervisor::skeleton::VehicleSupervisorSkeleton>().VehicleConfig)& VehicleConfig;
+    auto supervisorport_CalibrateOdometer(const uint32_t& current_km) {
+        return app_.get_supervisorport_skeleton().CalibrateOdometer(current_km);
+    }
     auto CalibrateOdometer(const uint32_t& current_km) {
         return app_.get_supervisorport_skeleton().CalibrateOdometer(current_km);
+    }
+    void supervisorport_ResetTripMeter() {
+        app_.get_supervisorport_skeleton().ResetTripMeter();
     }
     void ResetTripMeter() {
         app_.get_supervisorport_skeleton().ResetTripMeter();
     }
+    auto supervisorport_SetSpeedLimiter(const float& max_kmh, const bool& active) {
+        return app_.get_supervisorport_skeleton().SetSpeedLimiter(max_kmh, active);
+    }
     auto SetSpeedLimiter(const float& max_kmh, const bool& active) {
         return app_.get_supervisorport_skeleton().SetSpeedLimiter(max_kmh, active);
+    }
+    auto supervisorport_TriggerDiagnostic(const uint32_t& code) {
+        return app_.get_supervisorport_skeleton().TriggerDiagnostic(code);
     }
     auto TriggerDiagnostic(const uint32_t& code) {
         return app_.get_supervisorport_skeleton().TriggerDiagnostic(code);
     }
 
     // Event Injectors for consumed proxy events
+    template <typename Tag, typename Val>
+    void inject([[maybe_unused]] const Val& val) {
+        static_assert(!sizeof(Tag*), "reaktar: Unknown tag for inject (no proxy events/fields available)");
+    }
+
 
     // Field Notification Injectors
 
@@ -109,29 +162,75 @@ public:
     }
 
     // Direct accessor methods for backward compatibility
-    size_t activediagnosticmap_count() const { return emitted_ActiveDiagnosticMap_.size(); }
-    const std::vector<ara::core::Map<uint32_t, vehicle_data::EmergencyAlert>>& emitted_activediagnosticmaps() const { return emitted_ActiveDiagnosticMap_; }
-    size_t diagnosticsreport_count() const { return emitted_DiagnosticsReport_.size(); }
-    const std::vector<vehicle_data::VehicleDiagnostics>& emitted_diagnosticsreports() const { return emitted_DiagnosticsReport_; }
-    size_t drivehistory_count() const { return emitted_DriveHistory_.size(); }
-    const std::vector<ara::core::Vector<vehicle_data::DriveMode>>& emitted_drivehistorys() const { return emitted_DriveHistory_; }
-    size_t emergencyalert_count() const { return emitted_EmergencyAlert_.size(); }
-    const std::vector<vehicle_data::EmergencyAlert>& emitted_emergencyalerts() const { return emitted_EmergencyAlert_; }
+    size_t supervisorport_activediagnosticmap_count() const { return emitted_supervisorport_ActiveDiagnosticMap_.size(); }
+    const std::vector<ara::core::Map<uint32_t, vehicle_data::EmergencyAlert>>& emitted_supervisorport_activediagnosticmaps() const { return emitted_supervisorport_ActiveDiagnosticMap_; }
+    size_t activediagnosticmap_count() const { return emitted_supervisorport_ActiveDiagnosticMap_.size(); }
+    const std::vector<ara::core::Map<uint32_t, vehicle_data::EmergencyAlert>>& emitted_activediagnosticmaps() const { return emitted_supervisorport_ActiveDiagnosticMap_; }
+    size_t supervisorport_diagnosticsreport_count() const { return emitted_supervisorport_DiagnosticsReport_.size(); }
+    const std::vector<vehicle_data::VehicleDiagnostics>& emitted_supervisorport_diagnosticsreports() const { return emitted_supervisorport_DiagnosticsReport_; }
+    size_t diagnosticsreport_count() const { return emitted_supervisorport_DiagnosticsReport_.size(); }
+    const std::vector<vehicle_data::VehicleDiagnostics>& emitted_diagnosticsreports() const { return emitted_supervisorport_DiagnosticsReport_; }
+    size_t supervisorport_drivehistory_count() const { return emitted_supervisorport_DriveHistory_.size(); }
+    const std::vector<ara::core::Vector<vehicle_data::DriveMode>>& emitted_supervisorport_drivehistorys() const { return emitted_supervisorport_DriveHistory_; }
+    size_t drivehistory_count() const { return emitted_supervisorport_DriveHistory_.size(); }
+    const std::vector<ara::core::Vector<vehicle_data::DriveMode>>& emitted_drivehistorys() const { return emitted_supervisorport_DriveHistory_; }
+    size_t supervisorport_emergencyalert_count() const { return emitted_supervisorport_EmergencyAlert_.size(); }
+    const std::vector<vehicle_data::EmergencyAlert>& emitted_supervisorport_emergencyalerts() const { return emitted_supervisorport_EmergencyAlert_; }
+    size_t emergencyalert_count() const { return emitted_supervisorport_EmergencyAlert_.size(); }
+    const std::vector<vehicle_data::EmergencyAlert>& emitted_emergencyalerts() const { return emitted_supervisorport_EmergencyAlert_; }
+    size_t supervisorport_primarywarning_count() const { return emitted_supervisorport_PrimaryWarning_.size(); }
+    const std::vector<uint16_t>& emitted_supervisorport_primarywarnings() const { return emitted_supervisorport_PrimaryWarning_; }
+    size_t primarywarning_count() const { return emitted_supervisorport_PrimaryWarning_.size(); }
+    const std::vector<uint16_t>& emitted_primarywarnings() const { return emitted_supervisorport_PrimaryWarning_; }
+    size_t supervisorport_secondarywarning_count() const { return emitted_supervisorport_SecondaryWarning_.size(); }
+    const std::vector<uint16_t>& emitted_supervisorport_secondarywarnings() const { return emitted_supervisorport_SecondaryWarning_; }
+    size_t secondarywarning_count() const { return emitted_supervisorport_SecondaryWarning_.size(); }
+    const std::vector<uint16_t>& emitted_secondarywarnings() const { return emitted_supervisorport_SecondaryWarning_; }
 
     // Inspection of skeleton emissions by tag or type
     template <typename Tag>
     size_t emitted_count() const {
-        if constexpr (std::is_same_v<Tag, vehicle_supervisor::events::ActiveDiagnosticMap> || std::is_same_v<Tag, ara::core::Map<uint32_t, vehicle_data::EmergencyAlert>>) {
-            return emitted_ActiveDiagnosticMap_.size();
+        if constexpr (
+            std::is_same_v<Tag, typename App::ports::SupervisorPort::ActiveDiagnosticMap>
+            || std::is_same_v<Tag, ::reaktar::tags::vehicle_supervisor::events::ActiveDiagnosticMap>
+            || (std::is_same_v<Tag, ara::core::Map<uint32_t, vehicle_data::EmergencyAlert>> && true)
+        ) {
+            return emitted_supervisorport_ActiveDiagnosticMap_.size();
         }
-        else if constexpr (std::is_same_v<Tag, vehicle_supervisor::events::DiagnosticsReport> || std::is_same_v<Tag, vehicle_data::VehicleDiagnostics>) {
-            return emitted_DiagnosticsReport_.size();
+        else if constexpr (
+            std::is_same_v<Tag, typename App::ports::SupervisorPort::DiagnosticsReport>
+            || std::is_same_v<Tag, ::reaktar::tags::vehicle_supervisor::events::DiagnosticsReport>
+            || (std::is_same_v<Tag, vehicle_data::VehicleDiagnostics> && true)
+        ) {
+            return emitted_supervisorport_DiagnosticsReport_.size();
         }
-        else if constexpr (std::is_same_v<Tag, vehicle_supervisor::events::DriveHistory> || std::is_same_v<Tag, ara::core::Vector<vehicle_data::DriveMode>>) {
-            return emitted_DriveHistory_.size();
+        else if constexpr (
+            std::is_same_v<Tag, typename App::ports::SupervisorPort::DriveHistory>
+            || std::is_same_v<Tag, ::reaktar::tags::vehicle_supervisor::events::DriveHistory>
+            || (std::is_same_v<Tag, ara::core::Vector<vehicle_data::DriveMode>> && true)
+        ) {
+            return emitted_supervisorport_DriveHistory_.size();
         }
-        else if constexpr (std::is_same_v<Tag, vehicle_supervisor::events::EmergencyAlert> || std::is_same_v<Tag, vehicle_data::EmergencyAlert>) {
-            return emitted_EmergencyAlert_.size();
+        else if constexpr (
+            std::is_same_v<Tag, typename App::ports::SupervisorPort::EmergencyAlert>
+            || std::is_same_v<Tag, ::reaktar::tags::vehicle_supervisor::events::EmergencyAlert>
+            || (std::is_same_v<Tag, vehicle_data::EmergencyAlert> && true)
+        ) {
+            return emitted_supervisorport_EmergencyAlert_.size();
+        }
+        else if constexpr (
+            std::is_same_v<Tag, typename App::ports::SupervisorPort::PrimaryWarning>
+            || std::is_same_v<Tag, ::reaktar::tags::vehicle_supervisor::events::PrimaryWarning>
+            || (std::is_same_v<Tag, uint16_t> && false)
+        ) {
+            return emitted_supervisorport_PrimaryWarning_.size();
+        }
+        else if constexpr (
+            std::is_same_v<Tag, typename App::ports::SupervisorPort::SecondaryWarning>
+            || std::is_same_v<Tag, ::reaktar::tags::vehicle_supervisor::events::SecondaryWarning>
+            || (std::is_same_v<Tag, uint16_t> && false)
+        ) {
+            return emitted_supervisorport_SecondaryWarning_.size();
         }
         else {
             return 0;
@@ -140,42 +239,80 @@ public:
 
     template <typename Tag>
     auto last_emitted() const {
-        if constexpr (std::is_same_v<Tag, vehicle_supervisor::events::ActiveDiagnosticMap> || std::is_same_v<Tag, ara::core::Map<uint32_t, vehicle_data::EmergencyAlert>>) {
+        if constexpr (
+            std::is_same_v<Tag, typename App::ports::SupervisorPort::ActiveDiagnosticMap>
+            || std::is_same_v<Tag, ::reaktar::tags::vehicle_supervisor::events::ActiveDiagnosticMap>
+            || (std::is_same_v<Tag, ara::core::Map<uint32_t, vehicle_data::EmergencyAlert>> && true)
+        ) {
             using OptT = std::optional<ara::core::Map<uint32_t, vehicle_data::EmergencyAlert>>;
-            if (emitted_ActiveDiagnosticMap_.empty()) return OptT(std::nullopt);
-            return OptT(emitted_ActiveDiagnosticMap_.back());
+            if (emitted_supervisorport_ActiveDiagnosticMap_.empty()) return OptT(std::nullopt);
+            return OptT(emitted_supervisorport_ActiveDiagnosticMap_.back());
         }
-        else if constexpr (std::is_same_v<Tag, vehicle_supervisor::events::DiagnosticsReport> || std::is_same_v<Tag, vehicle_data::VehicleDiagnostics>) {
+        else if constexpr (
+            std::is_same_v<Tag, typename App::ports::SupervisorPort::DiagnosticsReport>
+            || std::is_same_v<Tag, ::reaktar::tags::vehicle_supervisor::events::DiagnosticsReport>
+            || (std::is_same_v<Tag, vehicle_data::VehicleDiagnostics> && true)
+        ) {
             using OptT = std::optional<vehicle_data::VehicleDiagnostics>;
-            if (emitted_DiagnosticsReport_.empty()) return OptT(std::nullopt);
-            return OptT(emitted_DiagnosticsReport_.back());
+            if (emitted_supervisorport_DiagnosticsReport_.empty()) return OptT(std::nullopt);
+            return OptT(emitted_supervisorport_DiagnosticsReport_.back());
         }
-        else if constexpr (std::is_same_v<Tag, vehicle_supervisor::events::DriveHistory> || std::is_same_v<Tag, ara::core::Vector<vehicle_data::DriveMode>>) {
+        else if constexpr (
+            std::is_same_v<Tag, typename App::ports::SupervisorPort::DriveHistory>
+            || std::is_same_v<Tag, ::reaktar::tags::vehicle_supervisor::events::DriveHistory>
+            || (std::is_same_v<Tag, ara::core::Vector<vehicle_data::DriveMode>> && true)
+        ) {
             using OptT = std::optional<ara::core::Vector<vehicle_data::DriveMode>>;
-            if (emitted_DriveHistory_.empty()) return OptT(std::nullopt);
-            return OptT(emitted_DriveHistory_.back());
+            if (emitted_supervisorport_DriveHistory_.empty()) return OptT(std::nullopt);
+            return OptT(emitted_supervisorport_DriveHistory_.back());
         }
-        else if constexpr (std::is_same_v<Tag, vehicle_supervisor::events::EmergencyAlert> || std::is_same_v<Tag, vehicle_data::EmergencyAlert>) {
+        else if constexpr (
+            std::is_same_v<Tag, typename App::ports::SupervisorPort::EmergencyAlert>
+            || std::is_same_v<Tag, ::reaktar::tags::vehicle_supervisor::events::EmergencyAlert>
+            || (std::is_same_v<Tag, vehicle_data::EmergencyAlert> && true)
+        ) {
             using OptT = std::optional<vehicle_data::EmergencyAlert>;
-            if (emitted_EmergencyAlert_.empty()) return OptT(std::nullopt);
-            return OptT(emitted_EmergencyAlert_.back());
+            if (emitted_supervisorport_EmergencyAlert_.empty()) return OptT(std::nullopt);
+            return OptT(emitted_supervisorport_EmergencyAlert_.back());
+        }
+        else if constexpr (
+            std::is_same_v<Tag, typename App::ports::SupervisorPort::PrimaryWarning>
+            || std::is_same_v<Tag, ::reaktar::tags::vehicle_supervisor::events::PrimaryWarning>
+            || (std::is_same_v<Tag, uint16_t> && false)
+        ) {
+            using OptT = std::optional<uint16_t>;
+            if (emitted_supervisorport_PrimaryWarning_.empty()) return OptT(std::nullopt);
+            return OptT(emitted_supervisorport_PrimaryWarning_.back());
+        }
+        else if constexpr (
+            std::is_same_v<Tag, typename App::ports::SupervisorPort::SecondaryWarning>
+            || std::is_same_v<Tag, ::reaktar::tags::vehicle_supervisor::events::SecondaryWarning>
+            || (std::is_same_v<Tag, uint16_t> && false)
+        ) {
+            using OptT = std::optional<uint16_t>;
+            if (emitted_supervisorport_SecondaryWarning_.empty()) return OptT(std::nullopt);
+            return OptT(emitted_supervisorport_SecondaryWarning_.back());
         }
     }
 
     void clear_emitted() {
-        emitted_ActiveDiagnosticMap_.clear();
-        emitted_DiagnosticsReport_.clear();
-        emitted_DriveHistory_.clear();
-        emitted_EmergencyAlert_.clear();
+        emitted_supervisorport_ActiveDiagnosticMap_.clear();
+        emitted_supervisorport_DiagnosticsReport_.clear();
+        emitted_supervisorport_DriveHistory_.clear();
+        emitted_supervisorport_EmergencyAlert_.clear();
+        emitted_supervisorport_PrimaryWarning_.clear();
+        emitted_supervisorport_SecondaryWarning_.clear();
     }
 
 private:
 
     // Recorded skeleton emissions
-    std::vector<ara::core::Map<uint32_t, vehicle_data::EmergencyAlert>> emitted_ActiveDiagnosticMap_;
-    std::vector<vehicle_data::VehicleDiagnostics> emitted_DiagnosticsReport_;
-    std::vector<ara::core::Vector<vehicle_data::DriveMode>> emitted_DriveHistory_;
-    std::vector<vehicle_data::EmergencyAlert> emitted_EmergencyAlert_;
+    std::vector<ara::core::Map<uint32_t, vehicle_data::EmergencyAlert>> emitted_supervisorport_ActiveDiagnosticMap_;
+    std::vector<vehicle_data::VehicleDiagnostics> emitted_supervisorport_DiagnosticsReport_;
+    std::vector<ara::core::Vector<vehicle_data::DriveMode>> emitted_supervisorport_DriveHistory_;
+    std::vector<vehicle_data::EmergencyAlert> emitted_supervisorport_EmergencyAlert_;
+    std::vector<uint16_t> emitted_supervisorport_PrimaryWarning_;
+    std::vector<uint16_t> emitted_supervisorport_SecondaryWarning_;
 };
 
 // Convenience alias mapping Component name to Executable Test Bench

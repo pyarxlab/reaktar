@@ -21,6 +21,7 @@
 #include <type_traits>
 #include <unordered_map>
 #include <utility>
+#include <variant>
 #include <vector>
 
 namespace reaktar::json {
@@ -329,6 +330,22 @@ struct is_sequence_container<T, std::void_t<
     !is_custom_string_like<T>::value
 > {};
 
+// Optional-like detector (for std::optional, ara::core::Optional, etc.)
+template <typename T>
+struct is_std_optional : std::false_type {};
+
+template <typename T>
+struct is_std_optional<std::optional<T>> : std::true_type {};
+
+template <typename T, typename = void>
+struct is_optional_like : std::false_type {};
+
+template <typename T>
+struct is_optional_like<T, std::void_t<
+    decltype(std::declval<const T&>().has_value()),
+    decltype(*std::declval<const T&>())
+>> : std::true_type {};
+
 namespace detail {
 
     // Primary fallback dispatcher for user and actor data types
@@ -506,6 +523,39 @@ namespace detail {
         }
     };
 
+    // Generic Optional-like fallback (e.g. ara::core::Optional when not an alias of std::optional)
+    template <typename Opt>
+    struct JsonWriter<Opt, std::enable_if_t<is_optional_like<Opt>::value && !is_std_optional<Opt>::value>> {
+        template <typename Sink>
+        static void write(Sink& sink, const Opt& opt) {
+            if (opt.has_value()) {
+                write_json(sink, *opt);
+            } else {
+                sink.write("null");
+            }
+        }
+    };
+
+    // std::variant<Ts...> / ara::core::Variant<Ts...>
+    template <typename... Ts>
+    struct JsonWriter<std::variant<Ts...>> {
+        template <typename Sink>
+        static void write(Sink& sink, const std::variant<Ts...>& var) {
+            if (var.valueless_by_exception()) {
+                sink.write("null");
+                return;
+            }
+            std::visit([&sink](const auto& val) {
+                using ValT = std::decay_t<decltype(val)>;
+                if constexpr (std::is_same_v<ValT, std::monostate>) {
+                    sink.write("null");
+                } else {
+                    write_json(sink, val);
+                }
+            }, var);
+        }
+    };
+
     // Maps / Dictionaries: std::map, std::unordered_map, ara::core::Map, etc.
     template <typename M>
     struct JsonWriter<M, std::enable_if_t<is_map_container<M>::value>> {
@@ -561,6 +611,20 @@ template <typename Stream, typename K, typename V, typename Compare, typename Al
 inline Stream& operator<<(Stream& os, const std::map<K, V, Compare, Alloc>& v) {
     StreamSink<Stream> sink(os);
     write_json(sink, v);
+    return os;
+}
+
+template <typename Stream, typename T>
+inline auto operator<<(Stream& os, const T& opt) -> std::enable_if_t<is_optional_like<T>::value, Stream&> {
+    StreamSink<Stream> sink(os);
+    write_json(sink, opt);
+    return os;
+}
+
+template <typename Stream, typename... Ts>
+inline Stream& operator<<(Stream& os, const std::variant<Ts...>& var) {
+    StreamSink<Stream> sink(os);
+    write_json(sink, var);
     return os;
 }
 

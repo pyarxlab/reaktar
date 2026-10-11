@@ -137,6 +137,10 @@ public:
 
     ara::com::SkeletonEvent<ara::core::Vector<vehicle_data::DriveMode>> DriveHistory;
 
+    ara::com::SkeletonEvent<uint16_t> PrimaryWarning;
+
+    ara::com::SkeletonEvent<uint16_t> SecondaryWarning;
+
 
     // Fields
 

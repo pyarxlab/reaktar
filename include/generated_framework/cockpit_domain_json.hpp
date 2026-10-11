@@ -18,18 +18,18 @@
 // No vendor, mock, or internal headers are included.
 // ==============================================================================
 namespace vehicle_data {
-struct EmergencyAlert;
 struct BatteryCell;
-struct VehicleDiagnostics;
-struct SpeedData;
 struct CabinSensorData;
+struct EmergencyAlert;
 struct LocationPoint;
+struct SpeedData;
+struct VehicleDiagnostics;
 } // namespace vehicle_data
 
 namespace vehicle_data {
-enum class SystemStatus : uint8_t;
-enum class GearPosition : uint8_t;
 enum class DriveMode : uint8_t;
+enum class GearPosition : uint8_t;
+enum class SystemStatus : uint8_t;
 } // namespace vehicle_data
 
 // ==============================================================================
@@ -37,6 +37,42 @@ enum class DriveMode : uint8_t;
 // Defer member resolution to template instantiation at call site
 // ==============================================================================
 namespace reaktar::json {
+
+template <>
+struct ActorJsonWriter<::vehicle_data::BatteryCell> {
+    template <typename Sink, typename U = ::vehicle_data::BatteryCell>
+    static void write(Sink& sink, const U& v) {
+        sink.write('{');
+        sink.write("\"cell_id\":");
+        ::reaktar::json::write_json(sink, v.cell_id);
+        sink.write(',');
+        sink.write("\"voltage\":");
+        ::reaktar::json::write_json(sink, v.voltage);
+        sink.write(',');
+        sink.write("\"temperature\":");
+        ::reaktar::json::write_json(sink, v.temperature);
+        
+        sink.write('}');
+    }
+};
+
+template <>
+struct ActorJsonWriter<::vehicle_data::CabinSensorData> {
+    template <typename Sink, typename U = ::vehicle_data::CabinSensorData>
+    static void write(Sink& sink, const U& v) {
+        sink.write('{');
+        sink.write("\"temperature_c\":");
+        ::reaktar::json::write_json(sink, v.temperature_c);
+        sink.write(',');
+        sink.write("\"humidity_pct\":");
+        ::reaktar::json::write_json(sink, v.humidity_pct);
+        sink.write(',');
+        sink.write("\"passenger_detected\":");
+        ::reaktar::json::write_json(sink, v.passenger_detected);
+        
+        sink.write('}');
+    }
+};
 
 template <>
 struct ActorJsonWriter<::vehicle_data::EmergencyAlert> {
@@ -54,18 +90,36 @@ struct ActorJsonWriter<::vehicle_data::EmergencyAlert> {
 };
 
 template <>
-struct ActorJsonWriter<::vehicle_data::BatteryCell> {
-    template <typename Sink, typename U = ::vehicle_data::BatteryCell>
+struct ActorJsonWriter<::vehicle_data::LocationPoint> {
+    template <typename Sink, typename U = ::vehicle_data::LocationPoint>
     static void write(Sink& sink, const U& v) {
         sink.write('{');
-        sink.write("\"cell_id\":");
-        ::reaktar::json::write_json(sink, v.cell_id);
+        sink.write("\"latitude\":");
+        ::reaktar::json::write_json(sink, v.latitude);
         sink.write(',');
-        sink.write("\"voltage\":");
-        ::reaktar::json::write_json(sink, v.voltage);
+        sink.write("\"longitude\":");
+        ::reaktar::json::write_json(sink, v.longitude);
         sink.write(',');
-        sink.write("\"temperature\":");
-        ::reaktar::json::write_json(sink, v.temperature);
+        sink.write("\"altitude\":");
+        ::reaktar::json::write_json(sink, v.altitude);
+        sink.write(',');
+        sink.write("\"speed_limit_kmh\":");
+        ::reaktar::json::write_json(sink, v.speed_limit_kmh);
+        
+        sink.write('}');
+    }
+};
+
+template <>
+struct ActorJsonWriter<::vehicle_data::SpeedData> {
+    template <typename Sink, typename U = ::vehicle_data::SpeedData>
+    static void write(Sink& sink, const U& v) {
+        sink.write('{');
+        sink.write("\"speed_kmh\":");
+        ::reaktar::json::write_json(sink, v.speed_kmh);
+        sink.write(',');
+        sink.write("\"timestamp_us\":");
+        ::reaktar::json::write_json(sink, v.timestamp_us);
         
         sink.write('}');
     }
@@ -105,74 +159,26 @@ struct ActorJsonWriter<::vehicle_data::VehicleDiagnostics> {
         sink.write(',');
         sink.write("\"battery_module\":");
         ::reaktar::json::write_json(sink, v.battery_module);
+        sink.write(',');
+        sink.write("\"optional_speed\":");
+        ::reaktar::json::write_json(sink, v.optional_speed);
+        sink.write(',');
+        sink.write("\"sensor_payload\":");
+        ::reaktar::json::write_json(sink, v.sensor_payload);
         
         sink.write('}');
     }
 };
 
 template <>
-struct ActorJsonWriter<::vehicle_data::SpeedData> {
-    template <typename Sink, typename U = ::vehicle_data::SpeedData>
-    static void write(Sink& sink, const U& v) {
-        sink.write('{');
-        sink.write("\"speed_kmh\":");
-        ::reaktar::json::write_json(sink, v.speed_kmh);
-        sink.write(',');
-        sink.write("\"timestamp_us\":");
-        ::reaktar::json::write_json(sink, v.timestamp_us);
-        
-        sink.write('}');
-    }
-};
-
-template <>
-struct ActorJsonWriter<::vehicle_data::CabinSensorData> {
-    template <typename Sink, typename U = ::vehicle_data::CabinSensorData>
-    static void write(Sink& sink, const U& v) {
-        sink.write('{');
-        sink.write("\"temperature_c\":");
-        ::reaktar::json::write_json(sink, v.temperature_c);
-        sink.write(',');
-        sink.write("\"humidity_pct\":");
-        ::reaktar::json::write_json(sink, v.humidity_pct);
-        sink.write(',');
-        sink.write("\"passenger_detected\":");
-        ::reaktar::json::write_json(sink, v.passenger_detected);
-        
-        sink.write('}');
-    }
-};
-
-template <>
-struct ActorJsonWriter<::vehicle_data::LocationPoint> {
-    template <typename Sink, typename U = ::vehicle_data::LocationPoint>
-    static void write(Sink& sink, const U& v) {
-        sink.write('{');
-        sink.write("\"latitude\":");
-        ::reaktar::json::write_json(sink, v.latitude);
-        sink.write(',');
-        sink.write("\"longitude\":");
-        ::reaktar::json::write_json(sink, v.longitude);
-        sink.write(',');
-        sink.write("\"altitude\":");
-        ::reaktar::json::write_json(sink, v.altitude);
-        sink.write(',');
-        sink.write("\"speed_limit_kmh\":");
-        ::reaktar::json::write_json(sink, v.speed_limit_kmh);
-        
-        sink.write('}');
-    }
-};
-
-template <>
-struct ActorJsonWriter<::vehicle_data::SystemStatus> {
-    template <typename Sink, typename U = ::vehicle_data::SystemStatus>
+struct ActorJsonWriter<::vehicle_data::DriveMode> {
+    template <typename Sink, typename U = ::vehicle_data::DriveMode>
     static void write(Sink& sink, const U& v) {
         switch (static_cast<uint8_t>(v)) {
-            case 0: sink.write("\"OK\""); break;
-            case 1: sink.write("\"WARNING\""); break;
-            case 2: sink.write("\"ERROR\""); break;
-            case 3: sink.write("\"CRITICAL\""); break;
+            case 0: sink.write("\"ECO\""); break;
+            case 1: sink.write("\"COMFORT\""); break;
+            case 2: sink.write("\"SPORT\""); break;
+            case 3: sink.write("\"EMERGENCY\""); break;
             default:
                 ::reaktar::json::write_json(sink, static_cast<uint8_t>(v));
                 break;
@@ -197,14 +203,14 @@ struct ActorJsonWriter<::vehicle_data::GearPosition> {
 };
 
 template <>
-struct ActorJsonWriter<::vehicle_data::DriveMode> {
-    template <typename Sink, typename U = ::vehicle_data::DriveMode>
+struct ActorJsonWriter<::vehicle_data::SystemStatus> {
+    template <typename Sink, typename U = ::vehicle_data::SystemStatus>
     static void write(Sink& sink, const U& v) {
         switch (static_cast<uint8_t>(v)) {
-            case 0: sink.write("\"ECO\""); break;
-            case 1: sink.write("\"COMFORT\""); break;
-            case 2: sink.write("\"SPORT\""); break;
-            case 3: sink.write("\"EMERGENCY\""); break;
+            case 0: sink.write("\"OK\""); break;
+            case 1: sink.write("\"WARNING\""); break;
+            case 2: sink.write("\"ERROR\""); break;
+            case 3: sink.write("\"CRITICAL\""); break;
             default:
                 ::reaktar::json::write_json(sink, static_cast<uint8_t>(v));
                 break;
@@ -220,25 +226,7 @@ struct ActorJsonWriter<::vehicle_data::DriveMode> {
 // ==============================================================================
 namespace vehicle_data {
 template <typename Stream>
-inline Stream& operator<<(Stream& os, const EmergencyAlert& v) {
-    ::reaktar::json::StreamSink<Stream> sink(os);
-    ::reaktar::json::write_json(sink, v);
-    return os;
-}
-template <typename Stream>
 inline Stream& operator<<(Stream& os, const BatteryCell& v) {
-    ::reaktar::json::StreamSink<Stream> sink(os);
-    ::reaktar::json::write_json(sink, v);
-    return os;
-}
-template <typename Stream>
-inline Stream& operator<<(Stream& os, const VehicleDiagnostics& v) {
-    ::reaktar::json::StreamSink<Stream> sink(os);
-    ::reaktar::json::write_json(sink, v);
-    return os;
-}
-template <typename Stream>
-inline Stream& operator<<(Stream& os, const SpeedData& v) {
     ::reaktar::json::StreamSink<Stream> sink(os);
     ::reaktar::json::write_json(sink, v);
     return os;
@@ -250,7 +238,25 @@ inline Stream& operator<<(Stream& os, const CabinSensorData& v) {
     return os;
 }
 template <typename Stream>
+inline Stream& operator<<(Stream& os, const EmergencyAlert& v) {
+    ::reaktar::json::StreamSink<Stream> sink(os);
+    ::reaktar::json::write_json(sink, v);
+    return os;
+}
+template <typename Stream>
 inline Stream& operator<<(Stream& os, const LocationPoint& v) {
+    ::reaktar::json::StreamSink<Stream> sink(os);
+    ::reaktar::json::write_json(sink, v);
+    return os;
+}
+template <typename Stream>
+inline Stream& operator<<(Stream& os, const SpeedData& v) {
+    ::reaktar::json::StreamSink<Stream> sink(os);
+    ::reaktar::json::write_json(sink, v);
+    return os;
+}
+template <typename Stream>
+inline Stream& operator<<(Stream& os, const VehicleDiagnostics& v) {
     ::reaktar::json::StreamSink<Stream> sink(os);
     ::reaktar::json::write_json(sink, v);
     return os;
@@ -259,7 +265,7 @@ inline Stream& operator<<(Stream& os, const LocationPoint& v) {
 
 namespace vehicle_data {
 template <typename Stream>
-inline Stream& operator<<(Stream& os, const SystemStatus& v) {
+inline Stream& operator<<(Stream& os, const DriveMode& v) {
     ::reaktar::json::StreamSink<Stream> sink(os);
     ::reaktar::json::write_json(sink, v);
     return os;
@@ -271,7 +277,7 @@ inline Stream& operator<<(Stream& os, const GearPosition& v) {
     return os;
 }
 template <typename Stream>
-inline Stream& operator<<(Stream& os, const DriveMode& v) {
+inline Stream& operator<<(Stream& os, const SystemStatus& v) {
     ::reaktar::json::StreamSink<Stream> sink(os);
     ::reaktar::json::write_json(sink, v);
     return os;

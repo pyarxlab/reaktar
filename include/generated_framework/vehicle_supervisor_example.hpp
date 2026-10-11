@@ -18,13 +18,14 @@
 //    - Skeleton Field Set:  T    on_set(const T& val)            or on_set(Tag, const T& val)
 //
 // 2. OUTGOING DATA -> call emit(...)
-//    - Events & Updates:     emit(val)                           or emit<Tag>(val)
-//    - Remote Methods (RPC): emit(args...).then(...)             or emit<Tag>(args...).then(...)
-//    - Remote Field Set:     emit(val)                           or emit<Tag>(val)
+//    - Ergonomic Untagged:  emit(val)                           or emit(args...).then(...)
+//    - Port-Only Targeted:  emit<ports::Port>(val)              or emit<ports::Port>(args...).then(...)
+//    - Fully Qualified:     emit<ports::Port::Tag>(val)         or emit<Tag>(val)
 //
 // 3. TAGS & CONFLICT RESOLUTION:
-//    - Unique type/signature: use ergonomic untagged on(...) / emit(...).
-//    - Type collision: pass/specify Tag (tags are in scope directly from Base).
+//    - Unique across Actor: use ergonomic untagged emit(...).
+//    - Unique on Port:      use port-only emit<ports::Port>(...).
+//    - Type collision:      pass/specify Tag (tags are in scope directly from Base).
 //
 // 4. PORT LIFECYCLE:
 //    - Full:     start(); wait_until_ready(); ... stop();
@@ -186,6 +187,10 @@ public:
 
         emit(vehicle_data::EmergencyAlert{1001u, ara::core::String{"Speed limit exceeded"}}); // EmergencyAlert
         emit<EmergencyAlert>(vehicle_data::EmergencyAlert{1001u, ara::core::String{"Speed limit exceeded"}}); // same as above, explicit tag
+
+        emit<PrimaryWarning>(100u); // PrimaryWarning (tagged, resolves type collision)
+
+        emit<SecondaryWarning>(100u); // SecondaryWarning (tagged, resolves type collision)
 
         emit(ara::core::Vector<vehicle_data::EmergencyAlert>{}); // ActiveAlerts
         emit<ActiveAlerts>(ara::core::Vector<vehicle_data::EmergencyAlert>{}); // same as above, explicit tag

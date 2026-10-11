@@ -44,6 +44,7 @@ add_executable(reaktar_example_app
     examples/vehicle_supervisor_example.cpp
     examples/cockpit_domain_example.cpp
     examples/telemetry_example.cpp
+    examples/multi_port_radar_example.cpp
 )
 target_link_libraries(reaktar_example_app PRIVATE reaktar reaktar_test_mock)
 

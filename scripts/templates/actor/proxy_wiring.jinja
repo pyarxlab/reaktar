@@ -364,7 +364,70 @@ private:
         {{ f.var_name }}.{{ f.name }}.Update({});
 {% endif %}
 {% if f.has_setter %}
-        if constexpr (has_on_field_set_v<Derived, {{ f.tag }}, {{ f.type }}>) {
+        using {{ f.port_ident }}_{{ f.name }}_Port_ = typename Base::ports::{{ f.port_name }};
+        using {{ f.port_ident }}_{{ f.name }}_PortTag_ = typename {{ f.port_ident }}_{{ f.name }}_Port_::{{ f.name }};
+
+        static constexpr bool kHas_{{ f.port_ident }}_{{ f.name }}_setter_port_tag  = has_on_field_set_v<Derived, {{ f.port_ident }}_{{ f.name }}_PortTag_, {{ f.type }}>;
+        static constexpr bool kHas_{{ f.port_ident }}_{{ f.name }}_setter_port_bare = has_on_field_set_v<Derived, {{ f.port_ident }}_{{ f.name }}_Port_, {{ f.type }}>;
+        static constexpr bool kHas_{{ f.port_ident }}_{{ f.name }}_setter_tagged    = has_on_field_set_v<Derived, {{ f.tag }}, {{ f.type }}>;
+        static constexpr bool kHas_{{ f.port_ident }}_{{ f.name }}_setter_direct    = has_on_direct_field_set_v<Derived, {{ f.type }}>;
+
+        static_assert(
+            (int(kHas_{{ f.port_ident }}_{{ f.name }}_setter_port_tag) +
+             int(kHas_{{ f.port_ident }}_{{ f.name }}_setter_port_bare) +
+             int(kHas_{{ f.port_ident }}_{{ f.name }}_setter_tagged) +
+             int(kHas_{{ f.port_ident }}_{{ f.name }}_setter_direct)) <= 1,
+            "reaktar: Multiple conflicting on_set(...) handlers declared for field '{{ f.name }}' on port '{{ f.port_name }}'! "
+            "You must define only one: on_set(ports::{{ f.port_name }}::{{ f.name }}, ...), on_set({{ f.tag }}, ...), on_set(ports::{{ f.port_name }}, ...), or on_set(...)."
+        );
+
+        if constexpr (kHas_{{ f.port_ident }}_{{ f.name }}_setter_port_tag) {
+            {{ f.var_name }}.{{ f.name }}.RegisterSetHandler([this](const {{ f.type }}& val) {
+                if constexpr (std::is_same_v<ExecutionPolicy, ::reaktar::DirectExecution>) {
+                    return result_adapter<reaktar::Future<{{ f.type }}>, decltype(self().on_set({{ f.port_ident }}_{{ f.name }}_PortTag_{}, val))>::adapt(
+                        self().on_set({{ f.port_ident }}_{{ f.name }}_PortTag_{}, val)
+                    );
+                } else if constexpr (std::is_same_v<ExecutionPolicy, ::reaktar::SynchronizedExecution>) {
+                    std::lock_guard<std::mutex> lock(this->execution_policy_.mutex());
+                    return result_adapter<reaktar::Future<{{ f.type }}>, decltype(self().on_set({{ f.port_ident }}_{{ f.name }}_PortTag_{}, val))>::adapt(
+                        self().on_set({{ f.port_ident }}_{{ f.name }}_PortTag_{}, val)
+                    );
+                } else {
+                    return this->execution_policy_.execute([&] {
+                        return result_adapter<reaktar::Future<{{ f.type }}>, decltype(self().on_set({{ f.port_ident }}_{{ f.name }}_PortTag_{}, val))>::adapt(
+                            self().on_set({{ f.port_ident }}_{{ f.name }}_PortTag_{}, val)
+                        );
+                    });
+                }
+            });
+        }
+{% if f.is_unique_setter_on_port %}
+        else if constexpr (kHas_{{ f.port_ident }}_{{ f.name }}_setter_port_bare) {
+            {{ f.var_name }}.{{ f.name }}.RegisterSetHandler([this](const {{ f.type }}& val) {
+                if constexpr (std::is_same_v<ExecutionPolicy, ::reaktar::DirectExecution>) {
+                    return result_adapter<reaktar::Future<{{ f.type }}>, decltype(self().on_set({{ f.port_ident }}_{{ f.name }}_Port_{}, val))>::adapt(
+                        self().on_set({{ f.port_ident }}_{{ f.name }}_Port_{}, val)
+                    );
+                } else if constexpr (std::is_same_v<ExecutionPolicy, ::reaktar::SynchronizedExecution>) {
+                    std::lock_guard<std::mutex> lock(this->execution_policy_.mutex());
+                    return result_adapter<reaktar::Future<{{ f.type }}>, decltype(self().on_set({{ f.port_ident }}_{{ f.name }}_Port_{}, val))>::adapt(
+                        self().on_set({{ f.port_ident }}_{{ f.name }}_Port_{}, val)
+                    );
+                } else {
+                    return this->execution_policy_.execute([&] {
+                        return result_adapter<reaktar::Future<{{ f.type }}>, decltype(self().on_set({{ f.port_ident }}_{{ f.name }}_Port_{}, val))>::adapt(
+                            self().on_set({{ f.port_ident }}_{{ f.name }}_Port_{}, val)
+                        );
+                    });
+                }
+            });
+        }
+{% else %}
+        else if constexpr (kHas_{{ f.port_ident }}_{{ f.name }}_setter_port_bare) {
+            static_assert(!sizeof(Derived*), "reaktar::on_set() collision: field type '{{ f.type }}' is shared across multiple field setters on port '{{ f.port_name }}'. You must specify the port field tag: on_set(ports::{{ f.port_name }}::{{ f.name }}, const {{ f.type }}& val) instead of on_set(ports::{{ f.port_name }}, ...).");
+        }
+{% endif %}
+        else if constexpr (kHas_{{ f.port_ident }}_{{ f.name }}_setter_tagged) {
             {{ f.var_name }}.{{ f.name }}.RegisterSetHandler([this](const {{ f.type }}& val) {
                 if constexpr (std::is_same_v<ExecutionPolicy, ::reaktar::DirectExecution>) {
                     return result_adapter<reaktar::Future<{{ f.type }}>, decltype(self().on_set({{ f.tag }}{}, val))>::adapt(
@@ -385,7 +448,7 @@ private:
             });
         }
 {% if f.is_unique_setter %}
-        else if constexpr (has_on_direct_field_set_v<Derived, {{ f.type }}>) {
+        else if constexpr (kHas_{{ f.port_ident }}_{{ f.name }}_setter_direct) {
             {{ f.var_name }}.{{ f.name }}.RegisterSetHandler([this](const {{ f.type }}& val) {
                 if constexpr (std::is_same_v<ExecutionPolicy, ::reaktar::DirectExecution>) {
                     return result_adapter<reaktar::Future<{{ f.type }}>, decltype(self().on_set(val))>::adapt(
@@ -405,29 +468,135 @@ private:
                 }
             });
         }
+{% else %}
+        else if constexpr (kHas_{{ f.port_ident }}_{{ f.name }}_setter_direct) {
+            static_assert(!sizeof(Derived*), "reaktar::on_set() collision: field type '{{ f.type }}' is shared across multiple field setters. You must specify the tag: on_set({{ f.tag }}, const {{ f.type }}& val) or port tag: on_set(typename Base::ports::{{ f.port_name }}::{{ f.name }}, const {{ f.type }}& val).");
+        }
 {% endif %}
 {% endif %}
 {% endfor %}
     }
 
+    void check_handler_collisions() {
 {% for proxy in model.consumed_proxies %}
 {% for ev in proxy.events %}
-    static constexpr bool kHas_{{ proxy.ident }}_{{ ev.name }}_tagged = has_on_event_v<Derived, {{ ev.tag }}, {{ ev.type }}>;
-    static constexpr bool kHas_{{ proxy.ident }}_{{ ev.name }}_direct = has_on_direct_event_v<Derived, {{ ev.type }}>;
-    static constexpr bool kSub_{{ proxy.ident }}_{{ ev.name }} = kHas_{{ proxy.ident }}_{{ ev.name }}_tagged || kHas_{{ proxy.ident }}_{{ ev.name }}_direct;
+        {
+            using Port_ = typename Base::ports::{{ proxy.port_name }};
+            using PortTag_ = typename Port_::{{ ev.name }};
+            constexpr bool kHas_port_tag  = has_on_event_v<Derived, PortTag_, {{ ev.type }}>;
+            constexpr bool kHas_port_bare = has_on_event_v<Derived, Port_, {{ ev.type }}>;
+            constexpr bool kHas_tagged    = has_on_event_v<Derived, {{ ev.tag }}, {{ ev.type }}>;
+            constexpr bool kHas_direct    = has_on_direct_event_v<Derived, {{ ev.type }}>;
+            static_assert(
+                (int(kHas_port_tag) + int(kHas_port_bare) + int(kHas_tagged) + int(kHas_direct)) <= 1,
+                "reaktar: Multiple conflicting on(...) handlers declared for event '{{ ev.name }}' on port '{{ proxy.port_name }}'! "
+                "You must define only one: on(ports::{{ proxy.port_name }}::{{ ev.name }}, ...), on({{ ev.tag }}, ...), on(ports::{{ proxy.port_name }}, ...), or on(...)."
+            );
+{% if not ev.is_unique_on_port %}
+            static_assert(!kHas_port_bare, "reaktar::on() collision: event payload type '{{ ev.type }}' is shared across multiple events/notifiers on port '{{ proxy.port_name }}'. You must specify the port event tag: on(ports::{{ proxy.port_name }}::{{ ev.name }}, const {{ ev.type }}& val) instead of on(ports::{{ proxy.port_name }}, ...).");
+{% endif %}
+        }
 {% endfor %}
 {% for f in proxy.fields %}
 {% if f.has_notifier %}
-    static constexpr bool kHas_{{ proxy.ident }}_{{ f.name }}_tagged = has_on_event_v<Derived, {{ f.tag }}, {{ f.type }}>;
-    static constexpr bool kHas_{{ proxy.ident }}_{{ f.name }}_direct = has_on_direct_event_v<Derived, {{ f.type }}>;
-    static constexpr bool kSub_{{ proxy.ident }}_{{ f.name }} = kHas_{{ proxy.ident }}_{{ f.name }}_tagged || kHas_{{ proxy.ident }}_{{ f.name }}_direct;
+        {
+            using Port_ = typename Base::ports::{{ proxy.port_name }};
+            using PortTag_ = typename Port_::{{ f.name }};
+            constexpr bool kHas_port_tag  = has_on_event_v<Derived, PortTag_, {{ f.type }}>;
+            constexpr bool kHas_port_bare = has_on_event_v<Derived, Port_, {{ f.type }}>;
+            constexpr bool kHas_tagged    = has_on_event_v<Derived, {{ f.tag }}, {{ f.type }}>;
+            constexpr bool kHas_direct    = has_on_direct_event_v<Derived, {{ f.type }}>;
+            static_assert(
+                (int(kHas_port_tag) + int(kHas_port_bare) + int(kHas_tagged) + int(kHas_direct)) <= 1,
+                "reaktar: Multiple conflicting on(...) handlers declared for field notifier '{{ f.name }}' on port '{{ proxy.port_name }}'! "
+                "You must define only one: on(ports::{{ proxy.port_name }}::{{ f.name }}, ...), on({{ f.tag }}, ...), on(ports::{{ proxy.port_name }}, ...), or on(...)."
+            );
+{% if not f.is_unique_on_port %}
+            static_assert(!kHas_port_bare, "reaktar::on() collision: field notifier type '{{ f.type }}' is shared across multiple events/notifiers on port '{{ proxy.port_name }}'. You must specify the port field tag: on(ports::{{ proxy.port_name }}::{{ f.name }}, const {{ f.type }}& val) instead of on(ports::{{ proxy.port_name }}, ...).");
+{% endif %}
+        }
 {% endif %}
 {% endfor %}
+{% endfor %}
+{% for f in model.skeleton_fields %}
+{% if f.has_setter %}
+        {
+            using Port_ = typename Base::ports::{{ f.port_name }};
+            using PortTag_ = typename Port_::{{ f.name }};
+            constexpr bool kHas_port_tag  = has_on_field_set_v<Derived, PortTag_, {{ f.type }}>;
+            constexpr bool kHas_port_bare = has_on_field_set_v<Derived, Port_, {{ f.type }}>;
+            constexpr bool kHas_tagged    = has_on_field_set_v<Derived, {{ f.tag }}, {{ f.type }}>;
+            constexpr bool kHas_direct    = has_on_direct_field_set_v<Derived, {{ f.type }}>;
+            static_assert(
+                (int(kHas_port_tag) + int(kHas_port_bare) + int(kHas_tagged) + int(kHas_direct)) <= 1,
+                "reaktar: Multiple conflicting on_set(...) handlers declared for field '{{ f.name }}' on port '{{ f.port_name }}'! "
+                "You must define only one: on_set(ports::{{ f.port_name }}::{{ f.name }}, ...), on_set({{ f.tag }}, ...), on_set(ports::{{ f.port_name }}, ...), or on_set(...)."
+            );
+{% if not f.is_unique_setter_on_port %}
+            static_assert(!kHas_port_bare, "reaktar::on_set() collision: field type '{{ f.type }}' is shared across multiple field setters on port '{{ f.port_name }}'. You must specify the port field tag: on_set(ports::{{ f.port_name }}::{{ f.name }}, const {{ f.type }}& val) instead of on_set(ports::{{ f.port_name }}, ...).");
+{% endif %}
+        }
+{% endif %}
+{% endfor %}
+    }
 
+{% for proxy in model.consumed_proxies %}
     void bind_{{ proxy.ident }}_events([[maybe_unused]] {{ proxy.cls }}& proxy) {
 {% for ev in proxy.events %}
         // Event: {{ ev.name }} ({{ ev.type }})
-        if constexpr (kHas_{{ proxy.ident }}_{{ ev.name }}_tagged) {
+        using {{ proxy.ident }}_{{ ev.name }}_Port_ = typename Base::ports::{{ proxy.port_name }};
+        using {{ proxy.ident }}_{{ ev.name }}_PortTag_ = typename {{ proxy.ident }}_{{ ev.name }}_Port_::{{ ev.name }};
+
+        constexpr bool kHas_{{ proxy.ident }}_{{ ev.name }}_port_tag  = has_on_event_v<Derived, {{ proxy.ident }}_{{ ev.name }}_PortTag_, {{ ev.type }}>;
+        constexpr bool kHas_{{ proxy.ident }}_{{ ev.name }}_port_bare = has_on_event_v<Derived, {{ proxy.ident }}_{{ ev.name }}_Port_, {{ ev.type }}>;
+        constexpr bool kHas_{{ proxy.ident }}_{{ ev.name }}_tagged    = has_on_event_v<Derived, {{ ev.tag }}, {{ ev.type }}>;
+        constexpr bool kHas_{{ proxy.ident }}_{{ ev.name }}_direct    = has_on_direct_event_v<Derived, {{ ev.type }}>;
+
+        if constexpr (kHas_{{ proxy.ident }}_{{ ev.name }}_port_tag) {
+            proxy.{{ ev.name }}.SetReceiveHandler([this]() {
+                auto lease = this->{{ proxy.slot_name }}.try_acquire();
+                if (lease) {
+                    lease->{{ ev.name }}.GetNewSamples([this](auto&& s) {
+                        if constexpr (std::is_same_v<ExecutionPolicy, ::reaktar::DirectExecution>) {
+                            self().on({{ proxy.ident }}_{{ ev.name }}_PortTag_{}, *s);
+                        } else if constexpr (std::is_same_v<ExecutionPolicy, ::reaktar::SynchronizedExecution>) {
+                            std::lock_guard<std::mutex> lock(this->execution_policy_.mutex());
+                            self().on({{ proxy.ident }}_{{ ev.name }}_PortTag_{}, *s);
+                        } else {
+                            this->execution_policy_.execute([&] {
+                                self().on({{ proxy.ident }}_{{ ev.name }}_PortTag_{}, *s);
+                            });
+                        }
+                    });
+                }
+            });
+        }
+{% if ev.is_unique_on_port %}
+        else if constexpr (kHas_{{ proxy.ident }}_{{ ev.name }}_port_bare) {
+            proxy.{{ ev.name }}.SetReceiveHandler([this]() {
+                auto lease = this->{{ proxy.slot_name }}.try_acquire();
+                if (lease) {
+                    lease->{{ ev.name }}.GetNewSamples([this](auto&& s) {
+                        if constexpr (std::is_same_v<ExecutionPolicy, ::reaktar::DirectExecution>) {
+                            self().on({{ proxy.ident }}_{{ ev.name }}_Port_{}, *s);
+                        } else if constexpr (std::is_same_v<ExecutionPolicy, ::reaktar::SynchronizedExecution>) {
+                            std::lock_guard<std::mutex> lock(this->execution_policy_.mutex());
+                            self().on({{ proxy.ident }}_{{ ev.name }}_Port_{}, *s);
+                        } else {
+                            this->execution_policy_.execute([&] {
+                                self().on({{ proxy.ident }}_{{ ev.name }}_Port_{}, *s);
+                            });
+                        }
+                    });
+                }
+            });
+        }
+{% else %}
+        else if constexpr (kHas_{{ proxy.ident }}_{{ ev.name }}_port_bare) {
+            static_assert(!sizeof(Derived*), "reaktar::on() collision: event payload type '{{ ev.type }}' is shared across multiple events/notifiers on port '{{ proxy.port_name }}'. You must specify the port event tag: on(ports::{{ proxy.port_name }}::{{ ev.name }}, const {{ ev.type }}& val) instead of on(ports::{{ proxy.port_name }}, ...).");
+        }
+{% endif %}
+        else if constexpr (kHas_{{ proxy.ident }}_{{ ev.name }}_tagged) {
             proxy.{{ ev.name }}.SetReceiveHandler([this]() {
                 auto lease = this->{{ proxy.slot_name }}.try_acquire();
                 if (lease) {
@@ -468,7 +637,7 @@ private:
         }
 {% else %}
         else if constexpr (kHas_{{ proxy.ident }}_{{ ev.name }}_direct) {
-            static_assert(!sizeof(Derived*), "reaktar::on() collision: type '{{ ev.type }}' is shared across multiple incoming channels (events/fields). You must specify the tag: void on({{ ev.tag }}, const {{ ev.type }}& val).");
+            static_assert(!sizeof(Derived*), "reaktar::on() collision: type '{{ ev.type }}' is shared across multiple incoming channels (events/fields). You must specify the tag: void on({{ ev.tag }}, const {{ ev.type }}& val) or port tag: void on(typename Base::ports::{{ proxy.port_name }}::{{ ev.name }}, const {{ ev.type }}& val).");
         }
 {% endif %}
 {% endfor %}
@@ -476,6 +645,15 @@ private:
 
     void subscribe_{{ proxy.ident }}_events([[maybe_unused]] {{ proxy.cls }}& proxy) {
 {% for ev in proxy.events %}
+        using {{ proxy.ident }}_{{ ev.name }}_Port_ = typename Base::ports::{{ proxy.port_name }};
+        using {{ proxy.ident }}_{{ ev.name }}_PortTag_ = typename {{ proxy.ident }}_{{ ev.name }}_Port_::{{ ev.name }};
+
+        constexpr bool kHas_{{ proxy.ident }}_{{ ev.name }}_port_tag  = has_on_event_v<Derived, {{ proxy.ident }}_{{ ev.name }}_PortTag_, {{ ev.type }}>;
+        constexpr bool kHas_{{ proxy.ident }}_{{ ev.name }}_port_bare = has_on_event_v<Derived, {{ proxy.ident }}_{{ ev.name }}_Port_, {{ ev.type }}>;
+        constexpr bool kHas_{{ proxy.ident }}_{{ ev.name }}_tagged    = has_on_event_v<Derived, {{ ev.tag }}, {{ ev.type }}>;
+        constexpr bool kHas_{{ proxy.ident }}_{{ ev.name }}_direct    = has_on_direct_event_v<Derived, {{ ev.type }}>;
+        constexpr bool kSub_{{ proxy.ident }}_{{ ev.name }} = kHas_{{ proxy.ident }}_{{ ev.name }}_port_tag || kHas_{{ proxy.ident }}_{{ ev.name }}_port_bare || kHas_{{ proxy.ident }}_{{ ev.name }}_tagged || kHas_{{ proxy.ident }}_{{ ev.name }}_direct;
+
         if constexpr (kSub_{{ proxy.ident }}_{{ ev.name }}) {
             proxy.{{ ev.name }}.Subscribe(10);
         }
@@ -486,7 +664,59 @@ private:
 {% for f in proxy.fields %}
 {% if f.has_notifier %}
         // Field Notifier: {{ f.name }} ({{ f.type }})
-        if constexpr (kHas_{{ proxy.ident }}_{{ f.name }}_tagged) {
+        using {{ proxy.ident }}_{{ f.name }}_Port_ = typename Base::ports::{{ proxy.port_name }};
+        using {{ proxy.ident }}_{{ f.name }}_PortTag_ = typename {{ proxy.ident }}_{{ f.name }}_Port_::{{ f.name }};
+
+        constexpr bool kHas_{{ proxy.ident }}_{{ f.name }}_port_tag  = has_on_event_v<Derived, {{ proxy.ident }}_{{ f.name }}_PortTag_, {{ f.type }}>;
+        constexpr bool kHas_{{ proxy.ident }}_{{ f.name }}_port_bare = has_on_event_v<Derived, {{ proxy.ident }}_{{ f.name }}_Port_, {{ f.type }}>;
+        constexpr bool kHas_{{ proxy.ident }}_{{ f.name }}_tagged    = has_on_event_v<Derived, {{ f.tag }}, {{ f.type }}>;
+        constexpr bool kHas_{{ proxy.ident }}_{{ f.name }}_direct    = has_on_direct_event_v<Derived, {{ f.type }}>;
+
+        if constexpr (kHas_{{ proxy.ident }}_{{ f.name }}_port_tag) {
+            proxy.{{ f.name }}.SetReceiveHandler([this]() {
+                auto lease = this->{{ proxy.slot_name }}.try_acquire();
+                if (lease) {
+                    lease->{{ f.name }}.GetNewSamples([this](auto&& s) {
+                        if constexpr (std::is_same_v<ExecutionPolicy, ::reaktar::DirectExecution>) {
+                            self().on({{ proxy.ident }}_{{ f.name }}_PortTag_{}, *s);
+                        } else if constexpr (std::is_same_v<ExecutionPolicy, ::reaktar::SynchronizedExecution>) {
+                            std::lock_guard<std::mutex> lock(this->execution_policy_.mutex());
+                            self().on({{ proxy.ident }}_{{ f.name }}_PortTag_{}, *s);
+                        } else {
+                            this->execution_policy_.execute([&] {
+                                self().on({{ proxy.ident }}_{{ f.name }}_PortTag_{}, *s);
+                            });
+                        }
+                    });
+                }
+            });
+        }
+{% if f.is_unique_on_port %}
+        else if constexpr (kHas_{{ proxy.ident }}_{{ f.name }}_port_bare) {
+            proxy.{{ f.name }}.SetReceiveHandler([this]() {
+                auto lease = this->{{ proxy.slot_name }}.try_acquire();
+                if (lease) {
+                    lease->{{ f.name }}.GetNewSamples([this](auto&& s) {
+                        if constexpr (std::is_same_v<ExecutionPolicy, ::reaktar::DirectExecution>) {
+                            self().on({{ proxy.ident }}_{{ f.name }}_Port_{}, *s);
+                        } else if constexpr (std::is_same_v<ExecutionPolicy, ::reaktar::SynchronizedExecution>) {
+                            std::lock_guard<std::mutex> lock(this->execution_policy_.mutex());
+                            self().on({{ proxy.ident }}_{{ f.name }}_Port_{}, *s);
+                        } else {
+                            this->execution_policy_.execute([&] {
+                                self().on({{ proxy.ident }}_{{ f.name }}_Port_{}, *s);
+                            });
+                        }
+                    });
+                }
+            });
+        }
+{% else %}
+        else if constexpr (kHas_{{ proxy.ident }}_{{ f.name }}_port_bare) {
+            static_assert(!sizeof(Derived*), "reaktar::on() collision: field notifier type '{{ f.type }}' is shared across multiple events/notifiers on port '{{ proxy.port_name }}'. You must specify the port field tag: on(ports::{{ proxy.port_name }}::{{ f.name }}, const {{ f.type }}& val) instead of on(ports::{{ proxy.port_name }}, ...).");
+        }
+{% endif %}
+        else if constexpr (kHas_{{ proxy.ident }}_{{ f.name }}_tagged) {
             proxy.{{ f.name }}.SetReceiveHandler([this]() {
                 auto lease = this->{{ proxy.slot_name }}.try_acquire();
                 if (lease) {
@@ -527,7 +757,7 @@ private:
         }
 {% else %}
         else if constexpr (kHas_{{ proxy.ident }}_{{ f.name }}_direct) {
-            static_assert(!sizeof(Derived*), "reaktar::on() collision: type '{{ f.type }}' is shared across multiple incoming channels (events/fields). You must specify the tag: void on({{ f.tag }}, const {{ f.type }}& val).");
+            static_assert(!sizeof(Derived*), "reaktar::on() collision: type '{{ f.type }}' is shared across multiple incoming channels (events/fields). You must specify the tag: void on({{ f.tag }}, const {{ f.type }}& val) or port tag: void on(typename Base::ports::{{ proxy.port_name }}::{{ f.name }}, const {{ f.type }}& val).");
         }
 {% endif %}
 {% endif %}
@@ -537,6 +767,15 @@ private:
     void subscribe_{{ proxy.ident }}_fields([[maybe_unused]] {{ proxy.cls }}& proxy) {
 {% for f in proxy.fields %}
 {% if f.has_notifier %}
+        using {{ proxy.ident }}_{{ f.name }}_Port_ = typename Base::ports::{{ proxy.port_name }};
+        using {{ proxy.ident }}_{{ f.name }}_PortTag_ = typename {{ proxy.ident }}_{{ f.name }}_Port_::{{ f.name }};
+
+        constexpr bool kHas_{{ proxy.ident }}_{{ f.name }}_port_tag  = has_on_event_v<Derived, {{ proxy.ident }}_{{ f.name }}_PortTag_, {{ f.type }}>;
+        constexpr bool kHas_{{ proxy.ident }}_{{ f.name }}_port_bare = has_on_event_v<Derived, {{ proxy.ident }}_{{ f.name }}_Port_, {{ f.type }}>;
+        constexpr bool kHas_{{ proxy.ident }}_{{ f.name }}_tagged    = has_on_event_v<Derived, {{ f.tag }}, {{ f.type }}>;
+        constexpr bool kHas_{{ proxy.ident }}_{{ f.name }}_direct    = has_on_direct_event_v<Derived, {{ f.type }}>;
+        constexpr bool kSub_{{ proxy.ident }}_{{ f.name }} = kHas_{{ proxy.ident }}_{{ f.name }}_port_tag || kHas_{{ proxy.ident }}_{{ f.name }}_port_bare || kHas_{{ proxy.ident }}_{{ f.name }}_tagged || kHas_{{ proxy.ident }}_{{ f.name }}_direct;
+
         if constexpr (kSub_{{ proxy.ident }}_{{ f.name }}) {
             proxy.{{ f.name }}.Subscribe(10);
         }

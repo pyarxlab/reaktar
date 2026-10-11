@@ -53,7 +53,9 @@ public:
     using EmergencyAlert = ::reaktar::tags::vehicle_supervisor::events::EmergencyAlert;
     using FeatureFlags = ::reaktar::tags::vehicle_supervisor::fields::FeatureFlags;
     using HardwareRevision = ::reaktar::tags::vehicle_supervisor::fields::HardwareRevision;
+    using PrimaryWarning = ::reaktar::tags::vehicle_supervisor::events::PrimaryWarning;
     using ResetTripMeter = ::reaktar::tags::vehicle_supervisor::methods::ResetTripMeter;
+    using SecondaryWarning = ::reaktar::tags::vehicle_supervisor::events::SecondaryWarning;
     using SetSpeedLimiter = ::reaktar::tags::vehicle_supervisor::methods::SetSpeedLimiter;
     using SystemMatrix = ::reaktar::tags::vehicle_supervisor::fields::SystemMatrix;
     using TriggerDiagnostic = ::reaktar::tags::vehicle_supervisor::methods::TriggerDiagnostic;
@@ -68,6 +70,92 @@ public:
             static constexpr size_t port_index = 0;
             using port_tag = SupervisorPort;
             using kind_type = ::reaktar::ProvidedPortTag;
+
+            struct ActiveDiagnosticMap {
+                using port_type = SupervisorPort;
+                static constexpr std::string_view port_name = "SupervisorPort";
+                static constexpr std::string_view event_name = "ActiveDiagnosticMap";
+            };
+            struct DiagnosticsReport {
+                using port_type = SupervisorPort;
+                static constexpr std::string_view port_name = "SupervisorPort";
+                static constexpr std::string_view event_name = "DiagnosticsReport";
+            };
+            struct DriveHistory {
+                using port_type = SupervisorPort;
+                static constexpr std::string_view port_name = "SupervisorPort";
+                static constexpr std::string_view event_name = "DriveHistory";
+            };
+            struct EmergencyAlert {
+                using port_type = SupervisorPort;
+                static constexpr std::string_view port_name = "SupervisorPort";
+                static constexpr std::string_view event_name = "EmergencyAlert";
+            };
+            struct PrimaryWarning {
+                using port_type = SupervisorPort;
+                static constexpr std::string_view port_name = "SupervisorPort";
+                static constexpr std::string_view event_name = "PrimaryWarning";
+            };
+            struct SecondaryWarning {
+                using port_type = SupervisorPort;
+                static constexpr std::string_view port_name = "SupervisorPort";
+                static constexpr std::string_view event_name = "SecondaryWarning";
+            };
+            struct ActiveAlerts {
+                using port_type = SupervisorPort;
+                static constexpr std::string_view port_name = "SupervisorPort";
+                static constexpr std::string_view field_name = "ActiveAlerts";
+            };
+            struct CalibrationKey {
+                using port_type = SupervisorPort;
+                static constexpr std::string_view port_name = "SupervisorPort";
+                static constexpr std::string_view field_name = "CalibrationKey";
+            };
+            struct CurrentDriveMode {
+                using port_type = SupervisorPort;
+                static constexpr std::string_view port_name = "SupervisorPort";
+                static constexpr std::string_view field_name = "CurrentDriveMode";
+            };
+            struct FeatureFlags {
+                using port_type = SupervisorPort;
+                static constexpr std::string_view port_name = "SupervisorPort";
+                static constexpr std::string_view field_name = "FeatureFlags";
+            };
+            struct HardwareRevision {
+                using port_type = SupervisorPort;
+                static constexpr std::string_view port_name = "SupervisorPort";
+                static constexpr std::string_view field_name = "HardwareRevision";
+            };
+            struct SystemMatrix {
+                using port_type = SupervisorPort;
+                static constexpr std::string_view port_name = "SupervisorPort";
+                static constexpr std::string_view field_name = "SystemMatrix";
+            };
+            struct VehicleConfig {
+                using port_type = SupervisorPort;
+                static constexpr std::string_view port_name = "SupervisorPort";
+                static constexpr std::string_view field_name = "VehicleConfig";
+            };
+            struct CalibrateOdometer {
+                using port_type = SupervisorPort;
+                static constexpr std::string_view port_name = "SupervisorPort";
+                static constexpr std::string_view method_name = "CalibrateOdometer";
+            };
+            struct ResetTripMeter {
+                using port_type = SupervisorPort;
+                static constexpr std::string_view port_name = "SupervisorPort";
+                static constexpr std::string_view method_name = "ResetTripMeter";
+            };
+            struct SetSpeedLimiter {
+                using port_type = SupervisorPort;
+                static constexpr std::string_view port_name = "SupervisorPort";
+                static constexpr std::string_view method_name = "SetSpeedLimiter";
+            };
+            struct TriggerDiagnostic {
+                using port_type = SupervisorPort;
+                static constexpr std::string_view port_name = "SupervisorPort";
+                static constexpr std::string_view method_name = "TriggerDiagnostic";
+            };
         };
         static constexpr size_t kPortCount = 1;
 
@@ -99,6 +187,25 @@ public:
     TelemetryActorBase() = default;
     virtual ~TelemetryActorBase() = default;
 
+
+    /**
+     * @brief Direct unleased raw pointer query by Port tag.
+     * @warning In concurrent code, use acquire_proxy<Port>() for RAII lease safety.
+     */
+    template <typename Port>
+    auto* get_proxy() const noexcept {
+        static_assert(!sizeof(Port*), "get_proxy<Port>() called on Actor with 0 consumed proxies");
+    }
+
+    template <typename Port>
+    bool is_port_ready() const noexcept {
+        static_assert(!sizeof(Port*), "is_port_ready<Port>() called on Actor with 0 consumed proxies");
+    }
+
+    template <typename Port>
+    auto acquire_proxy() {
+        static_assert(!sizeof(Port*), "acquire_proxy<Port>() called on Actor with 0 consumed proxies");
+    }
 
     static constexpr size_t kConsumedProxyCount = 0;
 
@@ -143,7 +250,11 @@ template <typename Derived, typename ExecutionPolicy = ::reaktar::DirectExecutio
 class TelemetryActor : public TelemetryActorBase {
 public:
     using Base = TelemetryActorBase;
+    using Base::ports;
     using execution_policy_type = ExecutionPolicy;
+    using Base::get_proxy;
+    using Base::is_port_ready;
+    using Base::acquire_proxy;
 
     ExecutionPolicy& execution_policy() noexcept { return execution_policy_; }
     const ExecutionPolicy& execution_policy() const noexcept { return execution_policy_; }
@@ -186,9 +297,66 @@ public:
         using CalibrateOdometerRetType = decltype(std::declval<vehicle_supervisor::skeleton::VehicleSupervisorSkeleton&>().CalibrateOdometer(std::declval<const uint32_t&>()));
 
         CalibrateOdometerRetType CalibrateOdometer(const uint32_t& current_km) override {
+            using Port_ = typename Base::ports::SupervisorPort;
+            using PortMethodTag_ = typename Port_::CalibrateOdometer;
             using MethodTag = ::reaktar::tags::vehicle_supervisor::methods::CalibrateOdometer;
-            if constexpr (has_method_handler_v<Derived, MethodTag, const uint32_t&> ||
-                          has_method_handler_v<Derived, MethodTag, uint32_t>) {
+
+            static constexpr bool kHas_port_tag =
+                has_method_handler_v<Derived, PortMethodTag_, const uint32_t&> ||
+                has_method_handler_v<Derived, PortMethodTag_, uint32_t>;
+            static constexpr bool kHas_port_bare =
+                has_method_handler_v<Derived, Port_, const uint32_t&> ||
+                has_method_handler_v<Derived, Port_, uint32_t>;
+            static constexpr bool kHas_tagged =
+                has_method_handler_v<Derived, MethodTag, const uint32_t&> ||
+                has_method_handler_v<Derived, MethodTag, uint32_t>;
+            static constexpr bool kHas_direct =
+                has_direct_method_handler_v<Derived, const uint32_t&> ||
+                has_direct_method_handler_v<Derived, uint32_t>;
+
+            static_assert(
+                (int(kHas_port_tag) + int(kHas_port_bare) + int(kHas_tagged) + int(kHas_direct)) <= 1,
+                "reaktar: Multiple conflicting on(...) RPC handlers declared for method 'CalibrateOdometer' on port 'SupervisorPort'! "
+                "You must define only one: on(ports::SupervisorPort::CalibrateOdometer, ...), on(::reaktar::tags::vehicle_supervisor::methods::CalibrateOdometer, ...), on(ports::SupervisorPort, ...), or on(...)."
+            );
+
+            if constexpr (kHas_port_tag) {
+                if constexpr (std::is_same_v<ExecutionPolicy, ::reaktar::DirectExecution>) {
+                    if constexpr (std::is_void_v<decltype(actor_->self().on(PortMethodTag_{}, current_km))>) {
+                        actor_->self().on(PortMethodTag_{}, current_km);
+                        return result_adapter<CalibrateOdometerRetType, void>::adapt();
+                    } else {
+                        return result_adapter<CalibrateOdometerRetType, decltype(actor_->self().on(PortMethodTag_{}, current_km))>::adapt(
+                            actor_->self().on(PortMethodTag_{}, current_km)
+                        );
+                    }
+                } else if constexpr (std::is_same_v<ExecutionPolicy, ::reaktar::SynchronizedExecution>) {
+                    std::lock_guard<std::mutex> lock(actor_->execution_policy_.mutex());
+                    if constexpr (std::is_void_v<decltype(actor_->self().on(PortMethodTag_{}, current_km))>) {
+                        actor_->self().on(PortMethodTag_{}, current_km);
+                        return result_adapter<CalibrateOdometerRetType, void>::adapt();
+                    } else {
+                        return result_adapter<CalibrateOdometerRetType, decltype(actor_->self().on(PortMethodTag_{}, current_km))>::adapt(
+                            actor_->self().on(PortMethodTag_{}, current_km)
+                        );
+                    }
+                } else {
+                    return actor_->execution_policy_.execute([&]() -> CalibrateOdometerRetType {
+                        if constexpr (std::is_void_v<decltype(actor_->self().on(PortMethodTag_{}, current_km))>) {
+                            actor_->self().on(PortMethodTag_{}, current_km);
+                            return result_adapter<CalibrateOdometerRetType, void>::adapt();
+                        } else {
+                            return result_adapter<CalibrateOdometerRetType, decltype(actor_->self().on(PortMethodTag_{}, current_km))>::adapt(
+                                actor_->self().on(PortMethodTag_{}, current_km)
+                            );
+                        }
+                    });
+                }
+            }
+            else if constexpr (kHas_port_bare) {
+                static_assert(!sizeof(Derived*), "reaktar::on() collision: RPC method argument signature is shared across multiple methods on port 'SupervisorPort'. You must specify the method tag: on(ports::SupervisorPort::CalibrateOdometer, ...) instead of on(ports::SupervisorPort, ...).");
+            }
+            else if constexpr (kHas_tagged) {
                 if constexpr (std::is_same_v<ExecutionPolicy, ::reaktar::DirectExecution>) {
                     if constexpr (std::is_void_v<decltype(actor_->self().on(MethodTag{}, current_km))>) {
                         actor_->self().on(MethodTag{}, current_km);
@@ -221,18 +389,62 @@ public:
                     });
                 }
             }
-            else if constexpr (has_direct_method_handler_v<Derived, const uint32_t&> ||
-                               has_direct_method_handler_v<Derived, uint32_t>) {
-                static_assert(!sizeof(Derived*), "reaktar::on() collision: RPC method argument signature is shared across multiple methods. You must specify the method tag: on(MethodTag, ...).");
+            else if constexpr (kHas_direct) {
+                static_assert(!sizeof(Derived*), "reaktar::on() collision: RPC method argument signature is shared across multiple methods. You must specify the method tag: on(MethodTag, ...) or port tag: on(typename Base::ports::SupervisorPort::CalibrateOdometer, ...).");
             }
             else {
                 return result_adapter<CalibrateOdometerRetType, void>::adapt();
             }
         }
         void ResetTripMeter() override {
+            using Port_ = typename Base::ports::SupervisorPort;
+            using PortMethodTag_ = typename Port_::ResetTripMeter;
             using MethodTag = ::reaktar::tags::vehicle_supervisor::methods::ResetTripMeter;
-            if constexpr (has_method_handler_v<Derived, MethodTag> ||
-                          has_method_handler_v<Derived, MethodTag>) {
+
+            static constexpr bool kHas_port_tag =
+                has_method_handler_v<Derived, PortMethodTag_> ||
+                has_method_handler_v<Derived, PortMethodTag_>;
+            static constexpr bool kHas_port_bare =
+                has_method_handler_v<Derived, Port_> ||
+                has_method_handler_v<Derived, Port_>;
+            static constexpr bool kHas_tagged =
+                has_method_handler_v<Derived, MethodTag> ||
+                has_method_handler_v<Derived, MethodTag>;
+            static constexpr bool kHas_direct =
+                has_direct_method_handler_v<Derived> ||
+                has_direct_method_handler_v<Derived>;
+
+            static_assert(
+                (int(kHas_port_tag) + int(kHas_port_bare) + int(kHas_tagged) + int(kHas_direct)) <= 1,
+                "reaktar: Multiple conflicting on(...) RPC handlers declared for method 'ResetTripMeter' on port 'SupervisorPort'! "
+                "You must define only one: on(ports::SupervisorPort::ResetTripMeter, ...), on(::reaktar::tags::vehicle_supervisor::methods::ResetTripMeter, ...), on(ports::SupervisorPort, ...), or on(...)."
+            );
+
+            if constexpr (kHas_port_tag) {
+                if constexpr (std::is_same_v<ExecutionPolicy, ::reaktar::DirectExecution>) {
+                    actor_->self().on(PortMethodTag_{});
+                } else if constexpr (std::is_same_v<ExecutionPolicy, ::reaktar::SynchronizedExecution>) {
+                    std::lock_guard<std::mutex> lock(actor_->execution_policy_.mutex());
+                    actor_->self().on(PortMethodTag_{});
+                } else {
+                    actor_->execution_policy_.execute([&] {
+                        actor_->self().on(PortMethodTag_{});
+                    });
+                }
+            }
+            else if constexpr (kHas_port_bare) {
+                if constexpr (std::is_same_v<ExecutionPolicy, ::reaktar::DirectExecution>) {
+                    actor_->self().on(Port_{});
+                } else if constexpr (std::is_same_v<ExecutionPolicy, ::reaktar::SynchronizedExecution>) {
+                    std::lock_guard<std::mutex> lock(actor_->execution_policy_.mutex());
+                    actor_->self().on(Port_{});
+                } else {
+                    actor_->execution_policy_.execute([&] {
+                        actor_->self().on(Port_{});
+                    });
+                }
+            }
+            else if constexpr (kHas_tagged) {
                 if constexpr (std::is_same_v<ExecutionPolicy, ::reaktar::DirectExecution>) {
                     actor_->self().on(MethodTag{});
                 } else if constexpr (std::is_same_v<ExecutionPolicy, ::reaktar::SynchronizedExecution>) {
@@ -244,8 +456,7 @@ public:
                     });
                 }
             }
-            else if constexpr (has_direct_method_handler_v<Derived> ||
-                               has_direct_method_handler_v<Derived>) {
+            else if constexpr (kHas_direct) {
                 if constexpr (std::is_same_v<ExecutionPolicy, ::reaktar::DirectExecution>) {
                     actor_->self().on();
                 } else if constexpr (std::is_same_v<ExecutionPolicy, ::reaktar::SynchronizedExecution>) {
@@ -264,9 +475,96 @@ public:
         using SetSpeedLimiterRetType = decltype(std::declval<vehicle_supervisor::skeleton::VehicleSupervisorSkeleton&>().SetSpeedLimiter(std::declval<const float&>(), std::declval<const bool&>()));
 
         SetSpeedLimiterRetType SetSpeedLimiter(const float& max_kmh, const bool& active) override {
+            using Port_ = typename Base::ports::SupervisorPort;
+            using PortMethodTag_ = typename Port_::SetSpeedLimiter;
             using MethodTag = ::reaktar::tags::vehicle_supervisor::methods::SetSpeedLimiter;
-            if constexpr (has_method_handler_v<Derived, MethodTag, const float&, const bool&> ||
-                          has_method_handler_v<Derived, MethodTag, float, bool>) {
+
+            static constexpr bool kHas_port_tag =
+                has_method_handler_v<Derived, PortMethodTag_, const float&, const bool&> ||
+                has_method_handler_v<Derived, PortMethodTag_, float, bool>;
+            static constexpr bool kHas_port_bare =
+                has_method_handler_v<Derived, Port_, const float&, const bool&> ||
+                has_method_handler_v<Derived, Port_, float, bool>;
+            static constexpr bool kHas_tagged =
+                has_method_handler_v<Derived, MethodTag, const float&, const bool&> ||
+                has_method_handler_v<Derived, MethodTag, float, bool>;
+            static constexpr bool kHas_direct =
+                has_direct_method_handler_v<Derived, const float&, const bool&> ||
+                has_direct_method_handler_v<Derived, float, bool>;
+
+            static_assert(
+                (int(kHas_port_tag) + int(kHas_port_bare) + int(kHas_tagged) + int(kHas_direct)) <= 1,
+                "reaktar: Multiple conflicting on(...) RPC handlers declared for method 'SetSpeedLimiter' on port 'SupervisorPort'! "
+                "You must define only one: on(ports::SupervisorPort::SetSpeedLimiter, ...), on(::reaktar::tags::vehicle_supervisor::methods::SetSpeedLimiter, ...), on(ports::SupervisorPort, ...), or on(...)."
+            );
+
+            if constexpr (kHas_port_tag) {
+                if constexpr (std::is_same_v<ExecutionPolicy, ::reaktar::DirectExecution>) {
+                    if constexpr (std::is_void_v<decltype(actor_->self().on(PortMethodTag_{}, max_kmh, active))>) {
+                        actor_->self().on(PortMethodTag_{}, max_kmh, active);
+                        return result_adapter<SetSpeedLimiterRetType, void>::adapt();
+                    } else {
+                        return result_adapter<SetSpeedLimiterRetType, decltype(actor_->self().on(PortMethodTag_{}, max_kmh, active))>::adapt(
+                            actor_->self().on(PortMethodTag_{}, max_kmh, active)
+                        );
+                    }
+                } else if constexpr (std::is_same_v<ExecutionPolicy, ::reaktar::SynchronizedExecution>) {
+                    std::lock_guard<std::mutex> lock(actor_->execution_policy_.mutex());
+                    if constexpr (std::is_void_v<decltype(actor_->self().on(PortMethodTag_{}, max_kmh, active))>) {
+                        actor_->self().on(PortMethodTag_{}, max_kmh, active);
+                        return result_adapter<SetSpeedLimiterRetType, void>::adapt();
+                    } else {
+                        return result_adapter<SetSpeedLimiterRetType, decltype(actor_->self().on(PortMethodTag_{}, max_kmh, active))>::adapt(
+                            actor_->self().on(PortMethodTag_{}, max_kmh, active)
+                        );
+                    }
+                } else {
+                    return actor_->execution_policy_.execute([&]() -> SetSpeedLimiterRetType {
+                        if constexpr (std::is_void_v<decltype(actor_->self().on(PortMethodTag_{}, max_kmh, active))>) {
+                            actor_->self().on(PortMethodTag_{}, max_kmh, active);
+                            return result_adapter<SetSpeedLimiterRetType, void>::adapt();
+                        } else {
+                            return result_adapter<SetSpeedLimiterRetType, decltype(actor_->self().on(PortMethodTag_{}, max_kmh, active))>::adapt(
+                                actor_->self().on(PortMethodTag_{}, max_kmh, active)
+                            );
+                        }
+                    });
+                }
+            }
+            else if constexpr (kHas_port_bare) {
+                if constexpr (std::is_same_v<ExecutionPolicy, ::reaktar::DirectExecution>) {
+                    if constexpr (std::is_void_v<decltype(actor_->self().on(Port_{}, max_kmh, active))>) {
+                        actor_->self().on(Port_{}, max_kmh, active);
+                        return result_adapter<SetSpeedLimiterRetType, void>::adapt();
+                    } else {
+                        return result_adapter<SetSpeedLimiterRetType, decltype(actor_->self().on(Port_{}, max_kmh, active))>::adapt(
+                            actor_->self().on(Port_{}, max_kmh, active)
+                        );
+                    }
+                } else if constexpr (std::is_same_v<ExecutionPolicy, ::reaktar::SynchronizedExecution>) {
+                    std::lock_guard<std::mutex> lock(actor_->execution_policy_.mutex());
+                    if constexpr (std::is_void_v<decltype(actor_->self().on(Port_{}, max_kmh, active))>) {
+                        actor_->self().on(Port_{}, max_kmh, active);
+                        return result_adapter<SetSpeedLimiterRetType, void>::adapt();
+                    } else {
+                        return result_adapter<SetSpeedLimiterRetType, decltype(actor_->self().on(Port_{}, max_kmh, active))>::adapt(
+                            actor_->self().on(Port_{}, max_kmh, active)
+                        );
+                    }
+                } else {
+                    return actor_->execution_policy_.execute([&]() -> SetSpeedLimiterRetType {
+                        if constexpr (std::is_void_v<decltype(actor_->self().on(Port_{}, max_kmh, active))>) {
+                            actor_->self().on(Port_{}, max_kmh, active);
+                            return result_adapter<SetSpeedLimiterRetType, void>::adapt();
+                        } else {
+                            return result_adapter<SetSpeedLimiterRetType, decltype(actor_->self().on(Port_{}, max_kmh, active))>::adapt(
+                                actor_->self().on(Port_{}, max_kmh, active)
+                            );
+                        }
+                    });
+                }
+            }
+            else if constexpr (kHas_tagged) {
                 if constexpr (std::is_same_v<ExecutionPolicy, ::reaktar::DirectExecution>) {
                     if constexpr (std::is_void_v<decltype(actor_->self().on(MethodTag{}, max_kmh, active))>) {
                         actor_->self().on(MethodTag{}, max_kmh, active);
@@ -299,8 +597,7 @@ public:
                     });
                 }
             }
-            else if constexpr (has_direct_method_handler_v<Derived, const float&, const bool&> ||
-                               has_direct_method_handler_v<Derived, float, bool>) {
+            else if constexpr (kHas_direct) {
                 if constexpr (std::is_same_v<ExecutionPolicy, ::reaktar::DirectExecution>) {
                     if constexpr (std::is_void_v<decltype(actor_->self().on(max_kmh, active))>) {
                         actor_->self().on(max_kmh, active);
@@ -340,9 +637,66 @@ public:
         using TriggerDiagnosticRetType = decltype(std::declval<vehicle_supervisor::skeleton::VehicleSupervisorSkeleton&>().TriggerDiagnostic(std::declval<const uint32_t&>()));
 
         TriggerDiagnosticRetType TriggerDiagnostic(const uint32_t& code) override {
+            using Port_ = typename Base::ports::SupervisorPort;
+            using PortMethodTag_ = typename Port_::TriggerDiagnostic;
             using MethodTag = ::reaktar::tags::vehicle_supervisor::methods::TriggerDiagnostic;
-            if constexpr (has_method_handler_v<Derived, MethodTag, const uint32_t&> ||
-                          has_method_handler_v<Derived, MethodTag, uint32_t>) {
+
+            static constexpr bool kHas_port_tag =
+                has_method_handler_v<Derived, PortMethodTag_, const uint32_t&> ||
+                has_method_handler_v<Derived, PortMethodTag_, uint32_t>;
+            static constexpr bool kHas_port_bare =
+                has_method_handler_v<Derived, Port_, const uint32_t&> ||
+                has_method_handler_v<Derived, Port_, uint32_t>;
+            static constexpr bool kHas_tagged =
+                has_method_handler_v<Derived, MethodTag, const uint32_t&> ||
+                has_method_handler_v<Derived, MethodTag, uint32_t>;
+            static constexpr bool kHas_direct =
+                has_direct_method_handler_v<Derived, const uint32_t&> ||
+                has_direct_method_handler_v<Derived, uint32_t>;
+
+            static_assert(
+                (int(kHas_port_tag) + int(kHas_port_bare) + int(kHas_tagged) + int(kHas_direct)) <= 1,
+                "reaktar: Multiple conflicting on(...) RPC handlers declared for method 'TriggerDiagnostic' on port 'SupervisorPort'! "
+                "You must define only one: on(ports::SupervisorPort::TriggerDiagnostic, ...), on(::reaktar::tags::vehicle_supervisor::methods::TriggerDiagnostic, ...), on(ports::SupervisorPort, ...), or on(...)."
+            );
+
+            if constexpr (kHas_port_tag) {
+                if constexpr (std::is_same_v<ExecutionPolicy, ::reaktar::DirectExecution>) {
+                    if constexpr (std::is_void_v<decltype(actor_->self().on(PortMethodTag_{}, code))>) {
+                        actor_->self().on(PortMethodTag_{}, code);
+                        return result_adapter<TriggerDiagnosticRetType, void>::adapt();
+                    } else {
+                        return result_adapter<TriggerDiagnosticRetType, decltype(actor_->self().on(PortMethodTag_{}, code))>::adapt(
+                            actor_->self().on(PortMethodTag_{}, code)
+                        );
+                    }
+                } else if constexpr (std::is_same_v<ExecutionPolicy, ::reaktar::SynchronizedExecution>) {
+                    std::lock_guard<std::mutex> lock(actor_->execution_policy_.mutex());
+                    if constexpr (std::is_void_v<decltype(actor_->self().on(PortMethodTag_{}, code))>) {
+                        actor_->self().on(PortMethodTag_{}, code);
+                        return result_adapter<TriggerDiagnosticRetType, void>::adapt();
+                    } else {
+                        return result_adapter<TriggerDiagnosticRetType, decltype(actor_->self().on(PortMethodTag_{}, code))>::adapt(
+                            actor_->self().on(PortMethodTag_{}, code)
+                        );
+                    }
+                } else {
+                    return actor_->execution_policy_.execute([&]() -> TriggerDiagnosticRetType {
+                        if constexpr (std::is_void_v<decltype(actor_->self().on(PortMethodTag_{}, code))>) {
+                            actor_->self().on(PortMethodTag_{}, code);
+                            return result_adapter<TriggerDiagnosticRetType, void>::adapt();
+                        } else {
+                            return result_adapter<TriggerDiagnosticRetType, decltype(actor_->self().on(PortMethodTag_{}, code))>::adapt(
+                                actor_->self().on(PortMethodTag_{}, code)
+                            );
+                        }
+                    });
+                }
+            }
+            else if constexpr (kHas_port_bare) {
+                static_assert(!sizeof(Derived*), "reaktar::on() collision: RPC method argument signature is shared across multiple methods on port 'SupervisorPort'. You must specify the method tag: on(ports::SupervisorPort::TriggerDiagnostic, ...) instead of on(ports::SupervisorPort, ...).");
+            }
+            else if constexpr (kHas_tagged) {
                 if constexpr (std::is_same_v<ExecutionPolicy, ::reaktar::DirectExecution>) {
                     if constexpr (std::is_void_v<decltype(actor_->self().on(MethodTag{}, code))>) {
                         actor_->self().on(MethodTag{}, code);
@@ -375,9 +729,8 @@ public:
                     });
                 }
             }
-            else if constexpr (has_direct_method_handler_v<Derived, const uint32_t&> ||
-                               has_direct_method_handler_v<Derived, uint32_t>) {
-                static_assert(!sizeof(Derived*), "reaktar::on() collision: RPC method argument signature is shared across multiple methods. You must specify the method tag: on(MethodTag, ...).");
+            else if constexpr (kHas_direct) {
+                static_assert(!sizeof(Derived*), "reaktar::on() collision: RPC method argument signature is shared across multiple methods. You must specify the method tag: on(MethodTag, ...) or port tag: on(typename Base::ports::SupervisorPort::TriggerDiagnostic, ...).");
             }
             else {
                 return result_adapter<TriggerDiagnosticRetType, void>::adapt();
@@ -393,10 +746,14 @@ public:
 
     using legal_signatures = std::tuple<
         reaktar::sig<>,
+        reaktar::sig<::reaktar::Connected<typename Base::ports::SupervisorPort>>,
+        reaktar::sig<::reaktar::Disconnected<typename Base::ports::SupervisorPort>>,
         reaktar::sig<::reaktar::tags::vehicle_supervisor::methods::ResetTripMeter>,
         reaktar::sig<ara::core::Map<ara::core::String, ara::core::String>>,
         reaktar::sig<ara::core::Map<ara::core::String, bool>>,
         reaktar::sig<ara::core::Vector<vehicle_data::EmergencyAlert>>,
+        reaktar::sig<typename Base::ports::SupervisorPort>,
+        reaktar::sig<typename Base::ports::SupervisorPort::ResetTripMeter>,
         reaktar::sig<uint32_t>,
         reaktar::sig<vehicle_data::DriveMode>,
         reaktar::sig<::reaktar::tags::vehicle_supervisor::fields::ActiveAlerts, ara::core::Vector<vehicle_data::EmergencyAlert>>,
@@ -407,9 +764,21 @@ public:
         reaktar::sig<::reaktar::tags::vehicle_supervisor::methods::CalibrateOdometer, uint32_t>,
         reaktar::sig<::reaktar::tags::vehicle_supervisor::methods::TriggerDiagnostic, uint32_t>,
         reaktar::sig<float, bool>,
+        reaktar::sig<typename Base::ports::SupervisorPort, ara::core::Map<ara::core::String, ara::core::String>>,
+        reaktar::sig<typename Base::ports::SupervisorPort, ara::core::Map<ara::core::String, bool>>,
+        reaktar::sig<typename Base::ports::SupervisorPort, ara::core::Vector<vehicle_data::EmergencyAlert>>,
+        reaktar::sig<typename Base::ports::SupervisorPort, uint32_t>,
+        reaktar::sig<typename Base::ports::SupervisorPort, vehicle_data::DriveMode>,
+        reaktar::sig<typename Base::ports::SupervisorPort::ActiveAlerts, ara::core::Vector<vehicle_data::EmergencyAlert>>,
+        reaktar::sig<typename Base::ports::SupervisorPort::CalibrateOdometer, uint32_t>,
+        reaktar::sig<typename Base::ports::SupervisorPort::CalibrationKey, uint32_t>,
+        reaktar::sig<typename Base::ports::SupervisorPort::CurrentDriveMode, vehicle_data::DriveMode>,
+        reaktar::sig<typename Base::ports::SupervisorPort::FeatureFlags, ara::core::Map<ara::core::String, bool>>,
+        reaktar::sig<typename Base::ports::SupervisorPort::TriggerDiagnostic, uint32_t>,
+        reaktar::sig<typename Base::ports::SupervisorPort::VehicleConfig, ara::core::Map<ara::core::String, ara::core::String>>,
         reaktar::sig<::reaktar::tags::vehicle_supervisor::methods::SetSpeedLimiter, float, bool>,
-        reaktar::sig<::reaktar::Connected<typename Base::ports::SupervisorPort>>,
-        reaktar::sig<::reaktar::Disconnected<typename Base::ports::SupervisorPort>>
+        reaktar::sig<typename Base::ports::SupervisorPort, float, bool>,
+        reaktar::sig<typename Base::ports::SupervisorPort::SetSpeedLimiter, float, bool>
     >;
 
     explicit TelemetryActor(
@@ -419,10 +788,13 @@ public:
         : TelemetryActorBase()
         , supervisorport_skeleton_(this, std::move(supervisorport_instance), mode)
     {
+        this->check_handler_collisions();
         if constexpr (::reaktar::strict_validation_enabled) {
             using LegalSignaturesTuple = legal_signatures;
 
             static_assert(!reaktar::has_rogue_handler_v<Derived, LegalSignaturesTuple
+                , ::reaktar::Connected<typename Base::ports::SupervisorPort>
+                , ::reaktar::Disconnected<typename Base::ports::SupervisorPort>
                 , ara::core::Map<ara::core::String, ara::core::String>
                 , ara::core::Map<ara::core::String, bool>
                 , ara::core::Vector<vehicle_data::EmergencyAlert>
@@ -430,8 +802,6 @@ public:
                 , float
                 , uint32_t
                 , vehicle_data::DriveMode
-                , ::reaktar::Connected<typename Base::ports::SupervisorPort>
-                , ::reaktar::Disconnected<typename Base::ports::SupervisorPort>
                 , ::reaktar::tags::vehicle_supervisor::fields::ActiveAlerts
                 , ::reaktar::tags::vehicle_supervisor::fields::CalibrationKey
                 , ::reaktar::tags::vehicle_supervisor::fields::CurrentDriveMode
@@ -441,6 +811,16 @@ public:
                 , ::reaktar::tags::vehicle_supervisor::methods::ResetTripMeter
                 , ::reaktar::tags::vehicle_supervisor::methods::SetSpeedLimiter
                 , ::reaktar::tags::vehicle_supervisor::methods::TriggerDiagnostic
+                , typename Base::ports::SupervisorPort
+                , typename Base::ports::SupervisorPort::ActiveAlerts
+                , typename Base::ports::SupervisorPort::CalibrateOdometer
+                , typename Base::ports::SupervisorPort::CalibrationKey
+                , typename Base::ports::SupervisorPort::CurrentDriveMode
+                , typename Base::ports::SupervisorPort::FeatureFlags
+                , typename Base::ports::SupervisorPort::ResetTripMeter
+                , typename Base::ports::SupervisorPort::SetSpeedLimiter
+                , typename Base::ports::SupervisorPort::TriggerDiagnostic
+                , typename Base::ports::SupervisorPort::VehicleConfig
             >,
             "\n"
             "====================================================================================\n"
@@ -461,32 +841,110 @@ public:
     // ------------------------------------------------------------------------
     template <typename Tag, typename... Args>
     auto emit(Args&&... args) {
-        if constexpr (std::is_same_v<Tag, vehicle_supervisor::events::ActiveDiagnosticMap>) {
+        if constexpr (std::is_same_v<Tag, typename Base::ports::SupervisorPort>) {
+            if constexpr (sizeof...(Args) == 1) {
+                using PayloadType = std::decay_t<typename std::tuple_element<0, std::tuple<Args...>>::type>;
+                if constexpr (std::is_same_v<PayloadType, ara::core::Array<vehicle_data::SystemStatus, 4>>) {
+                    supervisorport_skeleton_.SystemMatrix.Update(std::forward<Args>(args)...);
+                    return ::reaktar::EmitStatus{true};
+                }
+                else if constexpr (std::is_same_v<PayloadType, ara::core::Map<uint32_t, vehicle_data::EmergencyAlert>>) {
+                    supervisorport_skeleton_.ActiveDiagnosticMap.Send(std::forward<Args>(args)...);
+                    return ::reaktar::EmitStatus{true};
+                }
+                else if constexpr (std::is_same_v<PayloadType, ara::core::Vector<vehicle_data::DriveMode>>) {
+                    supervisorport_skeleton_.DriveHistory.Send(std::forward<Args>(args)...);
+                    return ::reaktar::EmitStatus{true};
+                }
+                else if constexpr (std::is_same_v<PayloadType, ara::core::Vector<vehicle_data::EmergencyAlert>>) {
+                    supervisorport_skeleton_.ActiveAlerts.Update(std::forward<Args>(args)...);
+                    return ::reaktar::EmitStatus{true};
+                }
+                else if constexpr (std::is_same_v<PayloadType, uint16_t>) {
+                    static_assert(!sizeof(Tag*), "reaktar: emit<Port>(payload) is ambiguous on port 'SupervisorPort'! Multiple items accept type 'uint16_t'. Use emit<ports::SupervisorPort::ItemTag>(...) instead.");
+                }
+                else if constexpr (std::is_same_v<PayloadType, vehicle_data::EmergencyAlert>) {
+                    supervisorport_skeleton_.EmergencyAlert.Send(std::forward<Args>(args)...);
+                    return ::reaktar::EmitStatus{true};
+                }
+                else if constexpr (std::is_same_v<PayloadType, vehicle_data::VehicleDiagnostics>) {
+                    supervisorport_skeleton_.DiagnosticsReport.Send(std::forward<Args>(args)...);
+                    return ::reaktar::EmitStatus{true};
+                }
+                else {
+                    static_assert(!sizeof(Tag*), "reaktar: emit<Port>(payload) failed! The payload type does not match any outbound event, notifier, or single-arg method on port 'SupervisorPort'.");
+                }
+            }
+            else {
+                static_assert(!sizeof(Tag*), "reaktar: emit<Port>(args...) failed! Port 'SupervisorPort' has no outbound multi-argument methods.");
+            }
+        }
+        else if constexpr (std::is_same_v<Tag, typename Base::ports::SupervisorPort::ActiveDiagnosticMap>) {
             supervisorport_skeleton_.ActiveDiagnosticMap.Send(std::forward<Args>(args)...);
             return ::reaktar::EmitStatus{true};
         }
-        else if constexpr (std::is_same_v<Tag, vehicle_supervisor::events::DiagnosticsReport>) {
+        else if constexpr (std::is_same_v<Tag, ::reaktar::tags::vehicle_supervisor::events::ActiveDiagnosticMap>) {
+            supervisorport_skeleton_.ActiveDiagnosticMap.Send(std::forward<Args>(args)...);
+            return ::reaktar::EmitStatus{true};
+        }
+        else if constexpr (std::is_same_v<Tag, typename Base::ports::SupervisorPort::DiagnosticsReport>) {
             supervisorport_skeleton_.DiagnosticsReport.Send(std::forward<Args>(args)...);
             return ::reaktar::EmitStatus{true};
         }
-        else if constexpr (std::is_same_v<Tag, vehicle_supervisor::events::DriveHistory>) {
+        else if constexpr (std::is_same_v<Tag, ::reaktar::tags::vehicle_supervisor::events::DiagnosticsReport>) {
+            supervisorport_skeleton_.DiagnosticsReport.Send(std::forward<Args>(args)...);
+            return ::reaktar::EmitStatus{true};
+        }
+        else if constexpr (std::is_same_v<Tag, typename Base::ports::SupervisorPort::DriveHistory>) {
             supervisorport_skeleton_.DriveHistory.Send(std::forward<Args>(args)...);
             return ::reaktar::EmitStatus{true};
         }
-        else if constexpr (std::is_same_v<Tag, vehicle_supervisor::events::EmergencyAlert>) {
+        else if constexpr (std::is_same_v<Tag, ::reaktar::tags::vehicle_supervisor::events::DriveHistory>) {
+            supervisorport_skeleton_.DriveHistory.Send(std::forward<Args>(args)...);
+            return ::reaktar::EmitStatus{true};
+        }
+        else if constexpr (std::is_same_v<Tag, typename Base::ports::SupervisorPort::EmergencyAlert>) {
             supervisorport_skeleton_.EmergencyAlert.Send(std::forward<Args>(args)...);
             return ::reaktar::EmitStatus{true};
         }
-        else if constexpr (std::is_same_v<Tag, vehicle_supervisor::fields::ActiveAlerts>) {
+        else if constexpr (std::is_same_v<Tag, ::reaktar::tags::vehicle_supervisor::events::EmergencyAlert>) {
+            supervisorport_skeleton_.EmergencyAlert.Send(std::forward<Args>(args)...);
+            return ::reaktar::EmitStatus{true};
+        }
+        else if constexpr (std::is_same_v<Tag, typename Base::ports::SupervisorPort::PrimaryWarning>) {
+            supervisorport_skeleton_.PrimaryWarning.Send(std::forward<Args>(args)...);
+            return ::reaktar::EmitStatus{true};
+        }
+        else if constexpr (std::is_same_v<Tag, ::reaktar::tags::vehicle_supervisor::events::PrimaryWarning>) {
+            supervisorport_skeleton_.PrimaryWarning.Send(std::forward<Args>(args)...);
+            return ::reaktar::EmitStatus{true};
+        }
+        else if constexpr (std::is_same_v<Tag, typename Base::ports::SupervisorPort::SecondaryWarning>) {
+            supervisorport_skeleton_.SecondaryWarning.Send(std::forward<Args>(args)...);
+            return ::reaktar::EmitStatus{true};
+        }
+        else if constexpr (std::is_same_v<Tag, ::reaktar::tags::vehicle_supervisor::events::SecondaryWarning>) {
+            supervisorport_skeleton_.SecondaryWarning.Send(std::forward<Args>(args)...);
+            return ::reaktar::EmitStatus{true};
+        }
+        else if constexpr (std::is_same_v<Tag, typename Base::ports::SupervisorPort::ActiveAlerts>) {
             supervisorport_skeleton_.ActiveAlerts.Update(std::forward<Args>(args)...);
             return ::reaktar::EmitStatus{true};
         }
-        else if constexpr (std::is_same_v<Tag, vehicle_supervisor::fields::SystemMatrix>) {
+        else if constexpr (std::is_same_v<Tag, ::reaktar::tags::vehicle_supervisor::fields::ActiveAlerts>) {
+            supervisorport_skeleton_.ActiveAlerts.Update(std::forward<Args>(args)...);
+            return ::reaktar::EmitStatus{true};
+        }
+        else if constexpr (std::is_same_v<Tag, typename Base::ports::SupervisorPort::SystemMatrix>) {
+            supervisorport_skeleton_.SystemMatrix.Update(std::forward<Args>(args)...);
+            return ::reaktar::EmitStatus{true};
+        }
+        else if constexpr (std::is_same_v<Tag, ::reaktar::tags::vehicle_supervisor::fields::SystemMatrix>) {
             supervisorport_skeleton_.SystemMatrix.Update(std::forward<Args>(args)...);
             return ::reaktar::EmitStatus{true};
         }
         else {
-            static_assert(!sizeof(Tag*), "reaktar: emit called with unknown tag!");
+            static_assert(!sizeof(Tag*), "reaktar: emit called with unknown tag or port!");
         }
     }
 
@@ -698,7 +1156,64 @@ private:
     void bind_skeleton_fields() {
         // Initialise field value before OfferService (required by AUTOSAR Adaptive caching/notifier semantics)
         supervisorport_skeleton_.ActiveAlerts.Update({});
-        if constexpr (has_on_field_set_v<Derived, vehicle_supervisor::fields::ActiveAlerts, ara::core::Vector<vehicle_data::EmergencyAlert>>) {
+        using supervisorport_ActiveAlerts_Port_ = typename Base::ports::SupervisorPort;
+        using supervisorport_ActiveAlerts_PortTag_ = typename supervisorport_ActiveAlerts_Port_::ActiveAlerts;
+
+        static constexpr bool kHas_supervisorport_ActiveAlerts_setter_port_tag  = has_on_field_set_v<Derived, supervisorport_ActiveAlerts_PortTag_, ara::core::Vector<vehicle_data::EmergencyAlert>>;
+        static constexpr bool kHas_supervisorport_ActiveAlerts_setter_port_bare = has_on_field_set_v<Derived, supervisorport_ActiveAlerts_Port_, ara::core::Vector<vehicle_data::EmergencyAlert>>;
+        static constexpr bool kHas_supervisorport_ActiveAlerts_setter_tagged    = has_on_field_set_v<Derived, vehicle_supervisor::fields::ActiveAlerts, ara::core::Vector<vehicle_data::EmergencyAlert>>;
+        static constexpr bool kHas_supervisorport_ActiveAlerts_setter_direct    = has_on_direct_field_set_v<Derived, ara::core::Vector<vehicle_data::EmergencyAlert>>;
+
+        static_assert(
+            (int(kHas_supervisorport_ActiveAlerts_setter_port_tag) +
+             int(kHas_supervisorport_ActiveAlerts_setter_port_bare) +
+             int(kHas_supervisorport_ActiveAlerts_setter_tagged) +
+             int(kHas_supervisorport_ActiveAlerts_setter_direct)) <= 1,
+            "reaktar: Multiple conflicting on_set(...) handlers declared for field 'ActiveAlerts' on port 'SupervisorPort'! "
+            "You must define only one: on_set(ports::SupervisorPort::ActiveAlerts, ...), on_set(vehicle_supervisor::fields::ActiveAlerts, ...), on_set(ports::SupervisorPort, ...), or on_set(...)."
+        );
+
+        if constexpr (kHas_supervisorport_ActiveAlerts_setter_port_tag) {
+            supervisorport_skeleton_.ActiveAlerts.RegisterSetHandler([this](const ara::core::Vector<vehicle_data::EmergencyAlert>& val) {
+                if constexpr (std::is_same_v<ExecutionPolicy, ::reaktar::DirectExecution>) {
+                    return result_adapter<reaktar::Future<ara::core::Vector<vehicle_data::EmergencyAlert>>, decltype(self().on_set(supervisorport_ActiveAlerts_PortTag_{}, val))>::adapt(
+                        self().on_set(supervisorport_ActiveAlerts_PortTag_{}, val)
+                    );
+                } else if constexpr (std::is_same_v<ExecutionPolicy, ::reaktar::SynchronizedExecution>) {
+                    std::lock_guard<std::mutex> lock(this->execution_policy_.mutex());
+                    return result_adapter<reaktar::Future<ara::core::Vector<vehicle_data::EmergencyAlert>>, decltype(self().on_set(supervisorport_ActiveAlerts_PortTag_{}, val))>::adapt(
+                        self().on_set(supervisorport_ActiveAlerts_PortTag_{}, val)
+                    );
+                } else {
+                    return this->execution_policy_.execute([&] {
+                        return result_adapter<reaktar::Future<ara::core::Vector<vehicle_data::EmergencyAlert>>, decltype(self().on_set(supervisorport_ActiveAlerts_PortTag_{}, val))>::adapt(
+                            self().on_set(supervisorport_ActiveAlerts_PortTag_{}, val)
+                        );
+                    });
+                }
+            });
+        }
+        else if constexpr (kHas_supervisorport_ActiveAlerts_setter_port_bare) {
+            supervisorport_skeleton_.ActiveAlerts.RegisterSetHandler([this](const ara::core::Vector<vehicle_data::EmergencyAlert>& val) {
+                if constexpr (std::is_same_v<ExecutionPolicy, ::reaktar::DirectExecution>) {
+                    return result_adapter<reaktar::Future<ara::core::Vector<vehicle_data::EmergencyAlert>>, decltype(self().on_set(supervisorport_ActiveAlerts_Port_{}, val))>::adapt(
+                        self().on_set(supervisorport_ActiveAlerts_Port_{}, val)
+                    );
+                } else if constexpr (std::is_same_v<ExecutionPolicy, ::reaktar::SynchronizedExecution>) {
+                    std::lock_guard<std::mutex> lock(this->execution_policy_.mutex());
+                    return result_adapter<reaktar::Future<ara::core::Vector<vehicle_data::EmergencyAlert>>, decltype(self().on_set(supervisorport_ActiveAlerts_Port_{}, val))>::adapt(
+                        self().on_set(supervisorport_ActiveAlerts_Port_{}, val)
+                    );
+                } else {
+                    return this->execution_policy_.execute([&] {
+                        return result_adapter<reaktar::Future<ara::core::Vector<vehicle_data::EmergencyAlert>>, decltype(self().on_set(supervisorport_ActiveAlerts_Port_{}, val))>::adapt(
+                            self().on_set(supervisorport_ActiveAlerts_Port_{}, val)
+                        );
+                    });
+                }
+            });
+        }
+        else if constexpr (kHas_supervisorport_ActiveAlerts_setter_tagged) {
             supervisorport_skeleton_.ActiveAlerts.RegisterSetHandler([this](const ara::core::Vector<vehicle_data::EmergencyAlert>& val) {
                 if constexpr (std::is_same_v<ExecutionPolicy, ::reaktar::DirectExecution>) {
                     return result_adapter<reaktar::Future<ara::core::Vector<vehicle_data::EmergencyAlert>>, decltype(self().on_set(vehicle_supervisor::fields::ActiveAlerts{}, val))>::adapt(
@@ -718,7 +1233,7 @@ private:
                 }
             });
         }
-        else if constexpr (has_on_direct_field_set_v<Derived, ara::core::Vector<vehicle_data::EmergencyAlert>>) {
+        else if constexpr (kHas_supervisorport_ActiveAlerts_setter_direct) {
             supervisorport_skeleton_.ActiveAlerts.RegisterSetHandler([this](const ara::core::Vector<vehicle_data::EmergencyAlert>& val) {
                 if constexpr (std::is_same_v<ExecutionPolicy, ::reaktar::DirectExecution>) {
                     return result_adapter<reaktar::Future<ara::core::Vector<vehicle_data::EmergencyAlert>>, decltype(self().on_set(val))>::adapt(
@@ -738,7 +1253,64 @@ private:
                 }
             });
         }
-        if constexpr (has_on_field_set_v<Derived, vehicle_supervisor::fields::CalibrationKey, uint32_t>) {
+        using supervisorport_CalibrationKey_Port_ = typename Base::ports::SupervisorPort;
+        using supervisorport_CalibrationKey_PortTag_ = typename supervisorport_CalibrationKey_Port_::CalibrationKey;
+
+        static constexpr bool kHas_supervisorport_CalibrationKey_setter_port_tag  = has_on_field_set_v<Derived, supervisorport_CalibrationKey_PortTag_, uint32_t>;
+        static constexpr bool kHas_supervisorport_CalibrationKey_setter_port_bare = has_on_field_set_v<Derived, supervisorport_CalibrationKey_Port_, uint32_t>;
+        static constexpr bool kHas_supervisorport_CalibrationKey_setter_tagged    = has_on_field_set_v<Derived, vehicle_supervisor::fields::CalibrationKey, uint32_t>;
+        static constexpr bool kHas_supervisorport_CalibrationKey_setter_direct    = has_on_direct_field_set_v<Derived, uint32_t>;
+
+        static_assert(
+            (int(kHas_supervisorport_CalibrationKey_setter_port_tag) +
+             int(kHas_supervisorport_CalibrationKey_setter_port_bare) +
+             int(kHas_supervisorport_CalibrationKey_setter_tagged) +
+             int(kHas_supervisorport_CalibrationKey_setter_direct)) <= 1,
+            "reaktar: Multiple conflicting on_set(...) handlers declared for field 'CalibrationKey' on port 'SupervisorPort'! "
+            "You must define only one: on_set(ports::SupervisorPort::CalibrationKey, ...), on_set(vehicle_supervisor::fields::CalibrationKey, ...), on_set(ports::SupervisorPort, ...), or on_set(...)."
+        );
+
+        if constexpr (kHas_supervisorport_CalibrationKey_setter_port_tag) {
+            supervisorport_skeleton_.CalibrationKey.RegisterSetHandler([this](const uint32_t& val) {
+                if constexpr (std::is_same_v<ExecutionPolicy, ::reaktar::DirectExecution>) {
+                    return result_adapter<reaktar::Future<uint32_t>, decltype(self().on_set(supervisorport_CalibrationKey_PortTag_{}, val))>::adapt(
+                        self().on_set(supervisorport_CalibrationKey_PortTag_{}, val)
+                    );
+                } else if constexpr (std::is_same_v<ExecutionPolicy, ::reaktar::SynchronizedExecution>) {
+                    std::lock_guard<std::mutex> lock(this->execution_policy_.mutex());
+                    return result_adapter<reaktar::Future<uint32_t>, decltype(self().on_set(supervisorport_CalibrationKey_PortTag_{}, val))>::adapt(
+                        self().on_set(supervisorport_CalibrationKey_PortTag_{}, val)
+                    );
+                } else {
+                    return this->execution_policy_.execute([&] {
+                        return result_adapter<reaktar::Future<uint32_t>, decltype(self().on_set(supervisorport_CalibrationKey_PortTag_{}, val))>::adapt(
+                            self().on_set(supervisorport_CalibrationKey_PortTag_{}, val)
+                        );
+                    });
+                }
+            });
+        }
+        else if constexpr (kHas_supervisorport_CalibrationKey_setter_port_bare) {
+            supervisorport_skeleton_.CalibrationKey.RegisterSetHandler([this](const uint32_t& val) {
+                if constexpr (std::is_same_v<ExecutionPolicy, ::reaktar::DirectExecution>) {
+                    return result_adapter<reaktar::Future<uint32_t>, decltype(self().on_set(supervisorport_CalibrationKey_Port_{}, val))>::adapt(
+                        self().on_set(supervisorport_CalibrationKey_Port_{}, val)
+                    );
+                } else if constexpr (std::is_same_v<ExecutionPolicy, ::reaktar::SynchronizedExecution>) {
+                    std::lock_guard<std::mutex> lock(this->execution_policy_.mutex());
+                    return result_adapter<reaktar::Future<uint32_t>, decltype(self().on_set(supervisorport_CalibrationKey_Port_{}, val))>::adapt(
+                        self().on_set(supervisorport_CalibrationKey_Port_{}, val)
+                    );
+                } else {
+                    return this->execution_policy_.execute([&] {
+                        return result_adapter<reaktar::Future<uint32_t>, decltype(self().on_set(supervisorport_CalibrationKey_Port_{}, val))>::adapt(
+                            self().on_set(supervisorport_CalibrationKey_Port_{}, val)
+                        );
+                    });
+                }
+            });
+        }
+        else if constexpr (kHas_supervisorport_CalibrationKey_setter_tagged) {
             supervisorport_skeleton_.CalibrationKey.RegisterSetHandler([this](const uint32_t& val) {
                 if constexpr (std::is_same_v<ExecutionPolicy, ::reaktar::DirectExecution>) {
                     return result_adapter<reaktar::Future<uint32_t>, decltype(self().on_set(vehicle_supervisor::fields::CalibrationKey{}, val))>::adapt(
@@ -758,7 +1330,7 @@ private:
                 }
             });
         }
-        else if constexpr (has_on_direct_field_set_v<Derived, uint32_t>) {
+        else if constexpr (kHas_supervisorport_CalibrationKey_setter_direct) {
             supervisorport_skeleton_.CalibrationKey.RegisterSetHandler([this](const uint32_t& val) {
                 if constexpr (std::is_same_v<ExecutionPolicy, ::reaktar::DirectExecution>) {
                     return result_adapter<reaktar::Future<uint32_t>, decltype(self().on_set(val))>::adapt(
@@ -780,7 +1352,64 @@ private:
         }
         // Initialise field value before OfferService (required by AUTOSAR Adaptive caching/notifier semantics)
         supervisorport_skeleton_.CurrentDriveMode.Update({});
-        if constexpr (has_on_field_set_v<Derived, vehicle_supervisor::fields::CurrentDriveMode, vehicle_data::DriveMode>) {
+        using supervisorport_CurrentDriveMode_Port_ = typename Base::ports::SupervisorPort;
+        using supervisorport_CurrentDriveMode_PortTag_ = typename supervisorport_CurrentDriveMode_Port_::CurrentDriveMode;
+
+        static constexpr bool kHas_supervisorport_CurrentDriveMode_setter_port_tag  = has_on_field_set_v<Derived, supervisorport_CurrentDriveMode_PortTag_, vehicle_data::DriveMode>;
+        static constexpr bool kHas_supervisorport_CurrentDriveMode_setter_port_bare = has_on_field_set_v<Derived, supervisorport_CurrentDriveMode_Port_, vehicle_data::DriveMode>;
+        static constexpr bool kHas_supervisorport_CurrentDriveMode_setter_tagged    = has_on_field_set_v<Derived, vehicle_supervisor::fields::CurrentDriveMode, vehicle_data::DriveMode>;
+        static constexpr bool kHas_supervisorport_CurrentDriveMode_setter_direct    = has_on_direct_field_set_v<Derived, vehicle_data::DriveMode>;
+
+        static_assert(
+            (int(kHas_supervisorport_CurrentDriveMode_setter_port_tag) +
+             int(kHas_supervisorport_CurrentDriveMode_setter_port_bare) +
+             int(kHas_supervisorport_CurrentDriveMode_setter_tagged) +
+             int(kHas_supervisorport_CurrentDriveMode_setter_direct)) <= 1,
+            "reaktar: Multiple conflicting on_set(...) handlers declared for field 'CurrentDriveMode' on port 'SupervisorPort'! "
+            "You must define only one: on_set(ports::SupervisorPort::CurrentDriveMode, ...), on_set(vehicle_supervisor::fields::CurrentDriveMode, ...), on_set(ports::SupervisorPort, ...), or on_set(...)."
+        );
+
+        if constexpr (kHas_supervisorport_CurrentDriveMode_setter_port_tag) {
+            supervisorport_skeleton_.CurrentDriveMode.RegisterSetHandler([this](const vehicle_data::DriveMode& val) {
+                if constexpr (std::is_same_v<ExecutionPolicy, ::reaktar::DirectExecution>) {
+                    return result_adapter<reaktar::Future<vehicle_data::DriveMode>, decltype(self().on_set(supervisorport_CurrentDriveMode_PortTag_{}, val))>::adapt(
+                        self().on_set(supervisorport_CurrentDriveMode_PortTag_{}, val)
+                    );
+                } else if constexpr (std::is_same_v<ExecutionPolicy, ::reaktar::SynchronizedExecution>) {
+                    std::lock_guard<std::mutex> lock(this->execution_policy_.mutex());
+                    return result_adapter<reaktar::Future<vehicle_data::DriveMode>, decltype(self().on_set(supervisorport_CurrentDriveMode_PortTag_{}, val))>::adapt(
+                        self().on_set(supervisorport_CurrentDriveMode_PortTag_{}, val)
+                    );
+                } else {
+                    return this->execution_policy_.execute([&] {
+                        return result_adapter<reaktar::Future<vehicle_data::DriveMode>, decltype(self().on_set(supervisorport_CurrentDriveMode_PortTag_{}, val))>::adapt(
+                            self().on_set(supervisorport_CurrentDriveMode_PortTag_{}, val)
+                        );
+                    });
+                }
+            });
+        }
+        else if constexpr (kHas_supervisorport_CurrentDriveMode_setter_port_bare) {
+            supervisorport_skeleton_.CurrentDriveMode.RegisterSetHandler([this](const vehicle_data::DriveMode& val) {
+                if constexpr (std::is_same_v<ExecutionPolicy, ::reaktar::DirectExecution>) {
+                    return result_adapter<reaktar::Future<vehicle_data::DriveMode>, decltype(self().on_set(supervisorport_CurrentDriveMode_Port_{}, val))>::adapt(
+                        self().on_set(supervisorport_CurrentDriveMode_Port_{}, val)
+                    );
+                } else if constexpr (std::is_same_v<ExecutionPolicy, ::reaktar::SynchronizedExecution>) {
+                    std::lock_guard<std::mutex> lock(this->execution_policy_.mutex());
+                    return result_adapter<reaktar::Future<vehicle_data::DriveMode>, decltype(self().on_set(supervisorport_CurrentDriveMode_Port_{}, val))>::adapt(
+                        self().on_set(supervisorport_CurrentDriveMode_Port_{}, val)
+                    );
+                } else {
+                    return this->execution_policy_.execute([&] {
+                        return result_adapter<reaktar::Future<vehicle_data::DriveMode>, decltype(self().on_set(supervisorport_CurrentDriveMode_Port_{}, val))>::adapt(
+                            self().on_set(supervisorport_CurrentDriveMode_Port_{}, val)
+                        );
+                    });
+                }
+            });
+        }
+        else if constexpr (kHas_supervisorport_CurrentDriveMode_setter_tagged) {
             supervisorport_skeleton_.CurrentDriveMode.RegisterSetHandler([this](const vehicle_data::DriveMode& val) {
                 if constexpr (std::is_same_v<ExecutionPolicy, ::reaktar::DirectExecution>) {
                     return result_adapter<reaktar::Future<vehicle_data::DriveMode>, decltype(self().on_set(vehicle_supervisor::fields::CurrentDriveMode{}, val))>::adapt(
@@ -800,7 +1429,7 @@ private:
                 }
             });
         }
-        else if constexpr (has_on_direct_field_set_v<Derived, vehicle_data::DriveMode>) {
+        else if constexpr (kHas_supervisorport_CurrentDriveMode_setter_direct) {
             supervisorport_skeleton_.CurrentDriveMode.RegisterSetHandler([this](const vehicle_data::DriveMode& val) {
                 if constexpr (std::is_same_v<ExecutionPolicy, ::reaktar::DirectExecution>) {
                     return result_adapter<reaktar::Future<vehicle_data::DriveMode>, decltype(self().on_set(val))>::adapt(
@@ -822,7 +1451,64 @@ private:
         }
         // Initialise field value before OfferService (required by AUTOSAR Adaptive caching/notifier semantics)
         supervisorport_skeleton_.FeatureFlags.Update({});
-        if constexpr (has_on_field_set_v<Derived, vehicle_supervisor::fields::FeatureFlags, ara::core::Map<ara::core::String, bool>>) {
+        using supervisorport_FeatureFlags_Port_ = typename Base::ports::SupervisorPort;
+        using supervisorport_FeatureFlags_PortTag_ = typename supervisorport_FeatureFlags_Port_::FeatureFlags;
+
+        static constexpr bool kHas_supervisorport_FeatureFlags_setter_port_tag  = has_on_field_set_v<Derived, supervisorport_FeatureFlags_PortTag_, ara::core::Map<ara::core::String, bool>>;
+        static constexpr bool kHas_supervisorport_FeatureFlags_setter_port_bare = has_on_field_set_v<Derived, supervisorport_FeatureFlags_Port_, ara::core::Map<ara::core::String, bool>>;
+        static constexpr bool kHas_supervisorport_FeatureFlags_setter_tagged    = has_on_field_set_v<Derived, vehicle_supervisor::fields::FeatureFlags, ara::core::Map<ara::core::String, bool>>;
+        static constexpr bool kHas_supervisorport_FeatureFlags_setter_direct    = has_on_direct_field_set_v<Derived, ara::core::Map<ara::core::String, bool>>;
+
+        static_assert(
+            (int(kHas_supervisorport_FeatureFlags_setter_port_tag) +
+             int(kHas_supervisorport_FeatureFlags_setter_port_bare) +
+             int(kHas_supervisorport_FeatureFlags_setter_tagged) +
+             int(kHas_supervisorport_FeatureFlags_setter_direct)) <= 1,
+            "reaktar: Multiple conflicting on_set(...) handlers declared for field 'FeatureFlags' on port 'SupervisorPort'! "
+            "You must define only one: on_set(ports::SupervisorPort::FeatureFlags, ...), on_set(vehicle_supervisor::fields::FeatureFlags, ...), on_set(ports::SupervisorPort, ...), or on_set(...)."
+        );
+
+        if constexpr (kHas_supervisorport_FeatureFlags_setter_port_tag) {
+            supervisorport_skeleton_.FeatureFlags.RegisterSetHandler([this](const ara::core::Map<ara::core::String, bool>& val) {
+                if constexpr (std::is_same_v<ExecutionPolicy, ::reaktar::DirectExecution>) {
+                    return result_adapter<reaktar::Future<ara::core::Map<ara::core::String, bool>>, decltype(self().on_set(supervisorport_FeatureFlags_PortTag_{}, val))>::adapt(
+                        self().on_set(supervisorport_FeatureFlags_PortTag_{}, val)
+                    );
+                } else if constexpr (std::is_same_v<ExecutionPolicy, ::reaktar::SynchronizedExecution>) {
+                    std::lock_guard<std::mutex> lock(this->execution_policy_.mutex());
+                    return result_adapter<reaktar::Future<ara::core::Map<ara::core::String, bool>>, decltype(self().on_set(supervisorport_FeatureFlags_PortTag_{}, val))>::adapt(
+                        self().on_set(supervisorport_FeatureFlags_PortTag_{}, val)
+                    );
+                } else {
+                    return this->execution_policy_.execute([&] {
+                        return result_adapter<reaktar::Future<ara::core::Map<ara::core::String, bool>>, decltype(self().on_set(supervisorport_FeatureFlags_PortTag_{}, val))>::adapt(
+                            self().on_set(supervisorport_FeatureFlags_PortTag_{}, val)
+                        );
+                    });
+                }
+            });
+        }
+        else if constexpr (kHas_supervisorport_FeatureFlags_setter_port_bare) {
+            supervisorport_skeleton_.FeatureFlags.RegisterSetHandler([this](const ara::core::Map<ara::core::String, bool>& val) {
+                if constexpr (std::is_same_v<ExecutionPolicy, ::reaktar::DirectExecution>) {
+                    return result_adapter<reaktar::Future<ara::core::Map<ara::core::String, bool>>, decltype(self().on_set(supervisorport_FeatureFlags_Port_{}, val))>::adapt(
+                        self().on_set(supervisorport_FeatureFlags_Port_{}, val)
+                    );
+                } else if constexpr (std::is_same_v<ExecutionPolicy, ::reaktar::SynchronizedExecution>) {
+                    std::lock_guard<std::mutex> lock(this->execution_policy_.mutex());
+                    return result_adapter<reaktar::Future<ara::core::Map<ara::core::String, bool>>, decltype(self().on_set(supervisorport_FeatureFlags_Port_{}, val))>::adapt(
+                        self().on_set(supervisorport_FeatureFlags_Port_{}, val)
+                    );
+                } else {
+                    return this->execution_policy_.execute([&] {
+                        return result_adapter<reaktar::Future<ara::core::Map<ara::core::String, bool>>, decltype(self().on_set(supervisorport_FeatureFlags_Port_{}, val))>::adapt(
+                            self().on_set(supervisorport_FeatureFlags_Port_{}, val)
+                        );
+                    });
+                }
+            });
+        }
+        else if constexpr (kHas_supervisorport_FeatureFlags_setter_tagged) {
             supervisorport_skeleton_.FeatureFlags.RegisterSetHandler([this](const ara::core::Map<ara::core::String, bool>& val) {
                 if constexpr (std::is_same_v<ExecutionPolicy, ::reaktar::DirectExecution>) {
                     return result_adapter<reaktar::Future<ara::core::Map<ara::core::String, bool>>, decltype(self().on_set(vehicle_supervisor::fields::FeatureFlags{}, val))>::adapt(
@@ -842,7 +1528,7 @@ private:
                 }
             });
         }
-        else if constexpr (has_on_direct_field_set_v<Derived, ara::core::Map<ara::core::String, bool>>) {
+        else if constexpr (kHas_supervisorport_FeatureFlags_setter_direct) {
             supervisorport_skeleton_.FeatureFlags.RegisterSetHandler([this](const ara::core::Map<ara::core::String, bool>& val) {
                 if constexpr (std::is_same_v<ExecutionPolicy, ::reaktar::DirectExecution>) {
                     return result_adapter<reaktar::Future<ara::core::Map<ara::core::String, bool>>, decltype(self().on_set(val))>::adapt(
@@ -868,7 +1554,64 @@ private:
         supervisorport_skeleton_.SystemMatrix.Update({});
         // Initialise field value before OfferService (required by AUTOSAR Adaptive caching/notifier semantics)
         supervisorport_skeleton_.VehicleConfig.Update({});
-        if constexpr (has_on_field_set_v<Derived, vehicle_supervisor::fields::VehicleConfig, ara::core::Map<ara::core::String, ara::core::String>>) {
+        using supervisorport_VehicleConfig_Port_ = typename Base::ports::SupervisorPort;
+        using supervisorport_VehicleConfig_PortTag_ = typename supervisorport_VehicleConfig_Port_::VehicleConfig;
+
+        static constexpr bool kHas_supervisorport_VehicleConfig_setter_port_tag  = has_on_field_set_v<Derived, supervisorport_VehicleConfig_PortTag_, ara::core::Map<ara::core::String, ara::core::String>>;
+        static constexpr bool kHas_supervisorport_VehicleConfig_setter_port_bare = has_on_field_set_v<Derived, supervisorport_VehicleConfig_Port_, ara::core::Map<ara::core::String, ara::core::String>>;
+        static constexpr bool kHas_supervisorport_VehicleConfig_setter_tagged    = has_on_field_set_v<Derived, vehicle_supervisor::fields::VehicleConfig, ara::core::Map<ara::core::String, ara::core::String>>;
+        static constexpr bool kHas_supervisorport_VehicleConfig_setter_direct    = has_on_direct_field_set_v<Derived, ara::core::Map<ara::core::String, ara::core::String>>;
+
+        static_assert(
+            (int(kHas_supervisorport_VehicleConfig_setter_port_tag) +
+             int(kHas_supervisorport_VehicleConfig_setter_port_bare) +
+             int(kHas_supervisorport_VehicleConfig_setter_tagged) +
+             int(kHas_supervisorport_VehicleConfig_setter_direct)) <= 1,
+            "reaktar: Multiple conflicting on_set(...) handlers declared for field 'VehicleConfig' on port 'SupervisorPort'! "
+            "You must define only one: on_set(ports::SupervisorPort::VehicleConfig, ...), on_set(vehicle_supervisor::fields::VehicleConfig, ...), on_set(ports::SupervisorPort, ...), or on_set(...)."
+        );
+
+        if constexpr (kHas_supervisorport_VehicleConfig_setter_port_tag) {
+            supervisorport_skeleton_.VehicleConfig.RegisterSetHandler([this](const ara::core::Map<ara::core::String, ara::core::String>& val) {
+                if constexpr (std::is_same_v<ExecutionPolicy, ::reaktar::DirectExecution>) {
+                    return result_adapter<reaktar::Future<ara::core::Map<ara::core::String, ara::core::String>>, decltype(self().on_set(supervisorport_VehicleConfig_PortTag_{}, val))>::adapt(
+                        self().on_set(supervisorport_VehicleConfig_PortTag_{}, val)
+                    );
+                } else if constexpr (std::is_same_v<ExecutionPolicy, ::reaktar::SynchronizedExecution>) {
+                    std::lock_guard<std::mutex> lock(this->execution_policy_.mutex());
+                    return result_adapter<reaktar::Future<ara::core::Map<ara::core::String, ara::core::String>>, decltype(self().on_set(supervisorport_VehicleConfig_PortTag_{}, val))>::adapt(
+                        self().on_set(supervisorport_VehicleConfig_PortTag_{}, val)
+                    );
+                } else {
+                    return this->execution_policy_.execute([&] {
+                        return result_adapter<reaktar::Future<ara::core::Map<ara::core::String, ara::core::String>>, decltype(self().on_set(supervisorport_VehicleConfig_PortTag_{}, val))>::adapt(
+                            self().on_set(supervisorport_VehicleConfig_PortTag_{}, val)
+                        );
+                    });
+                }
+            });
+        }
+        else if constexpr (kHas_supervisorport_VehicleConfig_setter_port_bare) {
+            supervisorport_skeleton_.VehicleConfig.RegisterSetHandler([this](const ara::core::Map<ara::core::String, ara::core::String>& val) {
+                if constexpr (std::is_same_v<ExecutionPolicy, ::reaktar::DirectExecution>) {
+                    return result_adapter<reaktar::Future<ara::core::Map<ara::core::String, ara::core::String>>, decltype(self().on_set(supervisorport_VehicleConfig_Port_{}, val))>::adapt(
+                        self().on_set(supervisorport_VehicleConfig_Port_{}, val)
+                    );
+                } else if constexpr (std::is_same_v<ExecutionPolicy, ::reaktar::SynchronizedExecution>) {
+                    std::lock_guard<std::mutex> lock(this->execution_policy_.mutex());
+                    return result_adapter<reaktar::Future<ara::core::Map<ara::core::String, ara::core::String>>, decltype(self().on_set(supervisorport_VehicleConfig_Port_{}, val))>::adapt(
+                        self().on_set(supervisorport_VehicleConfig_Port_{}, val)
+                    );
+                } else {
+                    return this->execution_policy_.execute([&] {
+                        return result_adapter<reaktar::Future<ara::core::Map<ara::core::String, ara::core::String>>, decltype(self().on_set(supervisorport_VehicleConfig_Port_{}, val))>::adapt(
+                            self().on_set(supervisorport_VehicleConfig_Port_{}, val)
+                        );
+                    });
+                }
+            });
+        }
+        else if constexpr (kHas_supervisorport_VehicleConfig_setter_tagged) {
             supervisorport_skeleton_.VehicleConfig.RegisterSetHandler([this](const ara::core::Map<ara::core::String, ara::core::String>& val) {
                 if constexpr (std::is_same_v<ExecutionPolicy, ::reaktar::DirectExecution>) {
                     return result_adapter<reaktar::Future<ara::core::Map<ara::core::String, ara::core::String>>, decltype(self().on_set(vehicle_supervisor::fields::VehicleConfig{}, val))>::adapt(
@@ -888,7 +1631,7 @@ private:
                 }
             });
         }
-        else if constexpr (has_on_direct_field_set_v<Derived, ara::core::Map<ara::core::String, ara::core::String>>) {
+        else if constexpr (kHas_supervisorport_VehicleConfig_setter_direct) {
             supervisorport_skeleton_.VehicleConfig.RegisterSetHandler([this](const ara::core::Map<ara::core::String, ara::core::String>& val) {
                 if constexpr (std::is_same_v<ExecutionPolicy, ::reaktar::DirectExecution>) {
                     return result_adapter<reaktar::Future<ara::core::Map<ara::core::String, ara::core::String>>, decltype(self().on_set(val))>::adapt(
@@ -907,6 +1650,74 @@ private:
                     });
                 }
             });
+        }
+    }
+
+    void check_handler_collisions() {
+        {
+            using Port_ = typename Base::ports::SupervisorPort;
+            using PortTag_ = typename Port_::ActiveAlerts;
+            constexpr bool kHas_port_tag  = has_on_field_set_v<Derived, PortTag_, ara::core::Vector<vehicle_data::EmergencyAlert>>;
+            constexpr bool kHas_port_bare = has_on_field_set_v<Derived, Port_, ara::core::Vector<vehicle_data::EmergencyAlert>>;
+            constexpr bool kHas_tagged    = has_on_field_set_v<Derived, vehicle_supervisor::fields::ActiveAlerts, ara::core::Vector<vehicle_data::EmergencyAlert>>;
+            constexpr bool kHas_direct    = has_on_direct_field_set_v<Derived, ara::core::Vector<vehicle_data::EmergencyAlert>>;
+            static_assert(
+                (int(kHas_port_tag) + int(kHas_port_bare) + int(kHas_tagged) + int(kHas_direct)) <= 1,
+                "reaktar: Multiple conflicting on_set(...) handlers declared for field 'ActiveAlerts' on port 'SupervisorPort'! "
+                "You must define only one: on_set(ports::SupervisorPort::ActiveAlerts, ...), on_set(vehicle_supervisor::fields::ActiveAlerts, ...), on_set(ports::SupervisorPort, ...), or on_set(...)."
+            );
+        }
+        {
+            using Port_ = typename Base::ports::SupervisorPort;
+            using PortTag_ = typename Port_::CalibrationKey;
+            constexpr bool kHas_port_tag  = has_on_field_set_v<Derived, PortTag_, uint32_t>;
+            constexpr bool kHas_port_bare = has_on_field_set_v<Derived, Port_, uint32_t>;
+            constexpr bool kHas_tagged    = has_on_field_set_v<Derived, vehicle_supervisor::fields::CalibrationKey, uint32_t>;
+            constexpr bool kHas_direct    = has_on_direct_field_set_v<Derived, uint32_t>;
+            static_assert(
+                (int(kHas_port_tag) + int(kHas_port_bare) + int(kHas_tagged) + int(kHas_direct)) <= 1,
+                "reaktar: Multiple conflicting on_set(...) handlers declared for field 'CalibrationKey' on port 'SupervisorPort'! "
+                "You must define only one: on_set(ports::SupervisorPort::CalibrationKey, ...), on_set(vehicle_supervisor::fields::CalibrationKey, ...), on_set(ports::SupervisorPort, ...), or on_set(...)."
+            );
+        }
+        {
+            using Port_ = typename Base::ports::SupervisorPort;
+            using PortTag_ = typename Port_::CurrentDriveMode;
+            constexpr bool kHas_port_tag  = has_on_field_set_v<Derived, PortTag_, vehicle_data::DriveMode>;
+            constexpr bool kHas_port_bare = has_on_field_set_v<Derived, Port_, vehicle_data::DriveMode>;
+            constexpr bool kHas_tagged    = has_on_field_set_v<Derived, vehicle_supervisor::fields::CurrentDriveMode, vehicle_data::DriveMode>;
+            constexpr bool kHas_direct    = has_on_direct_field_set_v<Derived, vehicle_data::DriveMode>;
+            static_assert(
+                (int(kHas_port_tag) + int(kHas_port_bare) + int(kHas_tagged) + int(kHas_direct)) <= 1,
+                "reaktar: Multiple conflicting on_set(...) handlers declared for field 'CurrentDriveMode' on port 'SupervisorPort'! "
+                "You must define only one: on_set(ports::SupervisorPort::CurrentDriveMode, ...), on_set(vehicle_supervisor::fields::CurrentDriveMode, ...), on_set(ports::SupervisorPort, ...), or on_set(...)."
+            );
+        }
+        {
+            using Port_ = typename Base::ports::SupervisorPort;
+            using PortTag_ = typename Port_::FeatureFlags;
+            constexpr bool kHas_port_tag  = has_on_field_set_v<Derived, PortTag_, ara::core::Map<ara::core::String, bool>>;
+            constexpr bool kHas_port_bare = has_on_field_set_v<Derived, Port_, ara::core::Map<ara::core::String, bool>>;
+            constexpr bool kHas_tagged    = has_on_field_set_v<Derived, vehicle_supervisor::fields::FeatureFlags, ara::core::Map<ara::core::String, bool>>;
+            constexpr bool kHas_direct    = has_on_direct_field_set_v<Derived, ara::core::Map<ara::core::String, bool>>;
+            static_assert(
+                (int(kHas_port_tag) + int(kHas_port_bare) + int(kHas_tagged) + int(kHas_direct)) <= 1,
+                "reaktar: Multiple conflicting on_set(...) handlers declared for field 'FeatureFlags' on port 'SupervisorPort'! "
+                "You must define only one: on_set(ports::SupervisorPort::FeatureFlags, ...), on_set(vehicle_supervisor::fields::FeatureFlags, ...), on_set(ports::SupervisorPort, ...), or on_set(...)."
+            );
+        }
+        {
+            using Port_ = typename Base::ports::SupervisorPort;
+            using PortTag_ = typename Port_::VehicleConfig;
+            constexpr bool kHas_port_tag  = has_on_field_set_v<Derived, PortTag_, ara::core::Map<ara::core::String, ara::core::String>>;
+            constexpr bool kHas_port_bare = has_on_field_set_v<Derived, Port_, ara::core::Map<ara::core::String, ara::core::String>>;
+            constexpr bool kHas_tagged    = has_on_field_set_v<Derived, vehicle_supervisor::fields::VehicleConfig, ara::core::Map<ara::core::String, ara::core::String>>;
+            constexpr bool kHas_direct    = has_on_direct_field_set_v<Derived, ara::core::Map<ara::core::String, ara::core::String>>;
+            static_assert(
+                (int(kHas_port_tag) + int(kHas_port_bare) + int(kHas_tagged) + int(kHas_direct)) <= 1,
+                "reaktar: Multiple conflicting on_set(...) handlers declared for field 'VehicleConfig' on port 'SupervisorPort'! "
+                "You must define only one: on_set(ports::SupervisorPort::VehicleConfig, ...), on_set(vehicle_supervisor::fields::VehicleConfig, ...), on_set(ports::SupervisorPort, ...), or on_set(...)."
+            );
         }
     }
 

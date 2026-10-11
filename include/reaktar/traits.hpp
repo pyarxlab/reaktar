@@ -33,15 +33,16 @@ inline constexpr bool has_on_event_v = has_on_event<Derived, Tag, Arg>::value;
 // strict_val prevents numeric conversions (e.g. bool -> float or uint32_t -> float)
 template <typename Target>
 struct strict_val {
-    Target val{};
-    operator Target&() & { return val; }
-    operator const Target&() const& { return val; }
-    operator Target&&() && { return std::move(val); }
+    operator Target&() & noexcept;
+    operator const Target&() const& noexcept;
+    operator Target&&() && noexcept;
 
-    template <typename Other, typename = std::enable_if_t<!std::is_same_v<std::decay_t<Other>, Target>>>
+    template <typename Other, typename = std::enable_if_t<(std::is_arithmetic_v<Other> || std::is_enum_v<Other>) && !std::is_same_v<std::decay_t<Other>, Target>>>
     operator Other() const = delete;
-    template <typename Other, typename = std::enable_if_t<!std::is_same_v<std::decay_t<Other>, Target>>>
+    template <typename Other, typename = std::enable_if_t<(std::is_arithmetic_v<Other> || std::is_enum_v<Other>) && !std::is_same_v<std::decay_t<Other>, Target>>>
     operator Other&() = delete;
+    template <typename Other, typename = std::enable_if_t<(std::is_arithmetic_v<Other> || std::is_enum_v<Other>) && !std::is_same_v<std::decay_t<Other>, Target>>>
+    operator const Other&() const = delete;
 };
 
 // SFINAE traits to detect if Derived has direct `on(Arg)` without a tag (supports const Arg&, Arg by-value, etc.)
@@ -261,7 +262,7 @@ struct result_adapter<void, ReturnType, void> {
 template <typename Derived, typename Tag, typename... Args>
 class has_method_handler {
     template <typename D>
-    static auto test(int) -> decltype(std::declval<D&>().on(std::declval<Tag>(), std::declval<Args>()...), std::true_type{});
+    static auto test(int) -> decltype(std::declval<D&>().on(std::declval<Tag>(), std::declval<strict_val<std::decay_t<Args>>&>()...), std::true_type{});
 
     template <typename>
     static auto test(...) -> std::false_type;
@@ -278,7 +279,7 @@ inline constexpr bool has_method_handler_v = has_method_handler<Derived, Tag, Ar
 template <typename Derived, typename... Args>
 class has_direct_method_handler {
     template <typename D>
-    static auto test(int) -> decltype(std::declval<D&>().on(std::declval<Args>()...), std::true_type{});
+    static auto test(int) -> decltype(std::declval<D&>().on(std::declval<strict_val<std::decay_t<Args>>&>()...), std::true_type{});
 
     template <typename>
     static auto test(...) -> std::false_type;
@@ -306,10 +307,7 @@ inline constexpr bool has_on_field_set_v = has_on_field_set<Derived, Tag, ValueT
 template <typename Derived, typename ValueType>
 class has_on_direct_field_set {
     template <typename D>
-    static auto test(int) -> decltype(std::declval<D&>().on_set(std::declval<const ValueType&>()), std::true_type{});
-
-    template <typename D>
-    static auto test(long) -> decltype(std::declval<D&>().on_set(std::declval<ValueType>()), std::true_type{});
+    static auto test(int) -> decltype(std::declval<D&>().on_set(std::declval<strict_val<std::decay_t<ValueType>>&>()), std::true_type{});
 
     template <typename>
     static auto test(...) -> std::false_type;

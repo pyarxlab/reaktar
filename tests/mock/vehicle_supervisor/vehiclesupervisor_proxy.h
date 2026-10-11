@@ -51,6 +51,10 @@ public:
 
     ara::com::ProxyEvent<ara::core::Vector<vehicle_data::DriveMode>> DriveHistory;
 
+    ara::com::ProxyEvent<uint16_t> PrimaryWarning;
+
+    ara::com::ProxyEvent<uint16_t> SecondaryWarning;
+
 
     // Fields
 

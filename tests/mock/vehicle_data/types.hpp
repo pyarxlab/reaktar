@@ -16,11 +16,15 @@
 #include <ara/core/vector.h>
 #include <ara/core/array.h>
 #include <ara/core/map.h>
+#include <ara/core/optional.h>
+#include <ara/core/variant.h>
 #include <cstdint>
 #include <string>
 #include <vector>
 #include <array>
 #include <map>
+#include <optional>
+#include <variant>
 
 namespace vehicle_data {
 
@@ -108,6 +112,10 @@ using DiagnosticMap = ara::core::Map<uint32_t, vehicle_data::EmergencyAlert>;
 
 using FeatureFlagMap = ara::core::Map<ara::core::String, bool>;
 
+using OptionalSpeed = ara::core::Optional<vehicle_data::SpeedData>;
+
+using SensorPayload = ara::core::Variant<vehicle_data::SpeedData, vehicle_data::CabinSensorData>;
+
 struct VehicleDiagnostics {
     uint32_t report_id{};
     vehicle_data::SystemStatus system_status{};
@@ -119,6 +127,8 @@ struct VehicleDiagnostics {
     ara::core::Map<ara::core::String, bool> feature_flags{};
     ara::core::Vector<ara::core::String> tags{};
     ara::core::Array<vehicle_data::BatteryCell, 4> battery_module{};
+    ara::core::Optional<vehicle_data::SpeedData> optional_speed{};
+    ara::core::Variant<vehicle_data::SpeedData, vehicle_data::CabinSensorData> sensor_payload{};
 };
 
 } // namespace vehicle_data

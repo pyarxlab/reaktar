@@ -233,6 +233,35 @@ def get_map_key_value_trefs(dt):
     return None, None
 
 
+def get_optional_element_tref(dt):
+    args = getattr(dt, "cpp_template_arguments", None) or getattr(dt, "template_arguments", None)
+    if args and len(args) > 0:
+        elem = getattr(args[0], "template_type_ref", None) or getattr(args[0], "type_reference_ref", None)
+        if elem and not getattr(elem, "is_null", False):
+            return elem
+    ref = getattr(dt, "type_reference_ref", None)
+    if ref and not getattr(ref, "is_null", False):
+        return ref
+    sub_els = getattr(dt, "sub_elements", None) or getattr(dt, "cpp_implementation_data_type_elements", None)
+    if sub_els and len(sub_els) > 0:
+        ref = getattr(sub_els[0], "type_reference_ref", None) or getattr(sub_els[0], "type_tref", None)
+        if ref and not getattr(ref, "is_null", False):
+            return ref
+    return None
+
+
+def get_union_alternative_trefs(dt):
+    sub_els = getattr(dt, "sub_elements", None) or getattr(dt, "cpp_implementation_data_type_elements", None)
+    if not sub_els:
+        return []
+    res = []
+    for el in sub_els:
+        ref = getattr(el, "type_reference_ref", None) or getattr(el, "type_tref", None)
+        if ref and not getattr(ref, "is_null", False):
+            res.append(ref)
+    return res
+
+
 def cpp_type(tref, domain=None, type_style=None):
     if type_style is None:
         type_style = CURRENT_TYPE_STYLE
@@ -256,6 +285,15 @@ def cpp_type(tref, domain=None, type_style=None):
         k, v = get_map_key_value_trefs(tref)
         prefix = "ara::core::Map" if type_style == "autosar" else "std::map"
         return f"{prefix}<{cpp_type(k, domain, type_style)}, {cpp_type(v, domain, type_style)}>"
+    if cat == "OPTIONAL":
+        elem = get_optional_element_tref(tref)
+        prefix = "ara::core::Optional" if type_style == "autosar" else "std::optional"
+        return f"{prefix}<{cpp_type(elem, domain, type_style)}>"
+    if cat == "UNION":
+        alts = get_union_alternative_trefs(tref)
+        prefix = "ara::core::Variant" if type_style == "autosar" else "std::variant"
+        alt_strs = [cpp_type(a, domain, type_style) for a in alts]
+        return f"{prefix}<{', '.join(alt_strs)}>"
     if cat == "TYPE_REFERENCE" and not (getattr(tref, "x", None) and getattr(tref.x, "compu_methods", None)):
         target = getattr(tref, "type_reference_ref", None)
         if target:
@@ -459,14 +497,14 @@ def analyze_application_types(app, domain):
     """
     outgoing_items = []
     # 1. P-Port events (Skeleton Events)
-    for p in app.p_port_prototypes:
+    for p in get_service_p_ports(app, domain):
         intf = resolve_intf(p, domain)
         for ev in sorted_events(intf.events):
             t = cpp_type(ev.type_tref, domain)
             outgoing_items.append(('event', ev.short_name, t, p.short_name, intf, ev))
 
     # 2. P-Port field notifiers (Skeleton Field Update)
-    for p in app.p_port_prototypes:
+    for p in get_service_p_ports(app, domain):
         intf = resolve_intf(p, domain)
         for f in sorted_fields(intf.fields):
             if f.has_notifier:
@@ -474,7 +512,7 @@ def analyze_application_types(app, domain):
                 outgoing_items.append(('field_update', f.short_name, t, p.short_name, intf, f))
 
     # 3. R-Port RPC methods (single-arg directly without artificial Request structs)
-    for r in app.r_port_prototypes:
+    for r in get_service_r_ports(app, domain):
         intf = resolve_intf(r, domain)
         for m in sorted_methods(intf.methods):
             in_args = method_in_args(m, domain)
@@ -492,7 +530,7 @@ def analyze_application_types(app, domain):
 
     # Incoming items: R-Port events + R-Port field notifiers
     incoming_items = []
-    for r in app.r_port_prototypes:
+    for r in get_service_r_ports(app, domain):
         intf = resolve_intf(r, domain)
         for ev in sorted_events(intf.events):
             t = cpp_type(ev.type_tref, domain)
@@ -507,7 +545,7 @@ def analyze_application_types(app, domain):
 
     # Skeleton field setters
     fset_items = []
-    for p in app.p_port_prototypes:
+    for p in get_service_p_ports(app, domain):
         intf = resolve_intf(p, domain)
         for f in sorted_fields(intf.fields):
             if f.has_setter:
@@ -519,7 +557,7 @@ def analyze_application_types(app, domain):
 
     # 4. Skeleton methods for direct tagless on(args...)
     skeleton_methods = []
-    for p in app.p_port_prototypes:
+    for p in get_service_p_ports(app, domain):
         intf = resolve_intf(p, domain)
         for m in sorted_methods(intf.methods):
             in_args = method_in_args(m, domain)
@@ -531,7 +569,7 @@ def analyze_application_types(app, domain):
 
     # 5. Proxy methods for variadic tagless emit(args...)
     proxy_methods = []
-    for r in app.r_port_prototypes:
+    for r in get_service_r_ports(app, domain):
         intf = resolve_intf(r, domain)
         for m in sorted_methods(intf.methods):
             in_args = method_in_args(m, domain)
@@ -549,32 +587,48 @@ def analyze_application_types(app, domain):
     legal_tags = set()
     legal_signatures = set()
 
-    for r in app.r_port_prototypes:
+    for r in get_service_r_ports(app, domain):
         intf = resolve_intf(r, domain)
         ns = service_ns(intf)
+        port_name = r.short_name
+        port_tag = f"typename Base::ports::{port_name}"
+        legal_tags.add(port_tag)
         for ev in sorted_events(intf.events):
             t = cpp_type(ev.type_tref, domain)
             legal_types.add(t)
             tag = f"::reaktar::tags::{ns}::events::{ev.short_name}"
+            nested_port_tag = f"typename Base::ports::{port_name}::{ev.short_name}"
             legal_tags.add(tag)
-            # Both direct on(t) and tagged on(tag, t) are legal
+            legal_tags.add(nested_port_tag)
+            # Direct on(t), service-tagged on(tag, t), port-tagged on(nested, t), port-bare on(port, t)
             legal_signatures.add((t,))
             legal_signatures.add((tag, t))
+            legal_signatures.add((nested_port_tag, t))
+            legal_signatures.add((port_tag, t))
         for f in sorted_fields(intf.fields):
             if f.has_notifier:
                 t = cpp_type(f.type_tref, domain)
                 legal_types.add(t)
                 tag = f"::reaktar::tags::{ns}::fields::{f.short_name}"
+                nested_port_tag = f"typename Base::ports::{port_name}::{f.short_name}"
                 legal_tags.add(tag)
+                legal_tags.add(nested_port_tag)
                 legal_signatures.add((t,))
                 legal_signatures.add((tag, t))
+                legal_signatures.add((nested_port_tag, t))
+                legal_signatures.add((port_tag, t))
 
-    for p in app.p_port_prototypes:
+    for p in get_service_p_ports(app, domain):
         intf = resolve_intf(p, domain)
         ns = service_ns(intf)
+        port_name = p.short_name
+        port_tag = f"typename Base::ports::{port_name}"
+        legal_tags.add(port_tag)
         for m in sorted_methods(intf.methods):
             tag = f"::reaktar::tags::{ns}::methods::{m.short_name}"
+            nested_port_tag = f"typename Base::ports::{port_name}::{m.short_name}"
             legal_tags.add(tag)
+            legal_tags.add(nested_port_tag)
             in_args = method_in_args(m, domain)
             sig_types = tuple(a[1] for a in in_args)
             for t in sig_types:
@@ -583,20 +637,28 @@ def analyze_application_types(app, domain):
             legal_signatures.add(sig_types)
             # Tagged on(Tag, args...)
             legal_signatures.add((tag,) + sig_types)
+            # Port-tagged on(Port::Method, args...)
+            legal_signatures.add((nested_port_tag,) + sig_types)
+            # Port-bare on(Port, args...)
+            legal_signatures.add((port_tag,) + sig_types)
         for f in sorted_fields(intf.fields):
             if f.has_setter:
                 t = cpp_type(f.type_tref, domain)
                 legal_types.add(t)
                 tag = f"::reaktar::tags::{ns}::fields::{f.short_name}"
+                nested_port_tag = f"typename Base::ports::{port_name}::{f.short_name}"
                 legal_tags.add(tag)
+                legal_tags.add(nested_port_tag)
                 legal_signatures.add((t,))
                 legal_signatures.add((tag, t))
+                legal_signatures.add((nested_port_tag, t))
+                legal_signatures.add((port_tag, t))
 
     # 7. Collect all app tags and build ergonomic tag aliases
     all_intfs = set()
-    for p in app.p_port_prototypes:
+    for p in get_service_p_ports(app, domain):
         all_intfs.add(resolve_intf(p, domain))
-    for r in app.r_port_prototypes:
+    for r in get_service_r_ports(app, domain):
         all_intfs.add(resolve_intf(r, domain))
 
     app_tags = []
@@ -663,6 +725,22 @@ def is_unique_skel_method(sig, analysis):
 
 def is_unique_proxy_method(sig, analysis):
     return tuple(sig) in analysis['proxy_method_unique_sigs']
+
+
+def is_unique_r_service(r_port, app, domain):
+    intf = resolve_intf(r_port, domain)
+    sident = service_ident(intf)
+    r_ports = get_service_r_ports(app, domain)
+    sidents = [service_ident(resolve_intf(r, domain)) for r in r_ports]
+    return sidents.count(sident) == 1
+
+
+def is_unique_p_service(p_port, app, domain):
+    intf = resolve_intf(p_port, domain)
+    sident = service_ident(intf)
+    p_ports = get_service_p_ports(app, domain)
+    sidents = [service_ident(resolve_intf(p, domain)) for p in p_ports]
+    return sidents.count(sident) == 1
 
 
 def is_bare_tag_ambiguous(tag_name: str, analysis: dict) -> bool:
@@ -742,25 +820,29 @@ def collect_actor_json_types(app, domain, pass_by="const_ref"):
     """
     Collects all custom structs and enums used by this application by inspecting
     its ports and service interfaces, recursively exploring nested types.
+    Gracefully handles unknown or unsupported ARXML types with diagnostics.
     """
     visited_trefs = set()
     structs_map = {}
     enums_map = {}
+    warnings = []
+    app_name = app.short_name
 
     def process_tref(tref):
-        if not tref or tref.is_null:
+        if not tref or getattr(tref, "is_null", False):
             return
-        tref_id = tref.id if hasattr(tref, "id") else id(tref)
+        tref_id = id(tref)
         if tref_id in visited_trefs:
             return
         visited_trefs.add(tref_id)
 
-        name = tref.short_name or tref.name
+        name = tref.short_name
         if not name or name in FUNDAMENTAL_CPP_TYPES:
             return
 
         cat = str(tref.category or "")
-        ns_parts = tuple(ns.symbol or ns.short_name for ns in tref.namespaces) if tref.namespaces and not tref.namespaces.is_null else ()
+        ns_parts = tuple(ns.symbol if hasattr(ns, "symbol") else ns.short_name
+                         for ns in (tref.namespaces or []))
         ns_str = "::".join(ns_parts)
         fq_name = f"{ns_str}::{name}" if ns_str else name
 
@@ -769,11 +851,17 @@ def collect_actor_json_types(app, domain, pass_by="const_ref"):
             sub_els = tref.sub_elements or tref.cpp_implementation_data_type_elements
             if sub_els:
                 for el in sub_els:
-                    el_tref = el.type_reference_ref
-                    el_type = cpp_type(el_tref, domain)
-                    fields.append({"name": el.short_name, "type": el_type})
-                    if el_tref:
-                        process_tref(el_tref)
+                    el_name = el.short_name
+                    try:
+                        el_tref = el.type_reference_ref
+                        el_type = cpp_type(el_tref, domain)
+                        fields.append({"name": el_name, "type": el_type})
+                        if el_tref:
+                            process_tref(el_tref)
+                    except Exception as ex:
+                        msg = f"Component '{app_name}', struct '{fq_name}': skipping field '{el_name}' (type resolution error: {ex})"
+                        warnings.append(msg)
+                        print(f"  [WARN] {msg}")
             guard_name = fq_name.replace("::", "_").replace(":", "_").upper()
             structs_map[fq_name] = {
                 "name": name,
@@ -783,80 +871,130 @@ def collect_actor_json_types(app, domain, pass_by="const_ref"):
                 "fields": fields,
             }
         elif cat == "VECTOR":
-            elem_ref = get_vector_element_tref(tref)
-            if elem_ref:
-                process_tref(elem_ref)
+            try:
+                elem_ref = get_vector_element_tref(tref)
+                if elem_ref:
+                    process_tref(elem_ref)
+            except Exception as ex:
+                msg = f"Component '{app_name}': failed resolving vector element for '{name}': {ex}"
+                warnings.append(msg)
+                print(f"  [WARN] {msg}")
         elif cat == "ARRAY":
-            elem_ref, _ = get_array_element_tref_and_size(tref)
-            if elem_ref:
-                process_tref(elem_ref)
+            try:
+                elem_ref, _ = get_array_element_tref_and_size(tref)
+                if elem_ref:
+                    process_tref(elem_ref)
+            except Exception as ex:
+                msg = f"Component '{app_name}': failed resolving array element for '{name}': {ex}"
+                warnings.append(msg)
+                print(f"  [WARN] {msg}")
         elif cat == "ASSOCIATIVE_MAP":
-            k_ref, v_ref = get_map_key_value_trefs(tref)
-            if k_ref:
-                process_tref(k_ref)
-            if v_ref:
-                process_tref(v_ref)
+            try:
+                k_ref, v_ref = get_map_key_value_trefs(tref)
+                if k_ref:
+                    process_tref(k_ref)
+                if v_ref:
+                    process_tref(v_ref)
+            except Exception as ex:
+                msg = f"Component '{app_name}': failed resolving map types for '{name}': {ex}"
+                warnings.append(msg)
+                print(f"  [WARN] {msg}")
         elif cat == "TYPE_REFERENCE":
-            if tref.x and tref.x.compu_methods:
-                underlying = tref.type_reference_ref
-                under_name = cpp_type(underlying, domain) if underlying else "uint8_t"
-                items = []
-                compu_methods = tref.x.compu_methods
-                if compu_methods and len(compu_methods) > 0:
-                    scales = list(compu_methods[0].q.compu_scales)
+            try:
+                tx = getattr(tref, "x", None)
+                compu_methods = tx.compu_methods if tx and hasattr(tx, "compu_methods") else None
+                if compu_methods:
+                    underlying = tref.type_reference_ref
+                    under_name = cpp_type(underlying, domain) if underlying else "uint8_t"
+                    items = []
+                    cm0 = compu_methods[0]
+                    q = getattr(cm0, "q", None) or cm0
+                    scales = list(getattr(q, "compu_scales", []) or [])
                     for idx, s in enumerate(scales):
                         val = idx
-                        if s.lower_limit is not None:
+                        lower_lim = getattr(s, "lower_limit", None)
+                        if lower_lim is not None:
                             try:
-                                val = int(s.lower_limit)
+                                val = int(lower_lim)
                             except (ValueError, TypeError):
                                 val = idx
                         sym_name = extract_compu_scale_symbol(s, val)
                         items.append({"name": sym_name, "value": val})
-                guard_name = fq_name.replace("::", "_").replace(":", "_").upper()
-                enums_map[fq_name] = {
-                    "name": name,
-                    "ns_parts": ns_parts,
-                    "fq_name": fq_name,
-                    "guard_name": guard_name,
-                    "underlying_type": under_name,
-                    "enum_items": items,
-                }
-            elif tref.type_reference_ref:
-                process_tref(tref.type_reference_ref)
+                    guard_name = fq_name.replace("::", "_").replace(":", "_").upper()
+                    enums_map[fq_name] = {
+                        "name": name,
+                        "ns_parts": ns_parts,
+                        "fq_name": fq_name,
+                        "guard_name": guard_name,
+                        "underlying_type": under_name,
+                        "enum_items": items,
+                    }
+                elif tref.type_reference_ref:
+                    process_tref(tref.type_reference_ref)
+            except Exception as ex:
+                msg = f"Component '{app_name}': failed resolving type reference / enum '{name}': {ex}"
+        elif cat == "OPTIONAL":
+            try:
+                elem_ref = get_optional_element_tref(tref)
+                if elem_ref:
+                    process_tref(elem_ref)
+            except Exception as ex:
+                msg = f"Component '{app_name}': failed resolving optional element for '{name}': {ex}"
+                warnings.append(msg)
+                print(f"  [WARN] {msg}")
+        elif cat == "UNION":
+            try:
+                for alt_ref in get_union_alternative_trefs(tref):
+                    process_tref(alt_ref)
+            except Exception as ex:
+                msg = f"Component '{app_name}': failed resolving union alternatives for '{name}': {ex}"
+                warnings.append(msg)
+                print(f"  [WARN] {msg}")
+        elif cat == "OPAQUE":
+            msg = f"Component '{app_name}': ARXML category '{cat}' for '{fq_name}' is not supported for JSON serialization; skipping."
+            warnings.append(msg)
+            print(f"  [WARN] {msg}")
 
-    all_ports = list(get_service_p_ports(app, domain)) + list(get_service_r_ports(app, domain))
-    for p in all_ports:
-        intf = resolve_intf(p, domain)
-        if not is_service_interface(intf):
-            continue
+    try:
+        all_ports = list(get_service_p_ports(app, domain)) + list(get_service_r_ports(app, domain))
+        for p in all_ports:
+            intf = resolve_intf(p, domain)
+            if not is_service_interface(intf):
+                continue
 
-        for ev in intf.events:
-            if ev.type_tref:
-                process_tref(ev.type_tref)
+            for ev in intf.events or []:
+                if ev.type_tref:
+                    process_tref(ev.type_tref)
 
-        for f in intf.fields:
-            if f.type_tref:
-                process_tref(f.type_tref)
+            for f in intf.fields or []:
+                if f.type_tref:
+                    process_tref(f.type_tref)
 
-        for m in intf.methods:
-            for arg in m.arguments:
-                if arg.type_tref:
-                    process_tref(arg.type_tref)
+            for m in intf.methods or []:
+                for arg in m.arguments or []:
+                    if arg.type_tref:
+                        process_tref(arg.type_tref)
+    except Exception as ex:
+        msg = f"Component '{app_name}': port inspection encountered error during JSON type collection: {ex}"
+        warnings.append(msg)
+        print(f"  [WARN] {msg}")
 
     structs_by_ns = defaultdict(list)
-    for s in structs_map.values():
+    sorted_structs = sorted(structs_map.values(), key=lambda s: s["fq_name"])
+    for s in sorted_structs:
         structs_by_ns[s["ns_parts"]].append(s)
 
     enums_by_ns = defaultdict(list)
-    for e in enums_map.values():
+    sorted_enums = sorted(enums_map.values(), key=lambda e: e["fq_name"])
+    for e in sorted_enums:
         enums_by_ns[e["ns_parts"]].append(e)
 
     return {
-        "structs": list(structs_map.values()),
-        "enums": list(enums_map.values()),
-        "structs_by_ns": dict(structs_by_ns),
-        "enums_by_ns": dict(enums_by_ns),
+        "structs": sorted_structs,
+        "enums": sorted_enums,
+        "structs_by_ns": dict(sorted(structs_by_ns.items())),
+        "enums_by_ns": dict(sorted(enums_by_ns.items())),
+        "warnings": warnings,
     }
 
 
@@ -872,20 +1010,30 @@ def build_actor_model(app, domain, analysis, pass_by="const_ref"):
         h = skeleton_header(resolve_intf(p, domain))
         if h not in skeleton_headers:
             skeleton_headers.append(h)
+    skeleton_headers.sort()
 
     proxy_headers = []
     for r in r_ports:
         h = proxy_header(resolve_intf(r, domain))
         if h not in proxy_headers:
             proxy_headers.append(h)
+    proxy_headers.sort()
+
+    r_sident_counts = Counter([service_ident(resolve_intf(r, domain)) for r in r_ports])
+    p_sident_counts = Counter([service_ident(resolve_intf(p, domain)) for p in p_ports])
 
     consumed_proxies = []
     for r_port in r_ports:
         intf = resolve_intf(r_port, domain)
         ns = service_ns(intf)
         sident = service_ident(intf)
+        port_ident = r_port.short_name.lower()
+        is_unique_service = (r_sident_counts[sident] == 1)
         pcls = proxy_cls(intf)
         instance_spec = resolve_instance_specifier(app, r_port)
+
+        port_incoming_types = [cpp_type(ev.type_tref, domain) for ev in intf.events] + \
+                              [cpp_type(f.type_tref, domain) for f in intf.fields if getattr(f, "has_notifier", False)]
 
         ev_list = []
         for ev in sorted_events(intf.events):
@@ -896,6 +1044,7 @@ def build_actor_model(app, domain, analysis, pass_by="const_ref"):
                 "type": t,
                 "tag": tag,
                 "is_unique": is_unique_incoming(t, analysis),
+                "is_unique_on_port": (port_incoming_types.count(t) == 1),
             })
 
         field_list = []
@@ -913,19 +1062,37 @@ def build_actor_model(app, domain, analysis, pass_by="const_ref"):
                 "has_getter": has_get,
                 "has_setter": has_set,
                 "is_unique": is_unique_incoming(t, analysis),
+                "is_unique_on_port": (port_incoming_types.count(t) == 1) if has_notif else True,
+            })
+
+        proxy_methods_list = []
+        for m in sorted_methods(intf.methods):
+            in_args = method_in_args(m, domain, pass_by=pass_by)
+            sig_types = [a[1] for a in in_args]
+            proxy_methods_list.append({
+                "name": m.short_name,
+                "is_faf": is_fire_and_forget(m),
+                "in_args": [
+                    {"name": aname, "type": atype, "pass_type": ptype}
+                    for aname, atype, ptype in in_args
+                ],
+                "sig_types": sig_types,
             })
 
         unsub_targets = [ev["name"] for ev in ev_list] + [f["name"] for f in field_list if f["has_notifier"]]
 
         consumed_proxies.append({
             "port_name": r_port.short_name,
-            "ident": sident,
+            "ident": port_ident,
+            "service_ident": sident,
+            "is_unique_service": is_unique_service,
             "cls": pcls,
-            "slot_name": f"{sident}_slot_",
-            "find_handle_name": f"{sident}_find_handle_",
+            "slot_name": f"{port_ident}_slot_",
+            "find_handle_name": f"{port_ident}_find_handle_",
             "instance_spec": instance_spec,
             "events": ev_list,
             "fields": field_list,
+            "methods": proxy_methods_list,
             "all_unsubscribe_targets": unsub_targets,
         })
 
@@ -934,10 +1101,28 @@ def build_actor_model(app, domain, analysis, pass_by="const_ref"):
     for p_port in p_ports:
         intf = resolve_intf(p_port, domain)
         ns = service_ns(intf)
+        sident = service_ident(intf)
         scls = skeleton_cls(intf)
         instance_spec = resolve_instance_specifier(app, p_port)
         var_name = f"{p_port.short_name.lower()}_skeleton_"
         adapter_name = f"{p_port.short_name}SkeletonAdapter"
+
+        ev_list = []
+        for ev in sorted_events(intf.events):
+            t = cpp_type(ev.type_tref, domain)
+            tag = f"{ns}::events::{ev.short_name}"
+            ev_list.append({
+                "name": ev.short_name,
+                "type": t,
+                "tag": tag,
+                "is_unique": is_unique_outgoing(t, analysis),
+            })
+
+        port_method_sigs = []
+        for m in sorted_methods(intf.methods):
+            in_args = method_in_args(m, domain, pass_by=pass_by)
+            sig_types = tuple(a[1] for a in in_args)
+            port_method_sigs.append(sig_types)
 
         method_list = []
         for m in sorted_methods(intf.methods):
@@ -947,6 +1132,7 @@ def build_actor_model(app, domain, analysis, pass_by="const_ref"):
             ret_t = method_ret_type(m, domain)
             tag = f"::reaktar::tags::{ns}::methods::{m.short_name}"
             is_unique_sig = is_unique_skel_method(sig_types, analysis)
+            is_unique_sig_on_port = (port_method_sigs.count(tuple(sig_types)) == 1)
 
             method_list.append({
                 "name": m.short_name,
@@ -958,7 +1144,10 @@ def build_actor_model(app, domain, analysis, pass_by="const_ref"):
                     for aname, atype, ptype in in_args
                 ],
                 "is_unique_sig": is_unique_sig,
+                "is_unique_sig_on_port": is_unique_sig_on_port,
             })
+
+        port_setter_types = [cpp_type(f.type_tref, domain) for f in intf.fields if getattr(f, "has_setter", False)]
 
         field_list = []
         for f in sorted_fields(intf.fields):
@@ -968,16 +1157,20 @@ def build_actor_model(app, domain, analysis, pass_by="const_ref"):
             has_get = bool(getattr(f, "has_getter", False))
             has_set = bool(getattr(f, "has_setter", False))
             is_uniq_set = is_unique_field_setter(t, analysis) if has_set else False
+            is_uniq_setter_on_port = (port_setter_types.count(t) == 1) if has_set else False
 
             f_info = {
                 "name": f.short_name,
                 "type": t,
                 "tag": tag,
                 "var_name": var_name,
+                "port_name": p_port.short_name,
+                "port_ident": p_port.short_name.lower(),
                 "has_notifier": has_notif,
                 "has_getter": has_get,
                 "has_setter": has_set,
                 "is_unique_setter": is_uniq_set,
+                "is_unique_setter_on_port": is_uniq_setter_on_port,
             }
             field_list.append(f_info)
             skeleton_fields_flat.append(f_info)
@@ -990,57 +1183,148 @@ def build_actor_model(app, domain, analysis, pass_by="const_ref"):
             "adapter_name": adapter_name,
             "cls": scls,
             "instance_spec": instance_spec,
+            "events": ev_list,
             "methods": method_list,
             "fields": field_list,
+            "service_ident": sident,
+            "is_unique_service": (p_sident_counts[sident] == 1),
         })
 
     outbound_tagged = []
+    outbound_ambiguous_tags = []
     # 1. Skeleton events & field updates
     for p_port in p_ports:
         intf = resolve_intf(p_port, domain)
         ns = service_ns(intf)
+        sident = service_ident(intf)
         var_name = f"{p_port.short_name.lower()}_skeleton_"
+        is_unique = (p_sident_counts[sident] == 1)
+
         for ev in sorted_events(intf.events):
             outbound_tagged.append({
                 "kind": "skeleton_event",
-                "tag": f"{ns}::events::{ev.short_name}",
+                "tag": f"typename Base::ports::{p_port.short_name}::{ev.short_name}",
                 "var_name": var_name,
                 "member": ev.short_name,
+                "slot_name": None,
+                "port_name": p_port.short_name,
                 "service_ident": None,
             })
+            if is_unique:
+                outbound_tagged.append({
+                    "kind": "skeleton_event",
+                    "tag": f"::reaktar::tags::{ns}::events::{ev.short_name}",
+                    "var_name": var_name,
+                    "member": ev.short_name,
+                    "slot_name": None,
+                    "port_name": p_port.short_name,
+                    "service_ident": None,
+                })
+            else:
+                ambig_tag = f"::reaktar::tags::{ns}::events::{ev.short_name}"
+                if ambig_tag not in [x["tag"] for x in outbound_ambiguous_tags]:
+                    outbound_ambiguous_tags.append({
+                        "tag": ambig_tag,
+                        "service": sident,
+                        "name": ev.short_name,
+                    })
         for f in sorted_fields(intf.fields):
             if getattr(f, "has_notifier", False):
                 outbound_tagged.append({
                     "kind": "skeleton_field_update",
-                    "tag": f"{ns}::fields::{f.short_name}",
+                    "tag": f"typename Base::ports::{p_port.short_name}::{f.short_name}",
                     "var_name": var_name,
                     "member": f.short_name,
+                    "slot_name": None,
+                    "port_name": p_port.short_name,
                     "service_ident": None,
                 })
+                if is_unique:
+                    outbound_tagged.append({
+                        "kind": "skeleton_field_update",
+                        "tag": f"::reaktar::tags::{ns}::fields::{f.short_name}",
+                        "var_name": var_name,
+                        "member": f.short_name,
+                        "slot_name": None,
+                        "port_name": p_port.short_name,
+                        "service_ident": None,
+                    })
+                else:
+                    ambig_tag = f"::reaktar::tags::{ns}::fields::{f.short_name}"
+                    if ambig_tag not in [x["tag"] for x in outbound_ambiguous_tags]:
+                        outbound_ambiguous_tags.append({
+                            "tag": ambig_tag,
+                            "service": sident,
+                            "name": f.short_name,
+                        })
 
     # 2. Proxy methods & fields
     for r_port in r_ports:
         intf = resolve_intf(r_port, domain)
         ns = service_ns(intf)
         sident = service_ident(intf)
+        port_ident = r_port.short_name.lower()
+        slot_name = f"{port_ident}_slot_"
+        is_unique = (r_sident_counts[sident] == 1)
+
         for m in sorted_methods(intf.methods):
             is_faf = is_fire_and_forget(m)
             outbound_tagged.append({
                 "kind": "proxy_faf" if is_faf else "proxy_rpc",
-                "tag": f"::reaktar::tags::{ns}::methods::{m.short_name}",
+                "tag": f"typename Base::ports::{r_port.short_name}::{m.short_name}",
                 "var_name": None,
                 "member": m.short_name,
+                "slot_name": slot_name,
+                "port_name": r_port.short_name,
                 "service_ident": sident,
             })
+            if is_unique:
+                outbound_tagged.append({
+                    "kind": "proxy_faf" if is_faf else "proxy_rpc",
+                    "tag": f"::reaktar::tags::{ns}::methods::{m.short_name}",
+                    "var_name": None,
+                    "member": m.short_name,
+                    "slot_name": slot_name,
+                    "port_name": r_port.short_name,
+                    "service_ident": sident,
+                })
+            else:
+                ambig_tag = f"::reaktar::tags::{ns}::methods::{m.short_name}"
+                if ambig_tag not in [x["tag"] for x in outbound_ambiguous_tags]:
+                    outbound_ambiguous_tags.append({
+                        "tag": ambig_tag,
+                        "service": sident,
+                        "name": m.short_name,
+                    })
         for f in sorted_fields(intf.fields):
             if getattr(f, "has_setter", False):
                 outbound_tagged.append({
                     "kind": "proxy_field_set",
-                    "tag": f"{ns}::fields::{f.short_name}",
+                    "tag": f"typename Base::ports::{r_port.short_name}::{f.short_name}",
                     "var_name": None,
                     "member": f.short_name,
+                    "slot_name": slot_name,
+                    "port_name": r_port.short_name,
                     "service_ident": sident,
                 })
+                if is_unique:
+                    outbound_tagged.append({
+                        "kind": "proxy_field_set",
+                        "tag": f"::reaktar::tags::{ns}::fields::{f.short_name}",
+                        "var_name": None,
+                        "member": f.short_name,
+                        "slot_name": slot_name,
+                        "port_name": r_port.short_name,
+                        "service_ident": sident,
+                    })
+                else:
+                    ambig_tag = f"::reaktar::tags::{ns}::fields::{f.short_name}"
+                    if ambig_tag not in [x["tag"] for x in outbound_ambiguous_tags]:
+                        outbound_ambiguous_tags.append({
+                            "tag": ambig_tag,
+                            "service": sident,
+                            "name": f.short_name,
+                        })
 
     outbound_by_type = []
     for p_port in p_ports:
@@ -1054,6 +1338,8 @@ def build_actor_model(app, domain, analysis, pass_by="const_ref"):
                     "type": t,
                     "var_name": var_name,
                     "member": ev.short_name,
+                    "slot_name": None,
+                    "port_name": p_port.short_name,
                     "service_ident": None,
                 })
         for f in sorted_fields(intf.fields):
@@ -1065,12 +1351,16 @@ def build_actor_model(app, domain, analysis, pass_by="const_ref"):
                         "type": t,
                         "var_name": var_name,
                         "member": f.short_name,
+                        "slot_name": None,
+                        "port_name": p_port.short_name,
                         "service_ident": None,
                     })
 
     for r_port in r_ports:
         intf = resolve_intf(r_port, domain)
         sident = service_ident(intf)
+        port_ident = r_port.short_name.lower()
+        slot_name = f"{port_ident}_slot_"
         for m in sorted_methods(intf.methods):
             in_args = method_in_args(m, domain, pass_by=pass_by)
             if len(in_args) == 1:
@@ -1082,6 +1372,8 @@ def build_actor_model(app, domain, analysis, pass_by="const_ref"):
                         "type": t,
                         "var_name": None,
                         "member": m.short_name,
+                        "slot_name": slot_name,
+                        "port_name": r_port.short_name,
                         "service_ident": sident,
                     })
         for f in sorted_fields(intf.fields):
@@ -1093,6 +1385,8 @@ def build_actor_model(app, domain, analysis, pass_by="const_ref"):
                         "type": t,
                         "var_name": None,
                         "member": f.short_name,
+                        "slot_name": slot_name,
+                        "port_name": r_port.short_name,
                         "service_ident": sident,
                     })
 
@@ -1100,6 +1394,8 @@ def build_actor_model(app, domain, analysis, pass_by="const_ref"):
     for r_port in r_ports:
         intf = resolve_intf(r_port, domain)
         sident = service_ident(intf)
+        port_ident = r_port.short_name.lower()
+        slot_name = f"{port_ident}_slot_"
         for m in sorted_methods(intf.methods):
             in_args = method_in_args(m, domain, pass_by=pass_by)
             if len(in_args) != 1:
@@ -1110,6 +1406,8 @@ def build_actor_model(app, domain, analysis, pass_by="const_ref"):
                         "sig_types": sig_types,
                         "is_faf": is_faf,
                         "member": m.short_name,
+                        "slot_name": slot_name,
+                        "port_name": r_port.short_name,
                         "service_ident": sident,
                     })
 
@@ -1123,6 +1421,9 @@ def build_actor_model(app, domain, analysis, pass_by="const_ref"):
             "cls": p["cls"],
             "var_name": p["var_name"],
             "ident": p["port_name"].lower(),
+            "events": p["events"],
+            "fields": p["fields"],
+            "methods": p["methods"],
         })
     for cp in consumed_proxies:
         all_ports.append({
@@ -1135,6 +1436,9 @@ def build_actor_model(app, domain, analysis, pass_by="const_ref"):
             "instance_spec": cp["instance_spec"],
             "ident": cp["ident"],
             "all_unsubscribe_targets": cp["all_unsubscribe_targets"],
+            "events": cp["events"],
+            "fields": cp["fields"],
+            "methods": cp["methods"],
         })
 
     # Determine collision-free ergonomic port aliases
@@ -1160,6 +1464,112 @@ def build_actor_model(app, domain, analysis, pass_by="const_ref"):
                 "is_ambiguous": True,
             })
 
+    # -------------------------------------------------------------------------
+    # Port-Only Outbound Emit Dispatch Structures
+    # -------------------------------------------------------------------------
+    ports_outbound = []
+    port_single_counts_by_port = {}
+    port_multi_counts_by_port = {}
+
+    for port in all_ports:
+        port_name = port["port_name"]
+        is_provided = (port["kind"] == "Provided")
+        raw_single_items = []
+        raw_multi_items = []
+
+        if is_provided:
+            var_name = port["var_name"]
+            for ev in port["events"]:
+                raw_single_items.append({
+                    "kind": "skeleton_event",
+                    "type": ev["type"],
+                    "var_name": var_name,
+                    "member": ev["name"],
+                    "port_name": port_name,
+                })
+            for f in port["fields"]:
+                if f.get("has_notifier", False):
+                    raw_single_items.append({
+                        "kind": "skeleton_field_update",
+                        "type": f["type"],
+                        "var_name": var_name,
+                        "member": f["name"],
+                        "port_name": port_name,
+                    })
+        else:
+            slot_name = port["slot_name"]
+            for m in port["methods"]:
+                is_faf = m["is_faf"]
+                sig_types = m["sig_types"]
+                if len(sig_types) == 1:
+                    raw_single_items.append({
+                        "kind": "proxy_faf" if is_faf else "proxy_rpc",
+                        "type": sig_types[0],
+                        "var_name": None,
+                        "member": m["name"],
+                        "slot_name": slot_name,
+                        "port_name": port_name,
+                    })
+                else:
+                    raw_multi_items.append({
+                        "kind": "proxy_faf" if is_faf else "proxy_rpc",
+                        "sig_types": sig_types,
+                        "var_name": None,
+                        "member": m["name"],
+                        "slot_name": slot_name,
+                        "port_name": port_name,
+                        "is_faf": is_faf,
+                    })
+            for f in port["fields"]:
+                if f.get("has_setter", False):
+                    raw_single_items.append({
+                        "kind": "proxy_field_set",
+                        "type": f["type"],
+                        "var_name": None,
+                        "member": f["name"],
+                        "slot_name": slot_name,
+                        "port_name": port_name,
+                    })
+
+        single_type_counts = Counter([it["type"] for it in raw_single_items])
+        multi_sig_counts = Counter([tuple(it["sig_types"]) for it in raw_multi_items])
+        port_single_counts_by_port[port_name] = single_type_counts
+        port_multi_counts_by_port[port_name] = multi_sig_counts
+
+        seen_types = set()
+        single_arg_items = []
+        for it in sorted(raw_single_items, key=lambda x: (x["type"], x["member"])):
+            t = it["type"]
+            if t in seen_types:
+                continue
+            seen_types.add(t)
+            is_ambig = (single_type_counts[t] > 1)
+            item_copy = dict(it)
+            item_copy["is_ambiguous"] = is_ambig
+            single_arg_items.append(item_copy)
+
+        seen_sigs = set()
+        multi_arg_items = []
+        for it in sorted(raw_multi_items, key=lambda x: (tuple(x["sig_types"]), x["member"])):
+            sig = tuple(it["sig_types"])
+            if sig in seen_sigs:
+                continue
+            seen_sigs.add(sig)
+            is_ambig = (multi_sig_counts[sig] > 1)
+            item_copy = dict(it)
+            item_copy["is_ambiguous"] = is_ambig
+            multi_arg_items.append(item_copy)
+
+        total_outbound = len(raw_single_items) + len(raw_multi_items)
+        ports_outbound.append({
+            "name": port_name,
+            "total_outbound_count": total_outbound,
+            "single_arg_items": single_arg_items,
+            "multi_arg_items": multi_arg_items,
+        })
+
+    ports_outbound.sort(key=lambda x: x["name"])
+
     app_base = re.sub(r'(?:App|Application)$', '', app.short_name)
     example_class_name = f"{app_base}Example"
     example_alias_name = f"{app.short_name}Example"
@@ -1168,10 +1578,15 @@ def build_actor_model(app, domain, analysis, pass_by="const_ref"):
     base_snake = re.sub(r'_exe$', '', raw_snake)
 
     example_interfaces = []
+    p_sident_counts = Counter([service_ident(resolve_intf(p, domain)) for p in p_ports])
+    r_sident_counts = Counter([service_ident(resolve_intf(r, domain)) for r in r_ports])
+
     # 1. Provided Ports (Skeletons)
     for p_port in p_ports:
         intf = resolve_intf(p_port, domain)
         ns = service_ns(intf)
+        sident = service_ident(intf)
+        is_shared_service = (p_sident_counts[sident] > 1)
         port_name = p_port.short_name
         port_ident = port_name.lower()
         candidate_alias = strip_port_affixes(port_name)
@@ -1190,7 +1605,12 @@ def build_actor_model(app, domain, analysis, pass_by="const_ref"):
             is_ambig = is_bare_tag_ambiguous(bare_tag, analysis)
             tag_expr = bare_tag if not is_ambig else f"::reaktar::tags::{ns}::methods::{m.short_name}"
 
-            if not is_uniq:
+            if is_shared_service:
+                is_uniq = False
+                tag_expr = f"ports::{port_name}::{m.short_name}"
+                sig_str = ", ".join(sig_types) if sig_types else "void"
+                tag_note = f"MANDATORY TAGGED: on(ports::{port_name}::{m.short_name}, ...) (shared service across ports)"
+            elif not is_uniq:
                 sig_str = ", ".join(sig_types) if sig_types else "void"
                 tag_note = f"Tagged (resolves collision on {sig_str})"
             else:
@@ -1224,7 +1644,11 @@ def build_actor_model(app, domain, analysis, pass_by="const_ref"):
                 is_ambig = is_bare_tag_ambiguous(bare_tag, analysis)
                 tag_expr = bare_tag if not is_ambig else f"::reaktar::tags::{ns}::fields::{f.short_name}"
 
-                if not is_uniq:
+                if is_shared_service:
+                    is_uniq = False
+                    tag_expr = f"ports::{port_name}::{f.short_name}"
+                    tag_note = f"MANDATORY TAGGED: on_set(ports::{port_name}::{f.short_name}, ...) (shared service across ports)"
+                elif not is_uniq:
                     tag_note = f"Tagged (resolves collision on {t})"
                 else:
                     tag_note = "Untagged (unique field type)"
@@ -1256,7 +1680,12 @@ def build_actor_model(app, domain, analysis, pass_by="const_ref"):
 
             autosar_note = f"AUTOSAR: skeleton.{ev.short_name}.Send()"
 
-            if is_uniq:
+            if is_shared_service:
+                is_uniq = False
+                tag_expr = f"ports::{port_name}::{ev.short_name}"
+                call_untagged = None
+                tag_note = f"MANDATORY TAGGED: emit<{tag_expr}>(val) (shared service across ports)"
+            elif is_uniq:
                 call_untagged = f"emit({dummy_val})"
                 tag_note = f"Untagged: emit(val). Alternative: emit<{tag_expr}>(val)"
             else:
@@ -1264,6 +1693,10 @@ def build_actor_model(app, domain, analysis, pass_by="const_ref"):
                 tag_note = f"MANDATORY TAGGED: emit<{tag_expr}>(val)"
 
             call_tagged = f"emit<{tag_expr}>({dummy_val})"
+            call_port_only = None
+            if is_shared_service and port_single_counts_by_port[port_name][t] == 1:
+                call_port_only = f"emit<ports::{port_name}>({dummy_val})"
+
             outgoing_emits.append({
                 "kind": "skeleton_event",
                 "name": ev.short_name,
@@ -1272,6 +1705,7 @@ def build_actor_model(app, domain, analysis, pass_by="const_ref"):
                 "is_unique": is_uniq,
                 "example_call_untagged": call_untagged,
                 "example_call_tagged": call_tagged,
+                "example_call_port_only": call_port_only,
                 "autosar_note": autosar_note,
                 "tag_note": tag_note,
             })
@@ -1288,7 +1722,12 @@ def build_actor_model(app, domain, analysis, pass_by="const_ref"):
 
                 autosar_note = f"AUTOSAR: skeleton.{f.short_name}.Update()"
 
-                if is_uniq:
+                if is_shared_service:
+                    is_uniq = False
+                    tag_expr = f"ports::{port_name}::{f.short_name}"
+                    call_untagged = None
+                    tag_note = f"MANDATORY TAGGED: emit<{tag_expr}>(val) (shared service across ports)"
+                elif is_uniq:
                     call_untagged = f"emit({dummy_val})"
                     tag_note = f"Untagged: emit(val). Alternative: emit<{tag_expr}>(val)"
                 else:
@@ -1296,6 +1735,10 @@ def build_actor_model(app, domain, analysis, pass_by="const_ref"):
                     tag_note = f"MANDATORY TAGGED: emit<{tag_expr}>(val)"
 
                 call_tagged = f"emit<{tag_expr}>({dummy_val})"
+                call_port_only = None
+                if is_shared_service and port_single_counts_by_port[port_name][t] == 1:
+                    call_port_only = f"emit<ports::{port_name}>({dummy_val})"
+
                 outgoing_emits.append({
                     "kind": "skeleton_field_update",
                     "name": f.short_name,
@@ -1304,6 +1747,7 @@ def build_actor_model(app, domain, analysis, pass_by="const_ref"):
                     "is_unique": is_uniq,
                     "example_call_untagged": call_untagged,
                     "example_call_tagged": call_tagged,
+                    "example_call_port_only": call_port_only,
                     "autosar_note": autosar_note,
                     "tag_note": tag_note,
                 })
@@ -1323,6 +1767,8 @@ def build_actor_model(app, domain, analysis, pass_by="const_ref"):
     for r_port in r_ports:
         intf = resolve_intf(r_port, domain)
         ns = service_ns(intf)
+        sident = service_ident(intf)
+        is_shared_service = (r_sident_counts[sident] > 1)
         port_name = r_port.short_name
         port_ident = port_name.lower()
         candidate_alias = strip_port_affixes(port_name)
@@ -1338,7 +1784,11 @@ def build_actor_model(app, domain, analysis, pass_by="const_ref"):
             is_ambig = is_bare_tag_ambiguous(bare_tag, analysis)
             tag_expr = bare_tag if not is_ambig else f"::reaktar::tags::{ns}::events::{ev.short_name}"
 
-            if not is_uniq:
+            if is_shared_service:
+                is_uniq = False
+                tag_expr = f"ports::{port_name}::{ev.short_name}"
+                tag_note = f"MANDATORY TAGGED: on(ports::{port_name}::{ev.short_name}, val) (shared service across ports)"
+            elif not is_uniq:
                 tag_note = f"Tagged (resolves collision on {t})"
             else:
                 tag_note = "Untagged (unique type)"
@@ -1367,7 +1817,11 @@ def build_actor_model(app, domain, analysis, pass_by="const_ref"):
                 is_ambig = is_bare_tag_ambiguous(bare_tag, analysis)
                 tag_expr = bare_tag if not is_ambig else f"::reaktar::tags::{ns}::fields::{f.short_name}"
 
-                if not is_uniq:
+                if is_shared_service:
+                    is_uniq = False
+                    tag_expr = f"ports::{port_name}::{f.short_name}"
+                    tag_note = f"MANDATORY TAGGED: on(ports::{port_name}::{f.short_name}, val) (shared service across ports)"
+                elif not is_uniq:
                     tag_note = f"Tagged (resolves collision on {t})"
                 else:
                     tag_note = "Untagged (unique type)"
@@ -1407,7 +1861,12 @@ def build_actor_model(app, domain, analysis, pass_by="const_ref"):
             call_kind = "fire-and-forget" if is_faf else "RPC"
             autosar_note = f"AUTOSAR: proxy->{m.short_name}() {call_kind}"
 
-            if is_uniq:
+            if is_shared_service:
+                is_uniq = False
+                call_untagged = None
+                tag_expr = f"ports::{port_name}::{m.short_name}"
+                tag_note = f"MANDATORY TAGGED: emit<{tag_expr}>({dummy_args_str})"
+            elif is_uniq:
                 call_untagged = f"emit({dummy_args_str})"
                 tag_note = f"Untagged (unique signature). Alternative: emit<{tag_expr}>({dummy_args_str})"
             else:
@@ -1415,6 +1874,13 @@ def build_actor_model(app, domain, analysis, pass_by="const_ref"):
                 tag_note = f"MANDATORY TAGGED: emit<{tag_expr}>({dummy_args_str})"
 
             call_tagged = f"emit<{tag_expr}>({dummy_args_str})"
+            call_port_only = None
+            if is_shared_service:
+                if len(in_args) == 1 and port_single_counts_by_port[port_name][in_args[0][1]] == 1:
+                    call_port_only = f"emit<ports::{port_name}>({dummy_args_str})"
+                elif len(in_args) != 1 and port_multi_counts_by_port[port_name][sig_types] == 1:
+                    call_port_only = f"emit<ports::{port_name}>({dummy_args_str})"
+
             outgoing_emits.append({
                 "kind": "proxy_faf" if is_faf else "proxy_rpc",
                 "name": m.short_name,
@@ -1423,6 +1889,7 @@ def build_actor_model(app, domain, analysis, pass_by="const_ref"):
                 "is_unique": is_uniq,
                 "example_call_untagged": call_untagged,
                 "example_call_tagged": call_tagged,
+                "example_call_port_only": call_port_only,
                 "autosar_note": autosar_note,
                 "tag_note": tag_note,
             })
@@ -1438,13 +1905,21 @@ def build_actor_model(app, domain, analysis, pass_by="const_ref"):
                 dummy_val = generate_dummy_value(t)
 
                 autosar_note = f"AUTOSAR: proxy->{f.short_name}.Set()"
-                if is_uniq:
+                if is_shared_service:
+                    is_uniq = False
+                    call_untagged = None
+                    tag_expr = f"ports::{port_name}::{f.short_name}"
+                    tag_note = f"MANDATORY TAGGED: emit<{tag_expr}>({dummy_val})"
+                elif is_uniq:
                     call_untagged = f"emit({dummy_val})"
                     tag_note = f"Untagged: emit(val). Alternative: emit<{tag_expr}>({dummy_val})"
                 else:
                     call_untagged = None
                     tag_note = f"MANDATORY TAGGED: emit<{tag_expr}>({dummy_val})"
                 call_tagged = f"emit<{tag_expr}>({dummy_val})"
+                call_port_only = None
+                if is_shared_service and port_single_counts_by_port[port_name][t] == 1:
+                    call_port_only = f"emit<ports::{port_name}>({dummy_val})"
 
                 outgoing_emits.append({
                     "kind": "proxy_field_set",
@@ -1454,6 +1929,7 @@ def build_actor_model(app, domain, analysis, pass_by="const_ref"):
                     "is_unique": is_uniq,
                     "example_call_untagged": call_untagged,
                     "example_call_tagged": call_tagged,
+                    "example_call_port_only": call_port_only,
                     "autosar_note": autosar_note,
                     "tag_note": tag_note,
                 })
@@ -1480,6 +1956,18 @@ def build_actor_model(app, domain, analysis, pass_by="const_ref"):
         legal_types.append(conn_t)
         legal_types.append(disconn_t)
 
+    def dedup_list(lst):
+        seen = set()
+        res = []
+        for x in lst:
+            if x not in seen:
+                seen.add(x)
+                res.append(x)
+        return res
+
+    legal_signatures = dedup_list(sorted(legal_signatures, key=lambda s: (len(s), s)))
+    legal_types = dedup_list(sorted(legal_types))
+
     return {
         "exe_name": exe_name,
         "app_short_name": app_short_name,
@@ -1491,12 +1979,14 @@ def build_actor_model(app, domain, analysis, pass_by="const_ref"):
         "proxy_headers": proxy_headers,
         "tag_aliases": analysis["tag_aliases"],
         "ports": all_ports,
+        "ports_outbound": ports_outbound,
         "port_aliases": port_aliases,
         "consumed_proxies": consumed_proxies,
         "consumed_proxy_count": len(consumed_proxies),
         "skeletons": skeletons,
         "skeleton_fields": skeleton_fields_flat,
         "outbound_tagged": outbound_tagged,
+        "outbound_ambiguous_tags": outbound_ambiguous_tags,
         "outbound_by_type": outbound_by_type,
         "outbound_multi": outbound_multi,
         "legal_signatures": legal_signatures,
@@ -1541,6 +2031,8 @@ def generate_code(arxml_path: Path, output_dir: Path, pass_by: str = "const_ref"
         "is_unique_field_setter": is_unique_field_setter,
         "is_unique_skel_method": is_unique_skel_method,
         "is_unique_proxy_method": is_unique_proxy_method,
+        "is_unique_r_service": is_unique_r_service,
+        "is_unique_p_service": is_unique_p_service,
         "skeleton_header": skeleton_header,
         "proxy_header": proxy_header,
         "domain": domain,
@@ -1564,14 +2056,39 @@ def generate_code(arxml_path: Path, output_dir: Path, pass_by: str = "const_ref"
                 all_intfs.add(intf)
     sorted_intfs = sorted(list(all_intfs), key=lambda x: x.short_name)
 
-    # 1. Generate include/reaktar/tags.hpp
-    reaktar_inc = output_dir.parent / "reaktar"
-    reaktar_inc.mkdir(parents=True, exist_ok=True)
-    tags_tmpl = env.get_template("tags.hpp.jinja")
-    tags_code = tags_tmpl.render(interfaces=sorted_intfs)
-    tags_path = reaktar_inc / "tags.hpp"
-    tags_path.write_text(tags_code)
-    print(f"  [OK] Generated Tag Definitions -> {tags_path}")
+    stats = {
+        "tags_succeeded": 0,
+        "apps_processed": 0,
+        "apps_skipped": 0,
+        "actors_succeeded": 0,
+        "actors_failed": 0,
+        "benches_succeeded": 0,
+        "benches_failed": 0,
+        "json_succeeded": 0,
+        "json_stubbed": 0,
+        "json_failed": 0,
+        "examples_succeeded": 0,
+        "examples_failed": 0,
+    }
+    warnings_list = []
+    errors_list = []
+
+    # 1. Generate include/reaktar/tags.hpp (Tier 0 - Critical Global Tags)
+    try:
+        reaktar_inc = output_dir.parent / "reaktar"
+        reaktar_inc.mkdir(parents=True, exist_ok=True)
+        tags_tmpl = env.get_template("tags.hpp.jinja")
+        tags_code = tags_tmpl.render(interfaces=sorted_intfs)
+        tags_path = reaktar_inc / "tags.hpp"
+        tags_path.write_text(tags_code)
+        stats["tags_succeeded"] = 1
+        print(f"  [OK] Generated Tag Definitions -> {tags_path}")
+    except Exception as ex:
+        import traceback
+        err_msg = f"Failed to generate global tags.hpp: {ex}"
+        errors_list.append(err_msg)
+        print(f"  [FATAL] {err_msg}", file=sys.stderr)
+        print(f"  [DIAGNOSTIC] Traceback:\n{traceback.format_exc().strip()}", file=sys.stderr)
 
     # 2. Generate Actors, TestBenches, Example Applications, and JSON Serializers
     actor_tmpl = env.get_template("actor.hpp.jinja")
@@ -1581,37 +2098,125 @@ def generate_code(arxml_path: Path, output_dir: Path, pass_by: str = "const_ref"
 
     output_dir.mkdir(parents=True, exist_ok=True)
     for app in apps:
+        app_name = app.short_name
         if not app_has_executable(app):
-            print(f"  [SKIP] Component '{app.short_name}' has no associated Executable in model. Skipping actor generation.")
+            print(f"  [SKIP] Component '{app_name}' has no associated Executable in model. Skipping actor generation.")
+            stats["apps_skipped"] += 1
             continue
 
+        stats["apps_processed"] += 1
+        print(f"\n==> Processing Component: {app_name}")
+
         import re
-        exe_name = app_exe_name(app)
-        raw_snake = re.sub(r'(?<!^)(?=[A-Z])', '_', exe_name).lower()
-        base_snake = re.sub(r'_exe$', '', raw_snake)
+        # Step 2a: Generate Actor (Tier 1 - Core Component)
+        try:
+            exe_name = app_exe_name(app)
+            raw_snake = re.sub(r'(?<!^)(?=[A-Z])', '_', exe_name).lower()
+            base_snake = re.sub(r'_exe$', '', raw_snake)
 
-        analysis = analyze_application_types(app, domain)
-        model = build_actor_model(app, domain, analysis, pass_by=pass_by)
-        actor_code = actor_tmpl.render(model=model, app=app, analysis=analysis)
-        actor_path = output_dir / f"{base_snake}_actor.hpp"
-        actor_path.write_text(actor_code)
-        print(f"  [OK] Generated Actor           -> {actor_path}")
+            analysis = analyze_application_types(app, domain)
+            model = build_actor_model(app, domain, analysis, pass_by=pass_by)
+            actor_code = actor_tmpl.render(model=model, app=app, analysis=analysis)
+            actor_path = output_dir / f"{base_snake}_actor.hpp"
+            actor_path.write_text(actor_code)
+            stats["actors_succeeded"] += 1
+            print(f"  [OK] Generated Actor           -> {actor_path}")
+        except Exception as ex:
+            import traceback
+            err_msg = f"Component '{app_name}': Failed to generate Actor: {ex}"
+            errors_list.append(err_msg)
+            stats["actors_failed"] += 1
+            print(f"  [ERROR] {err_msg}", file=sys.stderr)
+            print(f"  [DIAGNOSTIC] Traceback:\n{traceback.format_exc().strip()}", file=sys.stderr)
+            print(f"  [RECOVERY] Skipping dependent artifacts for '{app_name}' and continuing to next component...", file=sys.stderr)
+            continue
 
-        bench_code = bench_tmpl.render(app=app)
-        bench_path = output_dir / f"{base_snake}_test_bench.hpp"
-        bench_path.write_text(bench_code)
-        print(f"  [OK] Generated Test Bench      -> {bench_path}")
+        # Step 2b: Generate Test Bench (Tier 2 - Tooling)
+        try:
+            bench_code = bench_tmpl.render(app=app, model=model, analysis=analysis)
+            bench_path = output_dir / f"{base_snake}_test_bench.hpp"
+            bench_path.write_text(bench_code)
+            stats["benches_succeeded"] += 1
+            print(f"  [OK] Generated Test Bench      -> {bench_path}")
+        except Exception as ex:
+            import traceback
+            err_msg = f"Component '{app_name}': Failed to generate Test Bench: {ex}"
+            errors_list.append(err_msg)
+            stats["benches_failed"] += 1
+            print(f"  [ERROR] {err_msg}", file=sys.stderr)
+            print(f"  [DIAGNOSTIC] Traceback:\n{traceback.format_exc().strip()}", file=sys.stderr)
 
-        json_data = collect_actor_json_types(app, domain, pass_by=pass_by)
-        json_code = json_tmpl.render(app=app, base_snake=base_snake, **json_data)
+        # Step 2c: Generate JSON Serializers (Tier 3 - Peripheral / Graceful Degradation)
         json_path = output_dir / f"{base_snake}_json.hpp"
-        json_path.write_text(json_code)
-        print(f"  [OK] Generated JSON Serializers-> {json_path}")
+        try:
+            json_data = collect_actor_json_types(app, domain, pass_by=pass_by)
+            if "warnings" in json_data and json_data["warnings"]:
+                warnings_list.extend(json_data["warnings"])
+            json_code = json_tmpl.render(app=app, base_snake=base_snake, **json_data)
+            json_path.write_text(json_code)
+            stats["json_succeeded"] += 1
+            print(f"  [OK] Generated JSON Serializers-> {json_path}")
+        except Exception as ex:
+            import traceback
+            warn_msg = f"Component '{app_name}': JSON generation failed: {ex}"
+            warnings_list.append(warn_msg)
+            stats["json_stubbed"] += 1
+            print(f"  [WARN] {warn_msg}", file=sys.stderr)
+            print(f"  [DIAGNOSTIC] Traceback snippet:\n{traceback.format_exc().strip()}", file=sys.stderr)
+            print(f"  [STUB] Generating fallback JSON stub -> {json_path}")
+            stub_content = (
+                f"// ==============================================================================\n"
+                f"// Reaktar - Fallback JSON Stub\n"
+                f"// Component: {app_name}\n"
+                f"// Notice: Full JSON serializers could not be generated from ARXML model:\n"
+                f"//         {ex}\n"
+                f"// ==============================================================================\n\n"
+                f"#pragma once\n\n"
+                f"#include <reaktar/json.hpp>\n\n"
+                f"// Fallback unqualified imports so includes and basic JSON APIs don't break\n"
+                f"using ::reaktar::json::to_json;\n"
+                f"using ::reaktar::json::write_json;\n"
+                f"using ::reaktar::json::operator<<;\n"
+            )
+            json_path.write_text(stub_content)
 
-        example_code = example_tmpl.render(model=model, app=app, analysis=analysis)
-        example_path = output_dir / f"{base_snake}_example.hpp"
-        example_path.write_text(example_code)
-        print(f"  [OK] Generated Example App     -> {example_path}")
+        # Step 2d: Generate Example App (Tier 2 - Tooling)
+        try:
+            example_code = example_tmpl.render(model=model, app=app, analysis=analysis)
+            example_path = output_dir / f"{base_snake}_example.hpp"
+            example_path.write_text(example_code)
+            stats["examples_succeeded"] += 1
+            print(f"  [OK] Generated Example App     -> {example_path}")
+        except Exception as ex:
+            import traceback
+            err_msg = f"Component '{app_name}': Failed to generate Example App: {ex}"
+            errors_list.append(err_msg)
+            stats["examples_failed"] += 1
+            print(f"  [ERROR] {err_msg}", file=sys.stderr)
+            print(f"  [DIAGNOSTIC] Traceback:\n{traceback.format_exc().strip()}", file=sys.stderr)
+
+    print("\n" + "=" * 70)
+    print(" Reaktar Code Generation Summary")
+    print("=" * 70)
+    print(f"  Global Tags:       {stats['tags_succeeded']} / 1 generated")
+    print(f"  Components:        {stats['apps_processed']} processed ({stats['apps_skipped']} skipped)")
+    print(f"  Actors:            {stats['actors_succeeded']} / {stats['apps_processed']} generated")
+    print(f"  Test Benches:      {stats['benches_succeeded']} / {stats['apps_processed']} generated")
+    print(f"  JSON Serializers:  {stats['json_succeeded']} generated, {stats['json_stubbed']} stubbed")
+    print(f"  Example Apps:      {stats['examples_succeeded']} / {stats['apps_processed']} generated")
+    print("-" * 70)
+    print(f"  Warnings:          {len(warnings_list)}")
+    print(f"  Errors:            {len(errors_list)}")
+    print("=" * 70)
+
+    if errors_list or stats['tags_succeeded'] == 0:
+        print("\n[ERROR] Generation encountered critical errors. Check diagnostics above.\n", file=sys.stderr)
+        return False
+    if warnings_list:
+        print("\n[INFO] Generation completed with warnings. Peripheral fallbacks were applied.\n")
+    else:
+        print("\n[SUCCESS] All artifacts generated cleanly.\n")
+    return True
 
 
 if __name__ == "__main__":
@@ -1632,4 +2237,6 @@ if __name__ == "__main__":
         sys.exit(1)
 
     out_include = Path(args.output)
-    generate_code(arxml, out_include, pass_by=args.pass_by, type_style=args.type_style)
+    success = generate_code(arxml, out_include, pass_by=args.pass_by, type_style=args.type_style)
+    if not success:
+        sys.exit(1)

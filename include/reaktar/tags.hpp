@@ -62,6 +62,8 @@ namespace events {
     struct DiagnosticsReport {};
     struct DriveHistory {};
     struct EmergencyAlert {};
+    struct PrimaryWarning {};
+    struct SecondaryWarning {};
 } // namespace events
 namespace methods {
     struct CalibrateOdometer {};
