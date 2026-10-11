@@ -12,10 +12,38 @@
 #pragma once
 
 #include "mock_ara/com.hpp"
+#include <ara/core/string.h>
+#include <ara/core/vector.h>
+#include <ara/core/array.h>
+#include <ara/core/map.h>
 #include <cstdint>
 #include <string>
+#include <vector>
+#include <array>
+#include <map>
 
 namespace vehicle_data {
+
+enum class DriveMode : uint8_t {
+    ECO = 0,
+    COMFORT = 1,
+    SPORT = 2,
+    EMERGENCY = 3,
+};
+
+enum class SystemStatus : uint8_t {
+    OK = 0,
+    WARNING = 1,
+    ERROR = 2,
+    CRITICAL = 3,
+};
+
+enum class GearPosition : uint8_t {
+    PARK = 0,
+    REVERSE = 1,
+    NEUTRAL = 2,
+    DRIVE = 3,
+};
 
 struct SpeedData {
     float speed_kmh{};
@@ -33,18 +61,64 @@ struct EmergencyAlert {
     ara::core::String reason{};
 };
 
-enum class DriveMode : uint8_t {
-    ECO,
-    COMFORT,
-    SPORT,
-    EMERGENCY,
-};
-
 struct LocationPoint {
     float latitude{};
     float longitude{};
     float altitude{};
     float speed_limit_kmh{};
+};
+
+struct BatteryCell {
+    uint32_t cell_id{};
+    float voltage{};
+    float temperature{};
+};
+
+struct Vector3D {
+    double x{};
+    double y{};
+    double z{};
+};
+
+struct DiagnosticItem {
+    uint32_t code{};
+    int32_t error_offset{};
+    ara::core::String message{};
+};
+
+using WheelSpeeds = ara::core::Array<float, 4>;
+
+using BatteryModule = ara::core::Array<vehicle_data::BatteryCell, 4>;
+
+using SystemStatusMatrix = ara::core::Array<vehicle_data::SystemStatus, 4>;
+
+using AlertList = ara::core::Vector<vehicle_data::EmergencyAlert>;
+
+using WaypointList = ara::core::Vector<vehicle_data::LocationPoint>;
+
+using HistoryBuffer = ara::core::Vector<float>;
+
+using StringList = ara::core::Vector<ara::core::String>;
+
+using DriveModeHistory = ara::core::Vector<vehicle_data::DriveMode>;
+
+using ConfigMap = ara::core::Map<ara::core::String, ara::core::String>;
+
+using DiagnosticMap = ara::core::Map<uint32_t, vehicle_data::EmergencyAlert>;
+
+using FeatureFlagMap = ara::core::Map<ara::core::String, bool>;
+
+struct VehicleDiagnostics {
+    uint32_t report_id{};
+    vehicle_data::SystemStatus system_status{};
+    vehicle_data::GearPosition current_gear{};
+    ara::core::Array<float, 4> wheel_speeds{};
+    ara::core::Vector<vehicle_data::EmergencyAlert> active_alerts{};
+    ara::core::Map<ara::core::String, ara::core::String> config_kv{};
+    ara::core::Array<vehicle_data::SystemStatus, 4> status_matrix{};
+    ara::core::Map<ara::core::String, bool> feature_flags{};
+    ara::core::Vector<ara::core::String> tags{};
+    ara::core::Array<vehicle_data::BatteryCell, 4> battery_module{};
 };
 
 } // namespace vehicle_data

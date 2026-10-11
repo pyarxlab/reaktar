@@ -8,6 +8,7 @@
 
 #pragma once
 
+#include "reaktar/thread_safety.hpp"
 #include <atomic>
 #include <chrono>
 #include <condition_variable>
@@ -360,7 +361,7 @@ public:
 private:
     void retire_cell(ProxyCell<T, HandleT>* old_cell,
                      std::unique_ptr<ProxyCell<T, HandleT>> old_cell_owner,
-                     std::chrono::milliseconds timeout) {
+                     std::chrono::milliseconds timeout) REAKTAR_REQUIRES(lifecycle_mutex_) {
         if (!old_cell) {
             return;
         }
@@ -402,8 +403,8 @@ private:
     }
 
     std::atomic<ProxyCell<T, HandleT>*> current_cell_{nullptr};
-    std::unique_ptr<ProxyCell<T, HandleT>> active_cell_{nullptr};
-    std::vector<std::unique_ptr<ProxyCell<T, HandleT>>> graveyard_;
+    std::unique_ptr<ProxyCell<T, HandleT>> active_cell_ REAKTAR_GUARDED_BY(lifecycle_mutex_){nullptr};
+    std::vector<std::unique_ptr<ProxyCell<T, HandleT>>> graveyard_ REAKTAR_GUARDED_BY(lifecycle_mutex_);
     mutable std::mutex lifecycle_mutex_;
 };
 

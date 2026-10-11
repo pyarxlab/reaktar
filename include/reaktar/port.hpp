@@ -60,4 +60,39 @@ inline constexpr bool is_required_port_v = (is_port_v<T> && T::kind == PortKind:
 template <typename T>
 inline constexpr bool is_provided_port_v = (is_port_v<T> && T::kind == PortKind::Provided);
 
+/**
+ * @brief Reactive lifecycle event tag dispatched via drain() when a Port becomes connected/ready.
+ */
+template <typename PortTag>
+struct Connected {
+    using port_type = PortTag;
+};
+
+/**
+ * @brief Reactive lifecycle event tag dispatched via drain() when a Port becomes disconnected/unoffered.
+ */
+template <typename PortTag>
+struct Disconnected {
+    using port_type = PortTag;
+};
+
+template <typename T>
+struct is_connected : std::false_type {};
+
+template <typename PortTag>
+struct is_connected<Connected<PortTag>> : std::true_type {};
+
+template <typename T>
+inline constexpr bool is_connected_v = is_connected<T>::value;
+
+template <typename T>
+struct is_disconnected : std::false_type {};
+
+template <typename PortTag>
+struct is_disconnected<Disconnected<PortTag>> : std::true_type {};
+
+template <typename T>
+inline constexpr bool is_disconnected_v = is_disconnected<T>::value;
+
 } // namespace reaktar
+

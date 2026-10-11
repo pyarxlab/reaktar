@@ -25,10 +25,31 @@ public:
 {% for port in model.ports %}
         struct {{ port.port_name }} : public {{ port.kind_tag }} {
             static constexpr std::string_view name = "{{ port.port_name }}";
+            static constexpr size_t port_index = {{ loop.index0 }};
             using port_tag = {{ port.port_name }};
             using kind_type = {{ port.kind_tag }};
         };
 {% endfor %}
+        static constexpr size_t kPortCount = {{ model.ports | length }};
+
+        // Target CPU architecture detection (32-bit vs 64-bit)
+        static constexpr bool kIs32BitArch = (sizeof(void*) == 4);
+
+        // On 32-bit embedded platforms, use native uint32_t to guarantee 1-instruction lock-free execution
+        // On 64-bit platforms, use uint32_t for <= 32 ports and uint64_t for up to 64 ports
+        using port_mask_t = std::conditional_t<
+            kIs32BitArch || (kPortCount <= 32),
+            uint32_t,
+            uint64_t
+        >;
+
+        static constexpr size_t kMaxSupportedPorts = sizeof(port_mask_t) * 8;
+        static_assert(kPortCount <= kMaxSupportedPorts,
+            "Port count exceeds maximum lock-free atomic mask capacity on this architecture (32 ports on 32-bit, 64 on 64-bit)");
+        static_assert(std::atomic<port_mask_t>::is_always_lock_free,
+            "ReaktAR port_mask_t must be unconditionally lock-free on target architecture");
+
+
 {% if model.port_aliases %}
 
         // --------------------------------------------------------------------
@@ -115,8 +136,14 @@ protected:
 {% for proxy in model.consumed_proxies %}
     reaktar::ProxySlot<{{ proxy.cls }}> {{ proxy.slot_name }}{};
     mutable std::mutex {{ proxy.ident }}_port_mutex_{};
-    std::optional<ara::com::FindServiceHandle> {{ proxy.find_handle_name }}{std::nullopt};
+    std::optional<ara::com::FindServiceHandle> {{ proxy.find_handle_name }} REAKTAR_GUARDED_BY({{ proxy.ident }}_port_mutex_){std::nullopt};
     std::atomic<bool> {{ proxy.ident }}_open_{false};
-    uint64_t {{ proxy.ident }}_generation_{0};
+    uint64_t {{ proxy.ident }}_generation_ REAKTAR_GUARDED_BY({{ proxy.ident }}_port_mutex_){0};
 {% endfor %}
+
+    using port_mask_t = typename ports::port_mask_t;
+    std::atomic<port_mask_t> dirty_ports_{0};
+    port_mask_t last_known_ready_{0};
 };
+
+

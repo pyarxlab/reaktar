@@ -122,7 +122,7 @@ struct make_future_adapter {
     }
     static reaktar::Future<ValType> from_error(reaktar::ErrorCode err) {
         reaktar::Promise<ValType> p;
-        p.SetError(std::move(err));
+        p.SetError(err);
         return p.get_future();
     }
 };
@@ -146,7 +146,7 @@ struct make_future_adapter<void> {
     }
     static reaktar::Future<void> from_error(reaktar::ErrorCode err) {
         reaktar::Promise<void> p;
-        p.SetError(std::move(err));
+        p.SetError(err);
         return p.get_future();
     }
 };
@@ -421,7 +421,7 @@ public:
     template <typename Callback>
     void on_success(Callback&& cb) {
         if (!is_valid_) return;
-        future_.then([c = std::forward<Callback>(cb)](reaktar::Future<T> f) mutable {
+        future_.then([c = std::forward<Callback>(cb)](const reaktar::Future<T>& f) mutable {
             auto res = f.GetResult();
             if (res.HasValue()) {
                 if constexpr (std::is_void_v<T>) {
@@ -446,14 +446,13 @@ public:
             }
             return;
         }
-        future_.then([c = std::forward<ErrorCallback>(cb)](reaktar::Future<T> f) mutable {
+        future_.then([c = std::forward<ErrorCallback>(cb)](const reaktar::Future<T>& f) mutable {
             auto res = f.GetResult();
             if (!res.HasValue()) {
                 if constexpr (std::is_invocable_v<ErrorCallback>) {
                     c();
-                } else if constexpr (std::is_invocable_v<ErrorCallback, std::optional<reaktar::ErrorCode>>) {
-                    c(res.Error());
-                } else if constexpr (std::is_invocable_v<ErrorCallback, reaktar::ErrorCode>) {
+                } else if constexpr (std::is_invocable_v<ErrorCallback, std::optional<reaktar::ErrorCode>> ||
+                                     std::is_invocable_v<ErrorCallback, reaktar::ErrorCode>) {
                     c(res.Error());
                 }
             }

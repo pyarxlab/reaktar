@@ -12,6 +12,10 @@
 #pragma once
 
 #include "mock_ara/com.hpp"
+#include <ara/core/string.h>
+#include <ara/core/vector.h>
+#include <ara/core/array.h>
+#include <ara/core/map.h>
 
 #include "vehicle_data/types.hpp"
 
@@ -20,6 +24,7 @@
 #include <cstdint>
 #include <map>
 #include <vector>
+#include <array>
 #include <mutex>
 #include <functional>
 
@@ -40,10 +45,24 @@ public:
 
     ara::com::ProxyEvent<vehicle_data::EmergencyAlert> EmergencyAlert;
 
+    ara::com::ProxyEvent<vehicle_data::VehicleDiagnostics> DiagnosticsReport;
+
+    ara::com::ProxyEvent<ara::core::Map<uint32_t, vehicle_data::EmergencyAlert>> ActiveDiagnosticMap;
+
+    ara::com::ProxyEvent<ara::core::Vector<vehicle_data::DriveMode>> DriveHistory;
+
 
     // Fields
 
     ara::com::ProxyField<vehicle_data::DriveMode> CurrentDriveMode;
+
+    ara::com::ProxyField<ara::core::Vector<vehicle_data::EmergencyAlert>> ActiveAlerts;
+
+    ara::com::ProxyField<ara::core::Map<ara::core::String, ara::core::String>> VehicleConfig;
+
+    ara::com::ProxyField<ara::core::Array<vehicle_data::SystemStatus, 4>> SystemMatrix;
+
+    ara::com::ProxyField<ara::core::Map<ara::core::String, bool>> FeatureFlags;
 
     ara::com::ProxyField<uint32_t> HardwareRevision;
 

@@ -12,12 +12,19 @@
 #pragma once
 
 #include "mock_ara/com.hpp"
+#include <ara/core/string.h>
+#include <ara/core/vector.h>
+#include <ara/core/array.h>
+#include <ara/core/map.h>
 
 #include "vehicle_data/types.hpp"
 
 #include <string>
 #include <cstdint>
 #include <utility>
+#include <vector>
+#include <array>
+#include <map>
 
 
 namespace vehicle_supervisor {
@@ -124,10 +131,24 @@ public:
 
     ara::com::SkeletonEvent<vehicle_data::EmergencyAlert> EmergencyAlert;
 
+    ara::com::SkeletonEvent<vehicle_data::VehicleDiagnostics> DiagnosticsReport;
+
+    ara::com::SkeletonEvent<ara::core::Map<uint32_t, vehicle_data::EmergencyAlert>> ActiveDiagnosticMap;
+
+    ara::com::SkeletonEvent<ara::core::Vector<vehicle_data::DriveMode>> DriveHistory;
+
 
     // Fields
 
     ara::com::SkeletonField<vehicle_data::DriveMode> CurrentDriveMode;
+
+    ara::com::SkeletonField<ara::core::Vector<vehicle_data::EmergencyAlert>> ActiveAlerts;
+
+    ara::com::SkeletonField<ara::core::Map<ara::core::String, ara::core::String>> VehicleConfig;
+
+    ara::com::SkeletonField<ara::core::Array<vehicle_data::SystemStatus, 4>> SystemMatrix;
+
+    ara::com::SkeletonField<ara::core::Map<ara::core::String, bool>> FeatureFlags;
 
     ara::com::SkeletonField<uint32_t> HardwareRevision;
 

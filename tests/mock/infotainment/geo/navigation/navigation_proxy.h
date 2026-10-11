@@ -12,6 +12,10 @@
 #pragma once
 
 #include "mock_ara/com.hpp"
+#include <ara/core/string.h>
+#include <ara/core/vector.h>
+#include <ara/core/array.h>
+#include <ara/core/map.h>
 
 #include "vehicle_data/types.hpp"
 
@@ -20,6 +24,7 @@
 #include <cstdint>
 #include <map>
 #include <vector>
+#include <array>
 #include <mutex>
 #include <functional>
 
@@ -43,6 +48,8 @@ public:
     // Events
 
     ara::com::ProxyEvent<vehicle_data::LocationPoint> CurrentLocation;
+
+    ara::com::ProxyEvent<ara::core::Vector<vehicle_data::LocationPoint>> ActiveRoute;
 
 
     // Fields

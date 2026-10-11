@@ -38,3 +38,12 @@ add_executable(reaktar_smoke_tests
 target_link_libraries(reaktar_smoke_tests PRIVATE reaktar reaktar_test_mock)
 add_test(NAME core_smoke_tests COMMAND reaktar_smoke_tests)
 
+# Reference Example Applications (built during build and test, not run by ctest)
+add_executable(reaktar_example_app
+    examples/main.cpp
+    examples/vehicle_supervisor_example.cpp
+    examples/cockpit_domain_example.cpp
+    examples/telemetry_example.cpp
+)
+target_link_libraries(reaktar_example_app PRIVATE reaktar reaktar_test_mock)
+

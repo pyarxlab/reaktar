@@ -33,19 +33,45 @@ namespace testing {
 template <typename App>
 class CockpitDomainTestBench {
 protected:
+    // Mock skeleton field instances for proxy field bindings
+    ara::com::SkeletonField<uint32_t> mock_body_control_OutsideAirQuality_;
+    ara::com::SkeletonField<uint32_t> mock_body_control_RainSensorLevel_;
+    ara::com::SkeletonField<float> mock_body_control_TargetCabinTemperature_;
+    ara::com::SkeletonField<uint32_t> mock_body_control_WindowPosition_;
+
     App app_{};
 
 public:
+    virtual ~CockpitDomainTestBench() {
+        app_.stop();
+    }
+
     CockpitDomainTestBench()
         : app_{}
         , StatusNotification(app_.get_hmiport_skeleton().StatusNotification)
+        , ActiveDiagnosticMap(app_.get_supervisorport_skeleton().ActiveDiagnosticMap)
+        , DiagnosticsReport(app_.get_supervisorport_skeleton().DiagnosticsReport)
+        , DriveHistory(app_.get_supervisorport_skeleton().DriveHistory)
         , EmergencyAlert(app_.get_supervisorport_skeleton().EmergencyAlert)
+        , ActiveAlerts(app_.get_supervisorport_skeleton().ActiveAlerts)
         , CalibrationKey(app_.get_supervisorport_skeleton().CalibrationKey)
         , CurrentDriveMode(app_.get_supervisorport_skeleton().CurrentDriveMode)
+        , FeatureFlags(app_.get_supervisorport_skeleton().FeatureFlags)
         , HardwareRevision(app_.get_supervisorport_skeleton().HardwareRevision)
+        , SystemMatrix(app_.get_supervisorport_skeleton().SystemMatrix)
+        , VehicleConfig(app_.get_supervisorport_skeleton().VehicleConfig)
     {
         app_.get_hmiport_skeleton().StatusNotification.Connect([this](auto&& val) {
             emitted_StatusNotification_.push_back(*val);
+        });
+        app_.get_supervisorport_skeleton().ActiveDiagnosticMap.Connect([this](auto&& val) {
+            emitted_ActiveDiagnosticMap_.push_back(*val);
+        });
+        app_.get_supervisorport_skeleton().DiagnosticsReport.Connect([this](auto&& val) {
+            emitted_DiagnosticsReport_.push_back(*val);
+        });
+        app_.get_supervisorport_skeleton().DriveHistory.Connect([this](auto&& val) {
+            emitted_DriveHistory_.push_back(*val);
         });
         app_.get_supervisorport_skeleton().EmergencyAlert.Connect([this](auto&& val) {
             emitted_EmergencyAlert_.push_back(*val);
@@ -77,10 +103,17 @@ public:
         return app_.get_hmiport_skeleton().ShowPopup(message, priority);
     }
     vehicle_supervisor::skeleton::VehicleSupervisorSkeleton& supervisorport_skeleton() { return app_.get_supervisorport_skeleton(); }
+    decltype(std::declval<vehicle_supervisor::skeleton::VehicleSupervisorSkeleton>().ActiveDiagnosticMap)& ActiveDiagnosticMap;
+    decltype(std::declval<vehicle_supervisor::skeleton::VehicleSupervisorSkeleton>().DiagnosticsReport)& DiagnosticsReport;
+    decltype(std::declval<vehicle_supervisor::skeleton::VehicleSupervisorSkeleton>().DriveHistory)& DriveHistory;
     decltype(std::declval<vehicle_supervisor::skeleton::VehicleSupervisorSkeleton>().EmergencyAlert)& EmergencyAlert;
+    decltype(std::declval<vehicle_supervisor::skeleton::VehicleSupervisorSkeleton>().ActiveAlerts)& ActiveAlerts;
     decltype(std::declval<vehicle_supervisor::skeleton::VehicleSupervisorSkeleton>().CalibrationKey)& CalibrationKey;
     decltype(std::declval<vehicle_supervisor::skeleton::VehicleSupervisorSkeleton>().CurrentDriveMode)& CurrentDriveMode;
+    decltype(std::declval<vehicle_supervisor::skeleton::VehicleSupervisorSkeleton>().FeatureFlags)& FeatureFlags;
     decltype(std::declval<vehicle_supervisor::skeleton::VehicleSupervisorSkeleton>().HardwareRevision)& HardwareRevision;
+    decltype(std::declval<vehicle_supervisor::skeleton::VehicleSupervisorSkeleton>().SystemMatrix)& SystemMatrix;
+    decltype(std::declval<vehicle_supervisor::skeleton::VehicleSupervisorSkeleton>().VehicleConfig)& VehicleConfig;
     auto CalibrateOdometer(const uint32_t& current_km) {
         return app_.get_supervisorport_skeleton().CalibrateOdometer(current_km);
     }
@@ -95,24 +128,52 @@ public:
     }
 
     // Event Injectors for consumed proxy events
+    void inject(const ara::core::Vector<vehicle_data::LocationPoint>& val) {
+        if (auto lease = app_.acquire_navigation_proxy()) {
+            lease->ActiveRoute.OnDataArrived(
+                std::make_shared<const ara::core::Vector<vehicle_data::LocationPoint>>(val)
+            );
+        }
+    }
     void inject(const vehicle_data::LocationPoint& val) {
-        if (auto* p = app_.get_navigation_proxy()) {
-            p->CurrentLocation.OnDataArrived(
+        if (auto lease = app_.acquire_navigation_proxy()) {
+            lease->CurrentLocation.OnDataArrived(
                 std::make_shared<const vehicle_data::LocationPoint>(val)
             );
         }
     }
+    void inject(const ara::core::Array<vehicle_data::BatteryCell, 4>& val) {
+        if (auto lease = app_.acquire_powertrain_proxy()) {
+            lease->BatteryModuleStatus.OnDataArrived(
+                std::make_shared<const ara::core::Array<vehicle_data::BatteryCell, 4>>(val)
+            );
+        }
+    }
     void inject(const vehicle_data::CabinSensorData& val) {
-        if (auto* p = app_.get_powertrain_proxy()) {
-            p->CabinSensors.OnDataArrived(
+        if (auto lease = app_.acquire_powertrain_proxy()) {
+            lease->CabinSensors.OnDataArrived(
                 std::make_shared<const vehicle_data::CabinSensorData>(val)
             );
         }
     }
+    void inject(const ara::core::Vector<float>& val) {
+        if (auto lease = app_.acquire_powertrain_proxy()) {
+            lease->SpeedHistory.OnDataArrived(
+                std::make_shared<const ara::core::Vector<float>>(val)
+            );
+        }
+    }
     void inject(const vehicle_data::SpeedData& val) {
-        if (auto* p = app_.get_powertrain_proxy()) {
-            p->VehicleSpeed.OnDataArrived(
+        if (auto lease = app_.acquire_powertrain_proxy()) {
+            lease->VehicleSpeed.OnDataArrived(
                 std::make_shared<const vehicle_data::SpeedData>(val)
+            );
+        }
+    }
+    void inject(const ara::core::Array<float, 4>& val) {
+        if (auto lease = app_.acquire_powertrain_proxy()) {
+            lease->WheelSpeeds.OnDataArrived(
+                std::make_shared<const ara::core::Array<float, 4>>(val)
             );
         }
     }
@@ -135,14 +196,14 @@ public:
     template <typename Tag, typename Func>
     void mock_rpc([[maybe_unused]] Func&& handler) {
         if constexpr (std::is_same_v<Tag, ::reaktar::tags::body_control::methods::FlashLights>) {
-            if (auto* p = app_.get_body_control_proxy()) {
-                p->skel_flash_lights_ = std::forward<Func>(handler);
+            if (auto lease = app_.acquire_body_control_proxy()) {
+                lease->skel_flash_lights_ = std::forward<Func>(handler);
             }
         }
         else if constexpr (std::is_same_v<Tag, ::reaktar::tags::body_control::methods::LockDoors>) {
-            if (auto* p = app_.get_body_control_proxy()) {
-                using MethodExpectedRet = decltype(p->LockDoors(std::declval<const bool&>()));
-                p->skel_lock_doors_ = [h = std::forward<Func>(handler)](const bool& lock) -> MethodExpectedRet {
+            if (auto lease = app_.acquire_body_control_proxy()) {
+                using MethodExpectedRet = decltype(lease->LockDoors(std::declval<const bool&>()));
+                lease->skel_lock_doors_ = [h = std::forward<Func>(handler)](const bool& lock) -> MethodExpectedRet {
                     return result_adapter<MethodExpectedRet, decltype(h(lock))>::adapt(
                         h(lock)
                     );
@@ -150,9 +211,9 @@ public:
             }
         }
         else if constexpr (std::is_same_v<Tag, ::reaktar::tags::infotainment::geo::navigation::methods::SetDestination>) {
-            if (auto* p = app_.get_navigation_proxy()) {
-                using MethodExpectedRet = decltype(p->SetDestination(std::declval<const float&>(), std::declval<const float&>(), std::declval<const uint32_t&>()));
-                p->skel_set_destination_ = [h = std::forward<Func>(handler)](const float& latitude, const float& longitude, const uint32_t& priority) -> MethodExpectedRet {
+            if (auto lease = app_.acquire_navigation_proxy()) {
+                using MethodExpectedRet = decltype(lease->SetDestination(std::declval<const float&>(), std::declval<const float&>(), std::declval<const uint32_t&>()));
+                lease->skel_set_destination_ = [h = std::forward<Func>(handler)](const float& latitude, const float& longitude, const uint32_t& priority) -> MethodExpectedRet {
                     return result_adapter<MethodExpectedRet, decltype(h(latitude, longitude, priority))>::adapt(
                         h(latitude, longitude, priority)
                     );
@@ -167,6 +228,12 @@ public:
     // Direct accessor methods for backward compatibility
     size_t statusnotification_count() const { return emitted_StatusNotification_.size(); }
     const std::vector<ara::core::String>& emitted_statusnotifications() const { return emitted_StatusNotification_; }
+    size_t activediagnosticmap_count() const { return emitted_ActiveDiagnosticMap_.size(); }
+    const std::vector<ara::core::Map<uint32_t, vehicle_data::EmergencyAlert>>& emitted_activediagnosticmaps() const { return emitted_ActiveDiagnosticMap_; }
+    size_t diagnosticsreport_count() const { return emitted_DiagnosticsReport_.size(); }
+    const std::vector<vehicle_data::VehicleDiagnostics>& emitted_diagnosticsreports() const { return emitted_DiagnosticsReport_; }
+    size_t drivehistory_count() const { return emitted_DriveHistory_.size(); }
+    const std::vector<ara::core::Vector<vehicle_data::DriveMode>>& emitted_drivehistorys() const { return emitted_DriveHistory_; }
     size_t emergencyalert_count() const { return emitted_EmergencyAlert_.size(); }
     const std::vector<vehicle_data::EmergencyAlert>& emitted_emergencyalerts() const { return emitted_EmergencyAlert_; }
 
@@ -175,6 +242,15 @@ public:
     size_t emitted_count() const {
         if constexpr (std::is_same_v<Tag, hmi::events::StatusNotification> || std::is_same_v<Tag, ara::core::String>) {
             return emitted_StatusNotification_.size();
+        }
+        else if constexpr (std::is_same_v<Tag, vehicle_supervisor::events::ActiveDiagnosticMap> || std::is_same_v<Tag, ara::core::Map<uint32_t, vehicle_data::EmergencyAlert>>) {
+            return emitted_ActiveDiagnosticMap_.size();
+        }
+        else if constexpr (std::is_same_v<Tag, vehicle_supervisor::events::DiagnosticsReport> || std::is_same_v<Tag, vehicle_data::VehicleDiagnostics>) {
+            return emitted_DiagnosticsReport_.size();
+        }
+        else if constexpr (std::is_same_v<Tag, vehicle_supervisor::events::DriveHistory> || std::is_same_v<Tag, ara::core::Vector<vehicle_data::DriveMode>>) {
+            return emitted_DriveHistory_.size();
         }
         else if constexpr (std::is_same_v<Tag, vehicle_supervisor::events::EmergencyAlert> || std::is_same_v<Tag, vehicle_data::EmergencyAlert>) {
             return emitted_EmergencyAlert_.size();
@@ -191,6 +267,21 @@ public:
             if (emitted_StatusNotification_.empty()) return OptT(std::nullopt);
             return OptT(emitted_StatusNotification_.back());
         }
+        else if constexpr (std::is_same_v<Tag, vehicle_supervisor::events::ActiveDiagnosticMap> || std::is_same_v<Tag, ara::core::Map<uint32_t, vehicle_data::EmergencyAlert>>) {
+            using OptT = std::optional<ara::core::Map<uint32_t, vehicle_data::EmergencyAlert>>;
+            if (emitted_ActiveDiagnosticMap_.empty()) return OptT(std::nullopt);
+            return OptT(emitted_ActiveDiagnosticMap_.back());
+        }
+        else if constexpr (std::is_same_v<Tag, vehicle_supervisor::events::DiagnosticsReport> || std::is_same_v<Tag, vehicle_data::VehicleDiagnostics>) {
+            using OptT = std::optional<vehicle_data::VehicleDiagnostics>;
+            if (emitted_DiagnosticsReport_.empty()) return OptT(std::nullopt);
+            return OptT(emitted_DiagnosticsReport_.back());
+        }
+        else if constexpr (std::is_same_v<Tag, vehicle_supervisor::events::DriveHistory> || std::is_same_v<Tag, ara::core::Vector<vehicle_data::DriveMode>>) {
+            using OptT = std::optional<ara::core::Vector<vehicle_data::DriveMode>>;
+            if (emitted_DriveHistory_.empty()) return OptT(std::nullopt);
+            return OptT(emitted_DriveHistory_.back());
+        }
         else if constexpr (std::is_same_v<Tag, vehicle_supervisor::events::EmergencyAlert> || std::is_same_v<Tag, vehicle_data::EmergencyAlert>) {
             using OptT = std::optional<vehicle_data::EmergencyAlert>;
             if (emitted_EmergencyAlert_.empty()) return OptT(std::nullopt);
@@ -200,6 +291,9 @@ public:
 
     void clear_emitted() {
         emitted_StatusNotification_.clear();
+        emitted_ActiveDiagnosticMap_.clear();
+        emitted_DiagnosticsReport_.clear();
+        emitted_DriveHistory_.clear();
         emitted_EmergencyAlert_.clear();
     }
 
@@ -207,13 +301,10 @@ private:
 
     // Recorded skeleton emissions
     std::vector<ara::core::String> emitted_StatusNotification_;
+    std::vector<ara::core::Map<uint32_t, vehicle_data::EmergencyAlert>> emitted_ActiveDiagnosticMap_;
+    std::vector<vehicle_data::VehicleDiagnostics> emitted_DiagnosticsReport_;
+    std::vector<ara::core::Vector<vehicle_data::DriveMode>> emitted_DriveHistory_;
     std::vector<vehicle_data::EmergencyAlert> emitted_EmergencyAlert_;
-
-    // Mock skeleton field instances for proxy field bindings
-    ara::com::SkeletonField<uint32_t> mock_body_control_OutsideAirQuality_;
-    ara::com::SkeletonField<uint32_t> mock_body_control_RainSensorLevel_;
-    ara::com::SkeletonField<float> mock_body_control_TargetCabinTemperature_;
-    ara::com::SkeletonField<uint32_t> mock_body_control_WindowPosition_;
 };
 
 // Convenience alias mapping Component name to Executable Test Bench

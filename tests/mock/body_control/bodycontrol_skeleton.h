@@ -12,10 +12,17 @@
 #pragma once
 
 #include "mock_ara/com.hpp"
+#include <ara/core/string.h>
+#include <ara/core/vector.h>
+#include <ara/core/array.h>
+#include <ara/core/map.h>
 
 #include <string>
 #include <cstdint>
 #include <utility>
+#include <vector>
+#include <array>
+#include <map>
 
 
 namespace body_control {

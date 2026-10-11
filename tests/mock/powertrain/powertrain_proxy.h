@@ -12,6 +12,10 @@
 #pragma once
 
 #include "mock_ara/com.hpp"
+#include <ara/core/string.h>
+#include <ara/core/vector.h>
+#include <ara/core/array.h>
+#include <ara/core/map.h>
 
 #include "vehicle_data/types.hpp"
 
@@ -20,6 +24,7 @@
 #include <cstdint>
 #include <map>
 #include <vector>
+#include <array>
 #include <mutex>
 #include <functional>
 
@@ -41,6 +46,12 @@ public:
     ara::com::ProxyEvent<vehicle_data::SpeedData> VehicleSpeed;
 
     ara::com::ProxyEvent<vehicle_data::CabinSensorData> CabinSensors;
+
+    ara::com::ProxyEvent<ara::core::Array<float, 4>> WheelSpeeds;
+
+    ara::com::ProxyEvent<ara::core::Array<vehicle_data::BatteryCell, 4>> BatteryModuleStatus;
+
+    ara::com::ProxyEvent<ara::core::Vector<float>> SpeedHistory;
 
 
     // Fields

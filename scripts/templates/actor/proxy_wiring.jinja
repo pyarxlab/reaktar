@@ -82,16 +82,20 @@
     template <typename PortTag>
     uint64_t get_port_generation() const noexcept {
         static_assert(::reaktar::is_port_v<PortTag>, "get_port_generation requires a valid generated Port Tag!");
-{% for port in model.ports %}
+{% set req_ports = model.ports | rejectattr('kind', 'equalto', 'Provided') | list %}
+{% if req_ports | length > 0 %}
+{% for port in req_ports %}
         {{ "if" if loop.first else "else if" }} constexpr (std::is_same_v<PortTag, typename Base::ports::{{ port.port_name }}>) {
-{% if port.kind == "Provided" %}
-            return 0;
-{% else %}
             std::lock_guard<std::mutex> lock(this->{{ port.ident }}_port_mutex_);
             return this->{{ port.ident }}_generation_;
-{% endif %}
         }
 {% endfor %}
+        else {
+            return 0;
+        }
+{% else %}
+        return 0;
+{% endif %}
     }
 
     // Bring ActorBase::is_ready() (no-arg readiness check across all ports) into scope
@@ -114,6 +118,67 @@
 {% endfor %}
     }
 
+    static constexpr bool has_any_lifecycle_handlers_v = {% if model.ports | length == 0 %}false{% else %}(
+{% for port in model.ports %}
+        ::reaktar::has_on_direct_event_v<Derived, ::reaktar::Connected<typename Base::ports::{{ port.port_name }}>> ||
+        ::reaktar::has_on_direct_event_v<Derived, ::reaktar::Disconnected<typename Base::ports::{{ port.port_name }}>>{{ " ||" if not loop.last else "" }}
+{% endfor %}
+    ){% endif %};
+
+    /**
+     * @brief Synchronously drain port lifecycle state transitions and dispatch Connected/Disconnected events.
+     * Fully zero-cost: if Derived defines no lifecycle handlers, this is pruned at compile time to 'return 0;'.
+     * @return Number of lifecycle events dispatched.
+     */
+    size_t drain() {
+        if constexpr (!has_any_lifecycle_handlers_v) {
+            return 0;
+        } else {
+            typename Base::port_mask_t dirty = this->dirty_ports_.load(std::memory_order_relaxed);
+            if (!dirty) return 0;
+            dirty = this->dirty_ports_.exchange(0, std::memory_order_acq_rel);
+            if (!dirty) return 0;
+
+            size_t count = 0;
+            auto reconcile = [this, dirty, &count]() {
+{% for port in model.ports %}
+                if constexpr (::reaktar::has_on_direct_event_v<Derived, ::reaktar::Connected<typename Base::ports::{{ port.port_name }}>> ||
+                              ::reaktar::has_on_direct_event_v<Derived, ::reaktar::Disconnected<typename Base::ports::{{ port.port_name }}>>) {
+                    if (dirty & (static_cast<typename Base::port_mask_t>(1) << {{ loop.index0 }})) {
+                        bool is_now_ready = this->template is_ready<typename Base::ports::{{ port.port_name }}>();
+                        bool was_ready = (this->last_known_ready_ & (static_cast<typename Base::port_mask_t>(1) << {{ loop.index0 }})) != 0;
+                        if (is_now_ready != was_ready) {
+                            if (is_now_ready) {
+                                this->last_known_ready_ |= (static_cast<typename Base::port_mask_t>(1) << {{ loop.index0 }});
+                                if constexpr (::reaktar::has_on_direct_event_v<Derived, ::reaktar::Connected<typename Base::ports::{{ port.port_name }}>>) {
+                                    self().on(::reaktar::Connected<typename Base::ports::{{ port.port_name }}>{});
+                                    ++count;
+                                }
+                            } else {
+                                this->last_known_ready_ &= ~(static_cast<typename Base::port_mask_t>(1) << {{ loop.index0 }});
+                                if constexpr (::reaktar::has_on_direct_event_v<Derived, ::reaktar::Disconnected<typename Base::ports::{{ port.port_name }}>>) {
+                                    self().on(::reaktar::Disconnected<typename Base::ports::{{ port.port_name }}>{});
+                                    ++count;
+                                }
+                            }
+                        }
+                    }
+                }
+{% endfor %}
+            };
+
+            if constexpr (std::is_same_v<ExecutionPolicy, ::reaktar::DirectExecution>) {
+                reconcile();
+            } else if constexpr (std::is_same_v<ExecutionPolicy, ::reaktar::SynchronizedExecution>) {
+                std::lock_guard<std::mutex> lock(this->execution_policy_.mutex());
+                reconcile();
+            } else {
+                this->execution_policy_.execute(reconcile);
+            }
+            return count;
+        }
+    }
+
 private:
 {% for port in model.ports %}
 {% if port.kind == "Provided" %}
@@ -123,6 +188,10 @@ private:
             bind_skeleton_fields();
             this->{{ port.var_name }}.OfferService();
             this->{{ port.ident }}_offered_.store(true, std::memory_order_release);
+            if constexpr (::reaktar::has_on_direct_event_v<Derived, ::reaktar::Connected<typename Base::ports::{{ port.port_name }}>> ||
+                          ::reaktar::has_on_direct_event_v<Derived, ::reaktar::Disconnected<typename Base::ports::{{ port.port_name }}>>) {
+                this->dirty_ports_.fetch_or(static_cast<typename Base::port_mask_t>(1) << {{ loop.index0 }}, std::memory_order_release);
+            }
         }
     }
 {% else %}
@@ -167,6 +236,10 @@ private:
                         return; // Closed or generation shifted concurrently
                     }
                     this->{{ port.slot_name }}.reset();
+                    if constexpr (::reaktar::has_on_direct_event_v<Derived, ::reaktar::Connected<typename Base::ports::{{ port.port_name }}>> ||
+                                  ::reaktar::has_on_direct_event_v<Derived, ::reaktar::Disconnected<typename Base::ports::{{ port.port_name }}>>) {
+                        this->dirty_ports_.fetch_or(static_cast<typename Base::port_mask_t>(1) << {{ loop.index0 }}, std::memory_order_release);
+                    }
                 } else {
                     if (auto cur_h = this->{{ port.slot_name }}.get_handle(); cur_h.has_value() && *cur_h == handles[0]) {
                         return; // Same handle, already active
@@ -174,8 +247,8 @@ private:
                     // Zero-downtime update: do NOT wipe slot before creating new proxy!
                     // ProxySlot::publish handles atomic cell exchange, bounded reader drain, and teardown hook cleanly.
                     auto new_proxy = std::make_unique<{{ port.cls }}>(handles[0]);
-                    bind_{{ port.ident }}_events(new_proxy.get());
-                    bind_{{ port.ident }}_fields(new_proxy.get());
+                    bind_{{ port.ident }}_events(*new_proxy);
+                    bind_{{ port.ident }}_fields(*new_proxy);
 
                     auto teardown_hook = []([[maybe_unused]] {{ port.cls }}& p) {
 {% for target in port.all_unsubscribe_targets %}
@@ -190,6 +263,15 @@ private:
                             return; // Closed or generation shifted concurrently
                         }
                         this->{{ port.slot_name }}.publish(std::move(new_proxy), handles[0], teardown_hook);
+                        if constexpr (::reaktar::has_on_direct_event_v<Derived, ::reaktar::Connected<typename Base::ports::{{ port.port_name }}>> ||
+                                      ::reaktar::has_on_direct_event_v<Derived, ::reaktar::Disconnected<typename Base::ports::{{ port.port_name }}>>) {
+                            this->dirty_ports_.fetch_or(static_cast<typename Base::port_mask_t>(1) << {{ loop.index0 }}, std::memory_order_release);
+                        }
+                    }
+                    // Safe publication complete: now activate event/field subscriptions with zero locks held!
+                    if (auto lease = this->{{ port.slot_name }}.try_acquire()) {
+                        subscribe_{{ port.ident }}_events(*lease);
+                        subscribe_{{ port.ident }}_fields(*lease);
                     }
                     this->notify_proxy_resolved();
                 }
@@ -216,14 +298,20 @@ private:
 
         find_started = true; // Successfully started, prevent rollback
 
-        std::unique_lock<std::mutex> lock(this->{{ port.ident }}_port_mutex_);
-        if (!this->{{ port.ident }}_open_.load(std::memory_order_acquire) || this->{{ port.ident }}_generation_ != my_gen) {
-            // Port was closed or generation shifted while StartFindService was executing!
-            lock.unlock();
+        bool should_stop = false;
+        {
+            std::lock_guard<std::mutex> lock(this->{{ port.ident }}_port_mutex_);
+            if (!this->{{ port.ident }}_open_.load(std::memory_order_acquire) || this->{{ port.ident }}_generation_ != my_gen) {
+                // Port was closed or generation shifted while StartFindService was executing!
+                should_stop = true;
+            } else {
+                this->{{ port.find_handle_name }} = *handle;
+            }
+        }
+        if (should_stop) {
             {{ port.cls }}::StopFindService(*handle);
             return;
         }
-        this->{{ port.find_handle_name }} = *handle;
     }
 {% endif %}
 {% endfor %}
@@ -235,6 +323,10 @@ private:
         if (this->{{ port.ident }}_offered_.load(std::memory_order_relaxed)) {
             this->{{ port.var_name }}.StopOfferService();
             this->{{ port.ident }}_offered_.store(false, std::memory_order_release);
+            if constexpr (::reaktar::has_on_direct_event_v<Derived, ::reaktar::Connected<typename Base::ports::{{ port.port_name }}>> ||
+                          ::reaktar::has_on_direct_event_v<Derived, ::reaktar::Disconnected<typename Base::ports::{{ port.port_name }}>>) {
+                this->dirty_ports_.fetch_or(static_cast<typename Base::port_mask_t>(1) << {{ loop.index0 }}, std::memory_order_release);
+            }
         }
     }
 {% else %}
@@ -250,6 +342,10 @@ private:
             handle_to_stop = this->{{ port.find_handle_name }};
             this->{{ port.find_handle_name }}.reset();
             this->{{ port.slot_name }}.reset();
+            if constexpr (::reaktar::has_on_direct_event_v<Derived, ::reaktar::Connected<typename Base::ports::{{ port.port_name }}>> ||
+                          ::reaktar::has_on_direct_event_v<Derived, ::reaktar::Disconnected<typename Base::ports::{{ port.port_name }}>>) {
+                this->dirty_ports_.fetch_or(static_cast<typename Base::port_mask_t>(1) << {{ loop.index0 }}, std::memory_order_release);
+            }
         }
 
         if (handle_to_stop.has_value()) {
@@ -315,12 +411,24 @@ private:
     }
 
 {% for proxy in model.consumed_proxies %}
-    void bind_{{ proxy.ident }}_events({{ proxy.cls }}* proxy) {
-        if (!proxy) return;
+{% for ev in proxy.events %}
+    static constexpr bool kHas_{{ proxy.ident }}_{{ ev.name }}_tagged = has_on_event_v<Derived, {{ ev.tag }}, {{ ev.type }}>;
+    static constexpr bool kHas_{{ proxy.ident }}_{{ ev.name }}_direct = has_on_direct_event_v<Derived, {{ ev.type }}>;
+    static constexpr bool kSub_{{ proxy.ident }}_{{ ev.name }} = kHas_{{ proxy.ident }}_{{ ev.name }}_tagged || kHas_{{ proxy.ident }}_{{ ev.name }}_direct;
+{% endfor %}
+{% for f in proxy.fields %}
+{% if f.has_notifier %}
+    static constexpr bool kHas_{{ proxy.ident }}_{{ f.name }}_tagged = has_on_event_v<Derived, {{ f.tag }}, {{ f.type }}>;
+    static constexpr bool kHas_{{ proxy.ident }}_{{ f.name }}_direct = has_on_direct_event_v<Derived, {{ f.type }}>;
+    static constexpr bool kSub_{{ proxy.ident }}_{{ f.name }} = kHas_{{ proxy.ident }}_{{ f.name }}_tagged || kHas_{{ proxy.ident }}_{{ f.name }}_direct;
+{% endif %}
+{% endfor %}
+
+    void bind_{{ proxy.ident }}_events([[maybe_unused]] {{ proxy.cls }}& proxy) {
 {% for ev in proxy.events %}
         // Event: {{ ev.name }} ({{ ev.type }})
-        if constexpr (has_on_event_v<Derived, {{ ev.tag }}, {{ ev.type }}>) {
-            proxy->{{ ev.name }}.SetReceiveHandler([this]() {
+        if constexpr (kHas_{{ proxy.ident }}_{{ ev.name }}_tagged) {
+            proxy.{{ ev.name }}.SetReceiveHandler([this]() {
                 auto lease = this->{{ proxy.slot_name }}.try_acquire();
                 if (lease) {
                     lease->{{ ev.name }}.GetNewSamples([this](auto&& s) {
@@ -337,11 +445,10 @@ private:
                     });
                 }
             });
-            proxy->{{ ev.name }}.Subscribe(10);
         }
 {% if ev.is_unique %}
-        else if constexpr (has_on_direct_event_v<Derived, {{ ev.type }}>) {
-            proxy->{{ ev.name }}.SetReceiveHandler([this]() {
+        else if constexpr (kHas_{{ proxy.ident }}_{{ ev.name }}_direct) {
+            proxy.{{ ev.name }}.SetReceiveHandler([this]() {
                 auto lease = this->{{ proxy.slot_name }}.try_acquire();
                 if (lease) {
                     lease->{{ ev.name }}.GetNewSamples([this](auto&& s) {
@@ -358,23 +465,29 @@ private:
                     });
                 }
             });
-            proxy->{{ ev.name }}.Subscribe(10);
         }
 {% else %}
-        else if constexpr (has_on_direct_event_v<Derived, {{ ev.type }}>) {
+        else if constexpr (kHas_{{ proxy.ident }}_{{ ev.name }}_direct) {
             static_assert(!sizeof(Derived*), "reaktar::on() collision: type '{{ ev.type }}' is shared across multiple incoming channels (events/fields). You must specify the tag: void on({{ ev.tag }}, const {{ ev.type }}& val).");
         }
 {% endif %}
 {% endfor %}
     }
 
-    void bind_{{ proxy.ident }}_fields({{ proxy.cls }}* proxy) {
-        if (!proxy) return;
+    void subscribe_{{ proxy.ident }}_events([[maybe_unused]] {{ proxy.cls }}& proxy) {
+{% for ev in proxy.events %}
+        if constexpr (kSub_{{ proxy.ident }}_{{ ev.name }}) {
+            proxy.{{ ev.name }}.Subscribe(10);
+        }
+{% endfor %}
+    }
+
+    void bind_{{ proxy.ident }}_fields([[maybe_unused]] {{ proxy.cls }}& proxy) {
 {% for f in proxy.fields %}
 {% if f.has_notifier %}
         // Field Notifier: {{ f.name }} ({{ f.type }})
-        if constexpr (has_on_event_v<Derived, {{ f.tag }}, {{ f.type }}>) {
-            proxy->{{ f.name }}.SetReceiveHandler([this]() {
+        if constexpr (kHas_{{ proxy.ident }}_{{ f.name }}_tagged) {
+            proxy.{{ f.name }}.SetReceiveHandler([this]() {
                 auto lease = this->{{ proxy.slot_name }}.try_acquire();
                 if (lease) {
                     lease->{{ f.name }}.GetNewSamples([this](auto&& s) {
@@ -391,11 +504,10 @@ private:
                     });
                 }
             });
-            proxy->{{ f.name }}.Subscribe(10);
         }
 {% if f.is_unique %}
-        else if constexpr (has_on_direct_event_v<Derived, {{ f.type }}>) {
-            proxy->{{ f.name }}.SetReceiveHandler([this]() {
+        else if constexpr (kHas_{{ proxy.ident }}_{{ f.name }}_direct) {
+            proxy.{{ f.name }}.SetReceiveHandler([this]() {
                 auto lease = this->{{ proxy.slot_name }}.try_acquire();
                 if (lease) {
                     lease->{{ f.name }}.GetNewSamples([this](auto&& s) {
@@ -412,13 +524,22 @@ private:
                     });
                 }
             });
-            proxy->{{ f.name }}.Subscribe(10);
         }
 {% else %}
-        else if constexpr (has_on_direct_event_v<Derived, {{ f.type }}>) {
+        else if constexpr (kHas_{{ proxy.ident }}_{{ f.name }}_direct) {
             static_assert(!sizeof(Derived*), "reaktar::on() collision: type '{{ f.type }}' is shared across multiple incoming channels (events/fields). You must specify the tag: void on({{ f.tag }}, const {{ f.type }}& val).");
         }
 {% endif %}
+{% endif %}
+{% endfor %}
+    }
+
+    void subscribe_{{ proxy.ident }}_fields([[maybe_unused]] {{ proxy.cls }}& proxy) {
+{% for f in proxy.fields %}
+{% if f.has_notifier %}
+        if constexpr (kSub_{{ proxy.ident }}_{{ f.name }}) {
+            proxy.{{ f.name }}.Subscribe(10);
+        }
 {% endif %}
 {% endfor %}
     }

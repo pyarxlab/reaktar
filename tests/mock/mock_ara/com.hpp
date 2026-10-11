@@ -13,18 +13,13 @@
 #include <memory>
 #include <utility>
 #include <future>
-#include <string>
-#include <map>
-#include <array>
+#include "ara/core/string.h"
+#include "ara/core/vector.h"
+#include "ara/core/array.h"
+#include "ara/core/map.h"
 
 namespace ara {
 namespace core {
-
-// AUTOSAR Adaptive Platform Standard Core Types (SWS Core Types)
-using String = std::string;
-template <typename T> using Vector = std::vector<T>;
-template <typename K, typename V> using Map = std::map<K, V>;
-template <typename T, std::size_t N> using Array = std::array<T, N>;
 
 class ErrorDomain {
 public:

@@ -38,9 +38,25 @@ namespace testing {
 template <typename App>
 class {{ exe_name }}TestBench {
 protected:
+    // Mock skeleton field instances for proxy field bindings
+{% for r_port in sorted_ports(app.r_port_prototypes | service_r_ports) %}
+{% set intf = resolve_intf(r_port, domain) %}
+{% set ns = service_ns(intf) %}
+{% for f in sorted_fields(intf.fields) %}
+{% if f.has_notifier or f.has_getter or f.has_setter %}
+{% set type_str = cpp_type(f.type_tref) %}
+    ara::com::SkeletonField<{{ type_str }}> mock_{{ service_ident(intf) }}_{{ f.short_name }}_;
+{% endif %}
+{% endfor %}
+{% endfor %}
+
     App app_{};
 
 public:
+    virtual ~{{ exe_name }}TestBench() {
+        app_.stop();
+    }
+
     {{ exe_name }}TestBench()
         : app_{}
 {% for p_port in sorted_ports(app.p_port_prototypes | service_p_ports) %}
@@ -114,8 +130,8 @@ public:
 {% for ev in sorted_events(intf.events) %}
 {% set type_str = cpp_type(ev.type_tref) %}
     void inject(const {{ type_str }}& val) {
-        if (auto* p = app_.get_{{ service_ident(intf) }}_proxy()) {
-            p->{{ ev.short_name }}.OnDataArrived(
+        if (auto lease = app_.acquire_{{ service_ident(intf) }}_proxy()) {
+            lease->{{ ev.short_name }}.OnDataArrived(
                 std::make_shared<const {{ type_str }}>(val)
             );
         }
@@ -146,12 +162,12 @@ public:
 {% set ns = service_ns(intf) %}
 {% for m in sorted_methods(intf.methods) %}
         {{ "if" if first_rpc.value else "else if" }} constexpr (std::is_same_v<Tag, ::reaktar::tags::{{ ns }}::methods::{{ m.short_name }}>) {
-            if (auto* p = app_.get_{{ service_ident(intf) }}_proxy()) {
+            if (auto lease = app_.acquire_{{ service_ident(intf) }}_proxy()) {
 {% if m.fire_and_forget %}
-                p->skel_{{ method_snake_name(m) }}_ = std::forward<Func>(handler);
+                lease->skel_{{ method_snake_name(m) }}_ = std::forward<Func>(handler);
 {% else %}
-                using MethodExpectedRet = decltype(p->{{ m.short_name }}({% for aname, atype, ptype in method_in_args(m, domain) %}std::declval<{{ ptype }}>(){{ ", " if not loop.last else "" }}{% endfor %}));
-                p->skel_{{ method_snake_name(m) }}_ = [h = std::forward<Func>(handler)]({% for aname, atype, ptype in method_in_args(m, domain) %}{{ ptype }} {{ aname }}{{ ", " if not loop.last else "" }}{% endfor %}) -> MethodExpectedRet {
+                using MethodExpectedRet = decltype(lease->{{ m.short_name }}({% for aname, atype, ptype in method_in_args(m, domain) %}std::declval<{{ ptype }}>(){{ ", " if not loop.last else "" }}{% endfor %}));
+                lease->skel_{{ method_snake_name(m) }}_ = [h = std::forward<Func>(handler)]({% for aname, atype, ptype in method_in_args(m, domain) %}{{ ptype }} {{ aname }}{{ ", " if not loop.last else "" }}{% endfor %}) -> MethodExpectedRet {
                     return result_adapter<MethodExpectedRet, decltype(h({% for aname, atype, ptype in method_in_args(m, domain) %}{{ aname }}{{ ", " if not loop.last else "" }}{% endfor %}))>::adapt(
                         h({% for aname, atype, ptype in method_in_args(m, domain) %}{{ aname }}{{ ", " if not loop.last else "" }}{% endfor %})
                     );
@@ -240,18 +256,6 @@ private:
 {% for ev in sorted_events(intf.events) %}
 {% set type_str = cpp_type(ev.type_tref) %}
     std::vector<{{ type_str }}> emitted_{{ ev.short_name }}_;
-{% endfor %}
-{% endfor %}
-
-    // Mock skeleton field instances for proxy field bindings
-{% for r_port in sorted_ports(app.r_port_prototypes | service_r_ports) %}
-{% set intf = resolve_intf(r_port, domain) %}
-{% set ns = service_ns(intf) %}
-{% for f in sorted_fields(intf.fields) %}
-{% if f.has_notifier or f.has_getter or f.has_setter %}
-{% set type_str = cpp_type(f.type_tref) %}
-    ara::com::SkeletonField<{{ type_str }}> mock_{{ service_ident(intf) }}_{{ f.short_name }}_;
-{% endif %}
 {% endfor %}
 {% endfor %}
 };

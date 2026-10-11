@@ -38,6 +38,7 @@ namespace methods {
 
 namespace infotainment::geo::navigation {
 namespace events {
+    struct ActiveRoute {};
     struct CurrentLocation {};
 } // namespace events
 namespace methods {
@@ -47,13 +48,19 @@ namespace methods {
 
 namespace powertrain {
 namespace events {
+    struct BatteryModuleStatus {};
     struct CabinSensors {};
+    struct SpeedHistory {};
     struct VehicleSpeed {};
+    struct WheelSpeeds {};
 } // namespace events
 } // namespace powertrain
 
 namespace vehicle_supervisor {
 namespace events {
+    struct ActiveDiagnosticMap {};
+    struct DiagnosticsReport {};
+    struct DriveHistory {};
     struct EmergencyAlert {};
 } // namespace events
 namespace methods {
@@ -63,9 +70,13 @@ namespace methods {
     struct TriggerDiagnostic {};
 } // namespace methods
 namespace fields {
+    struct ActiveAlerts {};
     struct CalibrationKey {};
     struct CurrentDriveMode {};
+    struct FeatureFlags {};
     struct HardwareRevision {};
+    struct SystemMatrix {};
+    struct VehicleConfig {};
 } // namespace fields
 } // namespace vehicle_supervisor
 

@@ -12,12 +12,19 @@
 #pragma once
 
 #include "mock_ara/com.hpp"
+#include <ara/core/string.h>
+#include <ara/core/vector.h>
+#include <ara/core/array.h>
+#include <ara/core/map.h>
 
 #include "vehicle_data/types.hpp"
 
 #include <string>
 #include <cstdint>
 #include <utility>
+#include <vector>
+#include <array>
+#include <map>
 
 
 namespace infotainment {
@@ -72,6 +79,8 @@ public:
     // Events
 
     ara::com::SkeletonEvent<vehicle_data::LocationPoint> CurrentLocation;
+
+    ara::com::SkeletonEvent<ara::core::Vector<vehicle_data::LocationPoint>> ActiveRoute;
 
 
     // Fields

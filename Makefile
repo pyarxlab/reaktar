@@ -36,10 +36,13 @@ generate:
 	@echo "==> Generating C++ Actor & TestBench headers from $(ARXML) (pass-by: $(PASS_BY))..."
 	@$(PYTHON) scripts/generate_actor.py $(ARXML) --pass-by $(PASS_BY)
 
+include/reaktar/tags.hpp:
+	@$(MAKE) generate
+
 $(BUILD_DIR)/CMakeCache.txt: CMakeLists.txt
 	@cmake -B $(BUILD_DIR) -DCMAKE_BUILD_TYPE=Release
 
-build: $(BUILD_DIR)/CMakeCache.txt
+build: include/reaktar/tags.hpp $(BUILD_DIR)/CMakeCache.txt
 	@echo "==> Building Reaktar..."
 	@cmake --build $(BUILD_DIR)
 

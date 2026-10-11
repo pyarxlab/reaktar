@@ -19,6 +19,7 @@
 #include "powertrain/powertrain_proxy.h"
 #include "reaktar/tags.hpp"
 #include "reaktar/traits.hpp"
+#include "reaktar/thread_safety.hpp"
 #include "reaktar/proxy_slot.hpp"
 #include "reaktar/actor_base.hpp"
 #include "reaktar/port.hpp"
@@ -46,12 +47,19 @@ public:
     // ------------------------------------------------------------------------
     // Ergonomic Tag Aliases (brought directly into Actor class scope)
     // ------------------------------------------------------------------------
+    using ActiveAlerts = ::reaktar::tags::vehicle_supervisor::fields::ActiveAlerts;
+    using ActiveDiagnosticMap = ::reaktar::tags::vehicle_supervisor::events::ActiveDiagnosticMap;
+    using ActiveRoute = ::reaktar::tags::infotainment::geo::navigation::events::ActiveRoute;
+    using BatteryModuleStatus = ::reaktar::tags::powertrain::events::BatteryModuleStatus;
     using CabinSensors = ::reaktar::tags::powertrain::events::CabinSensors;
     using CalibrateOdometer = ::reaktar::tags::vehicle_supervisor::methods::CalibrateOdometer;
     using CalibrationKey = ::reaktar::tags::vehicle_supervisor::fields::CalibrationKey;
     using CurrentDriveMode = ::reaktar::tags::vehicle_supervisor::fields::CurrentDriveMode;
     using CurrentLocation = ::reaktar::tags::infotainment::geo::navigation::events::CurrentLocation;
+    using DiagnosticsReport = ::reaktar::tags::vehicle_supervisor::events::DiagnosticsReport;
+    using DriveHistory = ::reaktar::tags::vehicle_supervisor::events::DriveHistory;
     using EmergencyAlert = ::reaktar::tags::vehicle_supervisor::events::EmergencyAlert;
+    using FeatureFlags = ::reaktar::tags::vehicle_supervisor::fields::FeatureFlags;
     using FlashLights = ::reaktar::tags::body_control::methods::FlashLights;
     using HardwareRevision = ::reaktar::tags::vehicle_supervisor::fields::HardwareRevision;
     using LockDoors = ::reaktar::tags::body_control::methods::LockDoors;
@@ -61,10 +69,14 @@ public:
     using SetDestination = ::reaktar::tags::infotainment::geo::navigation::methods::SetDestination;
     using SetSpeedLimiter = ::reaktar::tags::vehicle_supervisor::methods::SetSpeedLimiter;
     using ShowPopup = ::reaktar::tags::hmi::methods::ShowPopup;
+    using SpeedHistory = ::reaktar::tags::powertrain::events::SpeedHistory;
     using StatusNotification = ::reaktar::tags::hmi::events::StatusNotification;
+    using SystemMatrix = ::reaktar::tags::vehicle_supervisor::fields::SystemMatrix;
     using TargetCabinTemperature = ::reaktar::tags::body_control::fields::TargetCabinTemperature;
     using TriggerDiagnostic = ::reaktar::tags::vehicle_supervisor::methods::TriggerDiagnostic;
+    using VehicleConfig = ::reaktar::tags::vehicle_supervisor::fields::VehicleConfig;
     using VehicleSpeed = ::reaktar::tags::powertrain::events::VehicleSpeed;
+    using WheelSpeeds = ::reaktar::tags::powertrain::events::WheelSpeeds;
     using WindowPosition = ::reaktar::tags::body_control::fields::WindowPosition;
 
     // ------------------------------------------------------------------------
@@ -73,29 +85,54 @@ public:
     struct ports {
         struct HmiPort : public ::reaktar::ProvidedPortTag {
             static constexpr std::string_view name = "HmiPort";
+            static constexpr size_t port_index = 0;
             using port_tag = HmiPort;
             using kind_type = ::reaktar::ProvidedPortTag;
         };
         struct SupervisorPort : public ::reaktar::ProvidedPortTag {
             static constexpr std::string_view name = "SupervisorPort";
+            static constexpr size_t port_index = 1;
             using port_tag = SupervisorPort;
             using kind_type = ::reaktar::ProvidedPortTag;
         };
         struct BodyControlIn : public ::reaktar::RequiredPortTag {
             static constexpr std::string_view name = "BodyControlIn";
+            static constexpr size_t port_index = 2;
             using port_tag = BodyControlIn;
             using kind_type = ::reaktar::RequiredPortTag;
         };
         struct NavigationIn : public ::reaktar::RequiredPortTag {
             static constexpr std::string_view name = "NavigationIn";
+            static constexpr size_t port_index = 3;
             using port_tag = NavigationIn;
             using kind_type = ::reaktar::RequiredPortTag;
         };
         struct PowertrainIn : public ::reaktar::RequiredPortTag {
             static constexpr std::string_view name = "PowertrainIn";
+            static constexpr size_t port_index = 4;
             using port_tag = PowertrainIn;
             using kind_type = ::reaktar::RequiredPortTag;
         };
+        static constexpr size_t kPortCount = 5;
+
+        // Target CPU architecture detection (32-bit vs 64-bit)
+        static constexpr bool kIs32BitArch = (sizeof(void*) == 4);
+
+        // On 32-bit embedded platforms, use native uint32_t to guarantee 1-instruction lock-free execution
+        // On 64-bit platforms, use uint32_t for <= 32 ports and uint64_t for up to 64 ports
+        using port_mask_t = std::conditional_t<
+            kIs32BitArch || (kPortCount <= 32),
+            uint32_t,
+            uint64_t
+        >;
+
+        static constexpr size_t kMaxSupportedPorts = sizeof(port_mask_t) * 8;
+        static_assert(kPortCount <= kMaxSupportedPorts,
+            "Port count exceeds maximum lock-free atomic mask capacity on this architecture (32 ports on 32-bit, 64 on 64-bit)");
+        static_assert(std::atomic<port_mask_t>::is_always_lock_free,
+            "ReaktAR port_mask_t must be unconditionally lock-free on target architecture");
+
+
 
         // --------------------------------------------------------------------
         // Ergonomic Port Aliases (affixes stripped when collision-free)
@@ -176,20 +213,26 @@ protected:
     reaktar::ReadinessTracker<kConsumedProxyCount> readiness_{};
     reaktar::ProxySlot<body_control::proxy::BodyControlProxy> body_control_slot_{};
     mutable std::mutex body_control_port_mutex_{};
-    std::optional<ara::com::FindServiceHandle> body_control_find_handle_{std::nullopt};
+    std::optional<ara::com::FindServiceHandle> body_control_find_handle_ REAKTAR_GUARDED_BY(body_control_port_mutex_){std::nullopt};
     std::atomic<bool> body_control_open_{false};
-    uint64_t body_control_generation_{0};
+    uint64_t body_control_generation_ REAKTAR_GUARDED_BY(body_control_port_mutex_){0};
     reaktar::ProxySlot<infotainment::geo::navigation::proxy::NavigationProxy> navigation_slot_{};
     mutable std::mutex navigation_port_mutex_{};
-    std::optional<ara::com::FindServiceHandle> navigation_find_handle_{std::nullopt};
+    std::optional<ara::com::FindServiceHandle> navigation_find_handle_ REAKTAR_GUARDED_BY(navigation_port_mutex_){std::nullopt};
     std::atomic<bool> navigation_open_{false};
-    uint64_t navigation_generation_{0};
+    uint64_t navigation_generation_ REAKTAR_GUARDED_BY(navigation_port_mutex_){0};
     reaktar::ProxySlot<powertrain::proxy::PowertrainProxy> powertrain_slot_{};
     mutable std::mutex powertrain_port_mutex_{};
-    std::optional<ara::com::FindServiceHandle> powertrain_find_handle_{std::nullopt};
+    std::optional<ara::com::FindServiceHandle> powertrain_find_handle_ REAKTAR_GUARDED_BY(powertrain_port_mutex_){std::nullopt};
     std::atomic<bool> powertrain_open_{false};
-    uint64_t powertrain_generation_{0};
+    uint64_t powertrain_generation_ REAKTAR_GUARDED_BY(powertrain_port_mutex_){0};
+
+    using port_mask_t = typename ports::port_mask_t;
+    std::atomic<port_mask_t> dirty_ports_{0};
+    port_mask_t last_known_ready_{0};
 };
+
+
 /**
  * @brief Code-generated CRTP Actor for CockpitDomain
  */
@@ -547,6 +590,13 @@ public:
     using legal_signatures = std::tuple<
         reaktar::sig<>,
         reaktar::sig<::reaktar::tags::vehicle_supervisor::methods::ResetTripMeter>,
+        reaktar::sig<ara::core::Array<float, 4>>,
+        reaktar::sig<ara::core::Array<vehicle_data::BatteryCell, 4>>,
+        reaktar::sig<ara::core::Map<ara::core::String, ara::core::String>>,
+        reaktar::sig<ara::core::Map<ara::core::String, bool>>,
+        reaktar::sig<ara::core::Vector<float>>,
+        reaktar::sig<ara::core::Vector<vehicle_data::EmergencyAlert>>,
+        reaktar::sig<ara::core::Vector<vehicle_data::LocationPoint>>,
         reaktar::sig<float>,
         reaktar::sig<uint32_t>,
         reaktar::sig<vehicle_data::CabinSensorData>,
@@ -557,17 +607,34 @@ public:
         reaktar::sig<::reaktar::tags::body_control::fields::RainSensorLevel, uint32_t>,
         reaktar::sig<::reaktar::tags::body_control::fields::TargetCabinTemperature, float>,
         reaktar::sig<::reaktar::tags::body_control::fields::WindowPosition, uint32_t>,
+        reaktar::sig<::reaktar::tags::infotainment::geo::navigation::events::ActiveRoute, ara::core::Vector<vehicle_data::LocationPoint>>,
         reaktar::sig<::reaktar::tags::infotainment::geo::navigation::events::CurrentLocation, vehicle_data::LocationPoint>,
+        reaktar::sig<::reaktar::tags::powertrain::events::BatteryModuleStatus, ara::core::Array<vehicle_data::BatteryCell, 4>>,
         reaktar::sig<::reaktar::tags::powertrain::events::CabinSensors, vehicle_data::CabinSensorData>,
+        reaktar::sig<::reaktar::tags::powertrain::events::SpeedHistory, ara::core::Vector<float>>,
         reaktar::sig<::reaktar::tags::powertrain::events::VehicleSpeed, vehicle_data::SpeedData>,
+        reaktar::sig<::reaktar::tags::powertrain::events::WheelSpeeds, ara::core::Array<float, 4>>,
+        reaktar::sig<::reaktar::tags::vehicle_supervisor::fields::ActiveAlerts, ara::core::Vector<vehicle_data::EmergencyAlert>>,
         reaktar::sig<::reaktar::tags::vehicle_supervisor::fields::CalibrationKey, uint32_t>,
         reaktar::sig<::reaktar::tags::vehicle_supervisor::fields::CurrentDriveMode, vehicle_data::DriveMode>,
+        reaktar::sig<::reaktar::tags::vehicle_supervisor::fields::FeatureFlags, ara::core::Map<ara::core::String, bool>>,
+        reaktar::sig<::reaktar::tags::vehicle_supervisor::fields::VehicleConfig, ara::core::Map<ara::core::String, ara::core::String>>,
         reaktar::sig<::reaktar::tags::vehicle_supervisor::methods::CalibrateOdometer, uint32_t>,
         reaktar::sig<::reaktar::tags::vehicle_supervisor::methods::TriggerDiagnostic, uint32_t>,
         reaktar::sig<ara::core::String, uint32_t>,
         reaktar::sig<float, bool>,
         reaktar::sig<::reaktar::tags::hmi::methods::ShowPopup, ara::core::String, uint32_t>,
-        reaktar::sig<::reaktar::tags::vehicle_supervisor::methods::SetSpeedLimiter, float, bool>
+        reaktar::sig<::reaktar::tags::vehicle_supervisor::methods::SetSpeedLimiter, float, bool>,
+        reaktar::sig<::reaktar::Connected<typename Base::ports::HmiPort>>,
+        reaktar::sig<::reaktar::Disconnected<typename Base::ports::HmiPort>>,
+        reaktar::sig<::reaktar::Connected<typename Base::ports::SupervisorPort>>,
+        reaktar::sig<::reaktar::Disconnected<typename Base::ports::SupervisorPort>>,
+        reaktar::sig<::reaktar::Connected<typename Base::ports::BodyControlIn>>,
+        reaktar::sig<::reaktar::Disconnected<typename Base::ports::BodyControlIn>>,
+        reaktar::sig<::reaktar::Connected<typename Base::ports::NavigationIn>>,
+        reaktar::sig<::reaktar::Disconnected<typename Base::ports::NavigationIn>>,
+        reaktar::sig<::reaktar::Connected<typename Base::ports::PowertrainIn>>,
+        reaktar::sig<::reaktar::Disconnected<typename Base::ports::PowertrainIn>>
     >;
 
     explicit CockpitDomainActor(
@@ -583,7 +650,14 @@ public:
             using LegalSignaturesTuple = legal_signatures;
 
             static_assert(!reaktar::has_rogue_handler_v<Derived, LegalSignaturesTuple
+                , ara::core::Array<float, 4>
+                , ara::core::Array<vehicle_data::BatteryCell, 4>
+                , ara::core::Map<ara::core::String, ara::core::String>
+                , ara::core::Map<ara::core::String, bool>
                 , ara::core::String
+                , ara::core::Vector<float>
+                , ara::core::Vector<vehicle_data::EmergencyAlert>
+                , ara::core::Vector<vehicle_data::LocationPoint>
                 , bool
                 , float
                 , uint32_t
@@ -591,16 +665,33 @@ public:
                 , vehicle_data::DriveMode
                 , vehicle_data::LocationPoint
                 , vehicle_data::SpeedData
+                , ::reaktar::Connected<typename Base::ports::HmiPort>
+                , ::reaktar::Disconnected<typename Base::ports::HmiPort>
+                , ::reaktar::Connected<typename Base::ports::SupervisorPort>
+                , ::reaktar::Disconnected<typename Base::ports::SupervisorPort>
+                , ::reaktar::Connected<typename Base::ports::BodyControlIn>
+                , ::reaktar::Disconnected<typename Base::ports::BodyControlIn>
+                , ::reaktar::Connected<typename Base::ports::NavigationIn>
+                , ::reaktar::Disconnected<typename Base::ports::NavigationIn>
+                , ::reaktar::Connected<typename Base::ports::PowertrainIn>
+                , ::reaktar::Disconnected<typename Base::ports::PowertrainIn>
                 , ::reaktar::tags::body_control::fields::OutsideAirQuality
                 , ::reaktar::tags::body_control::fields::RainSensorLevel
                 , ::reaktar::tags::body_control::fields::TargetCabinTemperature
                 , ::reaktar::tags::body_control::fields::WindowPosition
                 , ::reaktar::tags::hmi::methods::ShowPopup
+                , ::reaktar::tags::infotainment::geo::navigation::events::ActiveRoute
                 , ::reaktar::tags::infotainment::geo::navigation::events::CurrentLocation
+                , ::reaktar::tags::powertrain::events::BatteryModuleStatus
                 , ::reaktar::tags::powertrain::events::CabinSensors
+                , ::reaktar::tags::powertrain::events::SpeedHistory
                 , ::reaktar::tags::powertrain::events::VehicleSpeed
+                , ::reaktar::tags::powertrain::events::WheelSpeeds
+                , ::reaktar::tags::vehicle_supervisor::fields::ActiveAlerts
                 , ::reaktar::tags::vehicle_supervisor::fields::CalibrationKey
                 , ::reaktar::tags::vehicle_supervisor::fields::CurrentDriveMode
+                , ::reaktar::tags::vehicle_supervisor::fields::FeatureFlags
+                , ::reaktar::tags::vehicle_supervisor::fields::VehicleConfig
                 , ::reaktar::tags::vehicle_supervisor::methods::CalibrateOdometer
                 , ::reaktar::tags::vehicle_supervisor::methods::ResetTripMeter
                 , ::reaktar::tags::vehicle_supervisor::methods::SetSpeedLimiter
@@ -629,8 +720,28 @@ public:
             hmiport_skeleton_.StatusNotification.Send(std::forward<Args>(args)...);
             return ::reaktar::EmitStatus{true};
         }
+        else if constexpr (std::is_same_v<Tag, vehicle_supervisor::events::ActiveDiagnosticMap>) {
+            supervisorport_skeleton_.ActiveDiagnosticMap.Send(std::forward<Args>(args)...);
+            return ::reaktar::EmitStatus{true};
+        }
+        else if constexpr (std::is_same_v<Tag, vehicle_supervisor::events::DiagnosticsReport>) {
+            supervisorport_skeleton_.DiagnosticsReport.Send(std::forward<Args>(args)...);
+            return ::reaktar::EmitStatus{true};
+        }
+        else if constexpr (std::is_same_v<Tag, vehicle_supervisor::events::DriveHistory>) {
+            supervisorport_skeleton_.DriveHistory.Send(std::forward<Args>(args)...);
+            return ::reaktar::EmitStatus{true};
+        }
         else if constexpr (std::is_same_v<Tag, vehicle_supervisor::events::EmergencyAlert>) {
             supervisorport_skeleton_.EmergencyAlert.Send(std::forward<Args>(args)...);
+            return ::reaktar::EmitStatus{true};
+        }
+        else if constexpr (std::is_same_v<Tag, vehicle_supervisor::fields::ActiveAlerts>) {
+            supervisorport_skeleton_.ActiveAlerts.Update(std::forward<Args>(args)...);
+            return ::reaktar::EmitStatus{true};
+        }
+        else if constexpr (std::is_same_v<Tag, vehicle_supervisor::fields::SystemMatrix>) {
+            supervisorport_skeleton_.SystemMatrix.Update(std::forward<Args>(args)...);
             return ::reaktar::EmitStatus{true};
         }
         else if constexpr (std::is_same_v<Tag, ::reaktar::tags::body_control::methods::FlashLights>) {
@@ -691,8 +802,28 @@ public:
                 hmiport_skeleton_.StatusNotification.Send(std::forward<Args>(args)...);
                 return ::reaktar::EmitStatus{true};
             }
+            else if constexpr (std::is_same_v<PayloadType, ara::core::Map<uint32_t, vehicle_data::EmergencyAlert>>) {
+                supervisorport_skeleton_.ActiveDiagnosticMap.Send(std::forward<Args>(args)...);
+                return ::reaktar::EmitStatus{true};
+            }
+            else if constexpr (std::is_same_v<PayloadType, vehicle_data::VehicleDiagnostics>) {
+                supervisorport_skeleton_.DiagnosticsReport.Send(std::forward<Args>(args)...);
+                return ::reaktar::EmitStatus{true};
+            }
+            else if constexpr (std::is_same_v<PayloadType, ara::core::Vector<vehicle_data::DriveMode>>) {
+                supervisorport_skeleton_.DriveHistory.Send(std::forward<Args>(args)...);
+                return ::reaktar::EmitStatus{true};
+            }
             else if constexpr (std::is_same_v<PayloadType, vehicle_data::EmergencyAlert>) {
                 supervisorport_skeleton_.EmergencyAlert.Send(std::forward<Args>(args)...);
+                return ::reaktar::EmitStatus{true};
+            }
+            else if constexpr (std::is_same_v<PayloadType, ara::core::Vector<vehicle_data::EmergencyAlert>>) {
+                supervisorport_skeleton_.ActiveAlerts.Update(std::forward<Args>(args)...);
+                return ::reaktar::EmitStatus{true};
+            }
+            else if constexpr (std::is_same_v<PayloadType, ara::core::Array<vehicle_data::SystemStatus, 4>>) {
+                supervisorport_skeleton_.SystemMatrix.Update(std::forward<Args>(args)...);
                 return ::reaktar::EmitStatus{true};
             }
             else if constexpr (std::is_same_v<PayloadType, bool>) {
@@ -700,6 +831,22 @@ public:
                 using AsyncResType = decltype(make_async_result(proxy_lease->LockDoors(std::forward<Args>(args)...)));
                 if (proxy_lease) {
                     return make_async_result(proxy_lease->LockDoors(std::forward<Args>(args)...));
+                }
+                return AsyncResType::Failed();
+            }
+            else if constexpr (std::is_same_v<PayloadType, float>) {
+                auto proxy_lease = this->body_control_slot_.acquire("body_control");
+                using AsyncResType = decltype(make_async_result(proxy_lease->TargetCabinTemperature.Set(std::forward<Args>(args)...)));
+                if (proxy_lease) {
+                    return make_async_result(proxy_lease->TargetCabinTemperature.Set(std::forward<Args>(args)...));
+                }
+                return AsyncResType::Failed();
+            }
+            else if constexpr (std::is_same_v<PayloadType, uint32_t>) {
+                auto proxy_lease = this->body_control_slot_.acquire("body_control");
+                using AsyncResType = decltype(make_async_result(proxy_lease->WindowPosition.Set(std::forward<Args>(args)...)));
+                if (proxy_lease) {
+                    return make_async_result(proxy_lease->WindowPosition.Set(std::forward<Args>(args)...));
                 }
                 return AsyncResType::Failed();
             }
@@ -838,13 +985,7 @@ public:
     template <typename PortTag>
     uint64_t get_port_generation() const noexcept {
         static_assert(::reaktar::is_port_v<PortTag>, "get_port_generation requires a valid generated Port Tag!");
-        if constexpr (std::is_same_v<PortTag, typename Base::ports::HmiPort>) {
-            return 0;
-        }
-        else if constexpr (std::is_same_v<PortTag, typename Base::ports::SupervisorPort>) {
-            return 0;
-        }
-        else if constexpr (std::is_same_v<PortTag, typename Base::ports::BodyControlIn>) {
+        if constexpr (std::is_same_v<PortTag, typename Base::ports::BodyControlIn>) {
             std::lock_guard<std::mutex> lock(this->body_control_port_mutex_);
             return this->body_control_generation_;
         }
@@ -855,6 +996,9 @@ public:
         else if constexpr (std::is_same_v<PortTag, typename Base::ports::PowertrainIn>) {
             std::lock_guard<std::mutex> lock(this->powertrain_port_mutex_);
             return this->powertrain_generation_;
+        }
+        else {
+            return 0;
         }
     }
 
@@ -882,6 +1026,159 @@ public:
         this->template close_port<typename Base::ports::PowertrainIn>();
     }
 
+    static constexpr bool has_any_lifecycle_handlers_v = (
+        ::reaktar::has_on_direct_event_v<Derived, ::reaktar::Connected<typename Base::ports::HmiPort>> ||
+        ::reaktar::has_on_direct_event_v<Derived, ::reaktar::Disconnected<typename Base::ports::HmiPort>> ||
+        ::reaktar::has_on_direct_event_v<Derived, ::reaktar::Connected<typename Base::ports::SupervisorPort>> ||
+        ::reaktar::has_on_direct_event_v<Derived, ::reaktar::Disconnected<typename Base::ports::SupervisorPort>> ||
+        ::reaktar::has_on_direct_event_v<Derived, ::reaktar::Connected<typename Base::ports::BodyControlIn>> ||
+        ::reaktar::has_on_direct_event_v<Derived, ::reaktar::Disconnected<typename Base::ports::BodyControlIn>> ||
+        ::reaktar::has_on_direct_event_v<Derived, ::reaktar::Connected<typename Base::ports::NavigationIn>> ||
+        ::reaktar::has_on_direct_event_v<Derived, ::reaktar::Disconnected<typename Base::ports::NavigationIn>> ||
+        ::reaktar::has_on_direct_event_v<Derived, ::reaktar::Connected<typename Base::ports::PowertrainIn>> ||
+        ::reaktar::has_on_direct_event_v<Derived, ::reaktar::Disconnected<typename Base::ports::PowertrainIn>>
+    );
+
+    /**
+     * @brief Synchronously drain port lifecycle state transitions and dispatch Connected/Disconnected events.
+     * Fully zero-cost: if Derived defines no lifecycle handlers, this is pruned at compile time to 'return 0;'.
+     * @return Number of lifecycle events dispatched.
+     */
+    size_t drain() {
+        if constexpr (!has_any_lifecycle_handlers_v) {
+            return 0;
+        } else {
+            typename Base::port_mask_t dirty = this->dirty_ports_.load(std::memory_order_relaxed);
+            if (!dirty) return 0;
+            dirty = this->dirty_ports_.exchange(0, std::memory_order_acq_rel);
+            if (!dirty) return 0;
+
+            size_t count = 0;
+            auto reconcile = [this, dirty, &count]() {
+                if constexpr (::reaktar::has_on_direct_event_v<Derived, ::reaktar::Connected<typename Base::ports::HmiPort>> ||
+                              ::reaktar::has_on_direct_event_v<Derived, ::reaktar::Disconnected<typename Base::ports::HmiPort>>) {
+                    if (dirty & (static_cast<typename Base::port_mask_t>(1) << 0)) {
+                        bool is_now_ready = this->template is_ready<typename Base::ports::HmiPort>();
+                        bool was_ready = (this->last_known_ready_ & (static_cast<typename Base::port_mask_t>(1) << 0)) != 0;
+                        if (is_now_ready != was_ready) {
+                            if (is_now_ready) {
+                                this->last_known_ready_ |= (static_cast<typename Base::port_mask_t>(1) << 0);
+                                if constexpr (::reaktar::has_on_direct_event_v<Derived, ::reaktar::Connected<typename Base::ports::HmiPort>>) {
+                                    self().on(::reaktar::Connected<typename Base::ports::HmiPort>{});
+                                    ++count;
+                                }
+                            } else {
+                                this->last_known_ready_ &= ~(static_cast<typename Base::port_mask_t>(1) << 0);
+                                if constexpr (::reaktar::has_on_direct_event_v<Derived, ::reaktar::Disconnected<typename Base::ports::HmiPort>>) {
+                                    self().on(::reaktar::Disconnected<typename Base::ports::HmiPort>{});
+                                    ++count;
+                                }
+                            }
+                        }
+                    }
+                }
+                if constexpr (::reaktar::has_on_direct_event_v<Derived, ::reaktar::Connected<typename Base::ports::SupervisorPort>> ||
+                              ::reaktar::has_on_direct_event_v<Derived, ::reaktar::Disconnected<typename Base::ports::SupervisorPort>>) {
+                    if (dirty & (static_cast<typename Base::port_mask_t>(1) << 1)) {
+                        bool is_now_ready = this->template is_ready<typename Base::ports::SupervisorPort>();
+                        bool was_ready = (this->last_known_ready_ & (static_cast<typename Base::port_mask_t>(1) << 1)) != 0;
+                        if (is_now_ready != was_ready) {
+                            if (is_now_ready) {
+                                this->last_known_ready_ |= (static_cast<typename Base::port_mask_t>(1) << 1);
+                                if constexpr (::reaktar::has_on_direct_event_v<Derived, ::reaktar::Connected<typename Base::ports::SupervisorPort>>) {
+                                    self().on(::reaktar::Connected<typename Base::ports::SupervisorPort>{});
+                                    ++count;
+                                }
+                            } else {
+                                this->last_known_ready_ &= ~(static_cast<typename Base::port_mask_t>(1) << 1);
+                                if constexpr (::reaktar::has_on_direct_event_v<Derived, ::reaktar::Disconnected<typename Base::ports::SupervisorPort>>) {
+                                    self().on(::reaktar::Disconnected<typename Base::ports::SupervisorPort>{});
+                                    ++count;
+                                }
+                            }
+                        }
+                    }
+                }
+                if constexpr (::reaktar::has_on_direct_event_v<Derived, ::reaktar::Connected<typename Base::ports::BodyControlIn>> ||
+                              ::reaktar::has_on_direct_event_v<Derived, ::reaktar::Disconnected<typename Base::ports::BodyControlIn>>) {
+                    if (dirty & (static_cast<typename Base::port_mask_t>(1) << 2)) {
+                        bool is_now_ready = this->template is_ready<typename Base::ports::BodyControlIn>();
+                        bool was_ready = (this->last_known_ready_ & (static_cast<typename Base::port_mask_t>(1) << 2)) != 0;
+                        if (is_now_ready != was_ready) {
+                            if (is_now_ready) {
+                                this->last_known_ready_ |= (static_cast<typename Base::port_mask_t>(1) << 2);
+                                if constexpr (::reaktar::has_on_direct_event_v<Derived, ::reaktar::Connected<typename Base::ports::BodyControlIn>>) {
+                                    self().on(::reaktar::Connected<typename Base::ports::BodyControlIn>{});
+                                    ++count;
+                                }
+                            } else {
+                                this->last_known_ready_ &= ~(static_cast<typename Base::port_mask_t>(1) << 2);
+                                if constexpr (::reaktar::has_on_direct_event_v<Derived, ::reaktar::Disconnected<typename Base::ports::BodyControlIn>>) {
+                                    self().on(::reaktar::Disconnected<typename Base::ports::BodyControlIn>{});
+                                    ++count;
+                                }
+                            }
+                        }
+                    }
+                }
+                if constexpr (::reaktar::has_on_direct_event_v<Derived, ::reaktar::Connected<typename Base::ports::NavigationIn>> ||
+                              ::reaktar::has_on_direct_event_v<Derived, ::reaktar::Disconnected<typename Base::ports::NavigationIn>>) {
+                    if (dirty & (static_cast<typename Base::port_mask_t>(1) << 3)) {
+                        bool is_now_ready = this->template is_ready<typename Base::ports::NavigationIn>();
+                        bool was_ready = (this->last_known_ready_ & (static_cast<typename Base::port_mask_t>(1) << 3)) != 0;
+                        if (is_now_ready != was_ready) {
+                            if (is_now_ready) {
+                                this->last_known_ready_ |= (static_cast<typename Base::port_mask_t>(1) << 3);
+                                if constexpr (::reaktar::has_on_direct_event_v<Derived, ::reaktar::Connected<typename Base::ports::NavigationIn>>) {
+                                    self().on(::reaktar::Connected<typename Base::ports::NavigationIn>{});
+                                    ++count;
+                                }
+                            } else {
+                                this->last_known_ready_ &= ~(static_cast<typename Base::port_mask_t>(1) << 3);
+                                if constexpr (::reaktar::has_on_direct_event_v<Derived, ::reaktar::Disconnected<typename Base::ports::NavigationIn>>) {
+                                    self().on(::reaktar::Disconnected<typename Base::ports::NavigationIn>{});
+                                    ++count;
+                                }
+                            }
+                        }
+                    }
+                }
+                if constexpr (::reaktar::has_on_direct_event_v<Derived, ::reaktar::Connected<typename Base::ports::PowertrainIn>> ||
+                              ::reaktar::has_on_direct_event_v<Derived, ::reaktar::Disconnected<typename Base::ports::PowertrainIn>>) {
+                    if (dirty & (static_cast<typename Base::port_mask_t>(1) << 4)) {
+                        bool is_now_ready = this->template is_ready<typename Base::ports::PowertrainIn>();
+                        bool was_ready = (this->last_known_ready_ & (static_cast<typename Base::port_mask_t>(1) << 4)) != 0;
+                        if (is_now_ready != was_ready) {
+                            if (is_now_ready) {
+                                this->last_known_ready_ |= (static_cast<typename Base::port_mask_t>(1) << 4);
+                                if constexpr (::reaktar::has_on_direct_event_v<Derived, ::reaktar::Connected<typename Base::ports::PowertrainIn>>) {
+                                    self().on(::reaktar::Connected<typename Base::ports::PowertrainIn>{});
+                                    ++count;
+                                }
+                            } else {
+                                this->last_known_ready_ &= ~(static_cast<typename Base::port_mask_t>(1) << 4);
+                                if constexpr (::reaktar::has_on_direct_event_v<Derived, ::reaktar::Disconnected<typename Base::ports::PowertrainIn>>) {
+                                    self().on(::reaktar::Disconnected<typename Base::ports::PowertrainIn>{});
+                                    ++count;
+                                }
+                            }
+                        }
+                    }
+                }
+            };
+
+            if constexpr (std::is_same_v<ExecutionPolicy, ::reaktar::DirectExecution>) {
+                reconcile();
+            } else if constexpr (std::is_same_v<ExecutionPolicy, ::reaktar::SynchronizedExecution>) {
+                std::lock_guard<std::mutex> lock(this->execution_policy_.mutex());
+                reconcile();
+            } else {
+                this->execution_policy_.execute(reconcile);
+            }
+            return count;
+        }
+    }
+
 private:
     void open_hmiport_provided_port() {
         std::lock_guard<std::mutex> lock(this->hmiport_port_mutex_);
@@ -889,6 +1186,10 @@ private:
             bind_skeleton_fields();
             this->hmiport_skeleton_.OfferService();
             this->hmiport_offered_.store(true, std::memory_order_release);
+            if constexpr (::reaktar::has_on_direct_event_v<Derived, ::reaktar::Connected<typename Base::ports::HmiPort>> ||
+                          ::reaktar::has_on_direct_event_v<Derived, ::reaktar::Disconnected<typename Base::ports::HmiPort>>) {
+                this->dirty_ports_.fetch_or(static_cast<typename Base::port_mask_t>(1) << 0, std::memory_order_release);
+            }
         }
     }
     void open_supervisorport_provided_port() {
@@ -897,6 +1198,10 @@ private:
             bind_skeleton_fields();
             this->supervisorport_skeleton_.OfferService();
             this->supervisorport_offered_.store(true, std::memory_order_release);
+            if constexpr (::reaktar::has_on_direct_event_v<Derived, ::reaktar::Connected<typename Base::ports::SupervisorPort>> ||
+                          ::reaktar::has_on_direct_event_v<Derived, ::reaktar::Disconnected<typename Base::ports::SupervisorPort>>) {
+                this->dirty_ports_.fetch_or(static_cast<typename Base::port_mask_t>(1) << 1, std::memory_order_release);
+            }
         }
     }
     void open_body_control_required_port() {
@@ -940,6 +1245,10 @@ private:
                         return; // Closed or generation shifted concurrently
                     }
                     this->body_control_slot_.reset();
+                    if constexpr (::reaktar::has_on_direct_event_v<Derived, ::reaktar::Connected<typename Base::ports::BodyControlIn>> ||
+                                  ::reaktar::has_on_direct_event_v<Derived, ::reaktar::Disconnected<typename Base::ports::BodyControlIn>>) {
+                        this->dirty_ports_.fetch_or(static_cast<typename Base::port_mask_t>(1) << 2, std::memory_order_release);
+                    }
                 } else {
                     if (auto cur_h = this->body_control_slot_.get_handle(); cur_h.has_value() && *cur_h == handles[0]) {
                         return; // Same handle, already active
@@ -947,8 +1256,8 @@ private:
                     // Zero-downtime update: do NOT wipe slot before creating new proxy!
                     // ProxySlot::publish handles atomic cell exchange, bounded reader drain, and teardown hook cleanly.
                     auto new_proxy = std::make_unique<body_control::proxy::BodyControlProxy>(handles[0]);
-                    bind_body_control_events(new_proxy.get());
-                    bind_body_control_fields(new_proxy.get());
+                    bind_body_control_events(*new_proxy);
+                    bind_body_control_fields(*new_proxy);
 
                     auto teardown_hook = []([[maybe_unused]] body_control::proxy::BodyControlProxy& p) {
                         p.OutsideAirQuality.Unsubscribe();
@@ -964,6 +1273,15 @@ private:
                             return; // Closed or generation shifted concurrently
                         }
                         this->body_control_slot_.publish(std::move(new_proxy), handles[0], teardown_hook);
+                        if constexpr (::reaktar::has_on_direct_event_v<Derived, ::reaktar::Connected<typename Base::ports::BodyControlIn>> ||
+                                      ::reaktar::has_on_direct_event_v<Derived, ::reaktar::Disconnected<typename Base::ports::BodyControlIn>>) {
+                            this->dirty_ports_.fetch_or(static_cast<typename Base::port_mask_t>(1) << 2, std::memory_order_release);
+                        }
+                    }
+                    // Safe publication complete: now activate event/field subscriptions with zero locks held!
+                    if (auto lease = this->body_control_slot_.try_acquire()) {
+                        subscribe_body_control_events(*lease);
+                        subscribe_body_control_fields(*lease);
                     }
                     this->notify_proxy_resolved();
                 }
@@ -990,14 +1308,20 @@ private:
 
         find_started = true; // Successfully started, prevent rollback
 
-        std::unique_lock<std::mutex> lock(this->body_control_port_mutex_);
-        if (!this->body_control_open_.load(std::memory_order_acquire) || this->body_control_generation_ != my_gen) {
-            // Port was closed or generation shifted while StartFindService was executing!
-            lock.unlock();
+        bool should_stop = false;
+        {
+            std::lock_guard<std::mutex> lock(this->body_control_port_mutex_);
+            if (!this->body_control_open_.load(std::memory_order_acquire) || this->body_control_generation_ != my_gen) {
+                // Port was closed or generation shifted while StartFindService was executing!
+                should_stop = true;
+            } else {
+                this->body_control_find_handle_ = *handle;
+            }
+        }
+        if (should_stop) {
             body_control::proxy::BodyControlProxy::StopFindService(*handle);
             return;
         }
-        this->body_control_find_handle_ = *handle;
     }
     void open_navigation_required_port() {
         uint64_t my_gen{0};
@@ -1040,6 +1364,10 @@ private:
                         return; // Closed or generation shifted concurrently
                     }
                     this->navigation_slot_.reset();
+                    if constexpr (::reaktar::has_on_direct_event_v<Derived, ::reaktar::Connected<typename Base::ports::NavigationIn>> ||
+                                  ::reaktar::has_on_direct_event_v<Derived, ::reaktar::Disconnected<typename Base::ports::NavigationIn>>) {
+                        this->dirty_ports_.fetch_or(static_cast<typename Base::port_mask_t>(1) << 3, std::memory_order_release);
+                    }
                 } else {
                     if (auto cur_h = this->navigation_slot_.get_handle(); cur_h.has_value() && *cur_h == handles[0]) {
                         return; // Same handle, already active
@@ -1047,10 +1375,11 @@ private:
                     // Zero-downtime update: do NOT wipe slot before creating new proxy!
                     // ProxySlot::publish handles atomic cell exchange, bounded reader drain, and teardown hook cleanly.
                     auto new_proxy = std::make_unique<infotainment::geo::navigation::proxy::NavigationProxy>(handles[0]);
-                    bind_navigation_events(new_proxy.get());
-                    bind_navigation_fields(new_proxy.get());
+                    bind_navigation_events(*new_proxy);
+                    bind_navigation_fields(*new_proxy);
 
                     auto teardown_hook = []([[maybe_unused]] infotainment::geo::navigation::proxy::NavigationProxy& p) {
+                        p.ActiveRoute.Unsubscribe();
                         p.CurrentLocation.Unsubscribe();
                     };
 
@@ -1061,6 +1390,15 @@ private:
                             return; // Closed or generation shifted concurrently
                         }
                         this->navigation_slot_.publish(std::move(new_proxy), handles[0], teardown_hook);
+                        if constexpr (::reaktar::has_on_direct_event_v<Derived, ::reaktar::Connected<typename Base::ports::NavigationIn>> ||
+                                      ::reaktar::has_on_direct_event_v<Derived, ::reaktar::Disconnected<typename Base::ports::NavigationIn>>) {
+                            this->dirty_ports_.fetch_or(static_cast<typename Base::port_mask_t>(1) << 3, std::memory_order_release);
+                        }
+                    }
+                    // Safe publication complete: now activate event/field subscriptions with zero locks held!
+                    if (auto lease = this->navigation_slot_.try_acquire()) {
+                        subscribe_navigation_events(*lease);
+                        subscribe_navigation_fields(*lease);
                     }
                     this->notify_proxy_resolved();
                 }
@@ -1087,14 +1425,20 @@ private:
 
         find_started = true; // Successfully started, prevent rollback
 
-        std::unique_lock<std::mutex> lock(this->navigation_port_mutex_);
-        if (!this->navigation_open_.load(std::memory_order_acquire) || this->navigation_generation_ != my_gen) {
-            // Port was closed or generation shifted while StartFindService was executing!
-            lock.unlock();
+        bool should_stop = false;
+        {
+            std::lock_guard<std::mutex> lock(this->navigation_port_mutex_);
+            if (!this->navigation_open_.load(std::memory_order_acquire) || this->navigation_generation_ != my_gen) {
+                // Port was closed or generation shifted while StartFindService was executing!
+                should_stop = true;
+            } else {
+                this->navigation_find_handle_ = *handle;
+            }
+        }
+        if (should_stop) {
             infotainment::geo::navigation::proxy::NavigationProxy::StopFindService(*handle);
             return;
         }
-        this->navigation_find_handle_ = *handle;
     }
     void open_powertrain_required_port() {
         uint64_t my_gen{0};
@@ -1137,6 +1481,10 @@ private:
                         return; // Closed or generation shifted concurrently
                     }
                     this->powertrain_slot_.reset();
+                    if constexpr (::reaktar::has_on_direct_event_v<Derived, ::reaktar::Connected<typename Base::ports::PowertrainIn>> ||
+                                  ::reaktar::has_on_direct_event_v<Derived, ::reaktar::Disconnected<typename Base::ports::PowertrainIn>>) {
+                        this->dirty_ports_.fetch_or(static_cast<typename Base::port_mask_t>(1) << 4, std::memory_order_release);
+                    }
                 } else {
                     if (auto cur_h = this->powertrain_slot_.get_handle(); cur_h.has_value() && *cur_h == handles[0]) {
                         return; // Same handle, already active
@@ -1144,12 +1492,15 @@ private:
                     // Zero-downtime update: do NOT wipe slot before creating new proxy!
                     // ProxySlot::publish handles atomic cell exchange, bounded reader drain, and teardown hook cleanly.
                     auto new_proxy = std::make_unique<powertrain::proxy::PowertrainProxy>(handles[0]);
-                    bind_powertrain_events(new_proxy.get());
-                    bind_powertrain_fields(new_proxy.get());
+                    bind_powertrain_events(*new_proxy);
+                    bind_powertrain_fields(*new_proxy);
 
                     auto teardown_hook = []([[maybe_unused]] powertrain::proxy::PowertrainProxy& p) {
+                        p.BatteryModuleStatus.Unsubscribe();
                         p.CabinSensors.Unsubscribe();
+                        p.SpeedHistory.Unsubscribe();
                         p.VehicleSpeed.Unsubscribe();
+                        p.WheelSpeeds.Unsubscribe();
                     };
 
                     {
@@ -1159,6 +1510,15 @@ private:
                             return; // Closed or generation shifted concurrently
                         }
                         this->powertrain_slot_.publish(std::move(new_proxy), handles[0], teardown_hook);
+                        if constexpr (::reaktar::has_on_direct_event_v<Derived, ::reaktar::Connected<typename Base::ports::PowertrainIn>> ||
+                                      ::reaktar::has_on_direct_event_v<Derived, ::reaktar::Disconnected<typename Base::ports::PowertrainIn>>) {
+                            this->dirty_ports_.fetch_or(static_cast<typename Base::port_mask_t>(1) << 4, std::memory_order_release);
+                        }
+                    }
+                    // Safe publication complete: now activate event/field subscriptions with zero locks held!
+                    if (auto lease = this->powertrain_slot_.try_acquire()) {
+                        subscribe_powertrain_events(*lease);
+                        subscribe_powertrain_fields(*lease);
                     }
                     this->notify_proxy_resolved();
                 }
@@ -1185,14 +1545,20 @@ private:
 
         find_started = true; // Successfully started, prevent rollback
 
-        std::unique_lock<std::mutex> lock(this->powertrain_port_mutex_);
-        if (!this->powertrain_open_.load(std::memory_order_acquire) || this->powertrain_generation_ != my_gen) {
-            // Port was closed or generation shifted while StartFindService was executing!
-            lock.unlock();
+        bool should_stop = false;
+        {
+            std::lock_guard<std::mutex> lock(this->powertrain_port_mutex_);
+            if (!this->powertrain_open_.load(std::memory_order_acquire) || this->powertrain_generation_ != my_gen) {
+                // Port was closed or generation shifted while StartFindService was executing!
+                should_stop = true;
+            } else {
+                this->powertrain_find_handle_ = *handle;
+            }
+        }
+        if (should_stop) {
             powertrain::proxy::PowertrainProxy::StopFindService(*handle);
             return;
         }
-        this->powertrain_find_handle_ = *handle;
     }
 
     void close_hmiport_provided_port() {
@@ -1200,6 +1566,10 @@ private:
         if (this->hmiport_offered_.load(std::memory_order_relaxed)) {
             this->hmiport_skeleton_.StopOfferService();
             this->hmiport_offered_.store(false, std::memory_order_release);
+            if constexpr (::reaktar::has_on_direct_event_v<Derived, ::reaktar::Connected<typename Base::ports::HmiPort>> ||
+                          ::reaktar::has_on_direct_event_v<Derived, ::reaktar::Disconnected<typename Base::ports::HmiPort>>) {
+                this->dirty_ports_.fetch_or(static_cast<typename Base::port_mask_t>(1) << 0, std::memory_order_release);
+            }
         }
     }
     void close_supervisorport_provided_port() {
@@ -1207,6 +1577,10 @@ private:
         if (this->supervisorport_offered_.load(std::memory_order_relaxed)) {
             this->supervisorport_skeleton_.StopOfferService();
             this->supervisorport_offered_.store(false, std::memory_order_release);
+            if constexpr (::reaktar::has_on_direct_event_v<Derived, ::reaktar::Connected<typename Base::ports::SupervisorPort>> ||
+                          ::reaktar::has_on_direct_event_v<Derived, ::reaktar::Disconnected<typename Base::ports::SupervisorPort>>) {
+                this->dirty_ports_.fetch_or(static_cast<typename Base::port_mask_t>(1) << 1, std::memory_order_release);
+            }
         }
     }
     void close_body_control_required_port() {
@@ -1221,6 +1595,10 @@ private:
             handle_to_stop = this->body_control_find_handle_;
             this->body_control_find_handle_.reset();
             this->body_control_slot_.reset();
+            if constexpr (::reaktar::has_on_direct_event_v<Derived, ::reaktar::Connected<typename Base::ports::BodyControlIn>> ||
+                          ::reaktar::has_on_direct_event_v<Derived, ::reaktar::Disconnected<typename Base::ports::BodyControlIn>>) {
+                this->dirty_ports_.fetch_or(static_cast<typename Base::port_mask_t>(1) << 2, std::memory_order_release);
+            }
         }
 
         if (handle_to_stop.has_value()) {
@@ -1239,6 +1617,10 @@ private:
             handle_to_stop = this->navigation_find_handle_;
             this->navigation_find_handle_.reset();
             this->navigation_slot_.reset();
+            if constexpr (::reaktar::has_on_direct_event_v<Derived, ::reaktar::Connected<typename Base::ports::NavigationIn>> ||
+                          ::reaktar::has_on_direct_event_v<Derived, ::reaktar::Disconnected<typename Base::ports::NavigationIn>>) {
+                this->dirty_ports_.fetch_or(static_cast<typename Base::port_mask_t>(1) << 3, std::memory_order_release);
+            }
         }
 
         if (handle_to_stop.has_value()) {
@@ -1257,6 +1639,10 @@ private:
             handle_to_stop = this->powertrain_find_handle_;
             this->powertrain_find_handle_.reset();
             this->powertrain_slot_.reset();
+            if constexpr (::reaktar::has_on_direct_event_v<Derived, ::reaktar::Connected<typename Base::ports::PowertrainIn>> ||
+                          ::reaktar::has_on_direct_event_v<Derived, ::reaktar::Disconnected<typename Base::ports::PowertrainIn>>) {
+                this->dirty_ports_.fetch_or(static_cast<typename Base::port_mask_t>(1) << 4, std::memory_order_release);
+            }
         }
 
         if (handle_to_stop.has_value()) {
@@ -1267,6 +1653,48 @@ private:
 private:
 
     void bind_skeleton_fields() {
+        // Initialise field value before OfferService (required by AUTOSAR Adaptive caching/notifier semantics)
+        supervisorport_skeleton_.ActiveAlerts.Update({});
+        if constexpr (has_on_field_set_v<Derived, vehicle_supervisor::fields::ActiveAlerts, ara::core::Vector<vehicle_data::EmergencyAlert>>) {
+            supervisorport_skeleton_.ActiveAlerts.RegisterSetHandler([this](const ara::core::Vector<vehicle_data::EmergencyAlert>& val) {
+                if constexpr (std::is_same_v<ExecutionPolicy, ::reaktar::DirectExecution>) {
+                    return result_adapter<reaktar::Future<ara::core::Vector<vehicle_data::EmergencyAlert>>, decltype(self().on_set(vehicle_supervisor::fields::ActiveAlerts{}, val))>::adapt(
+                        self().on_set(vehicle_supervisor::fields::ActiveAlerts{}, val)
+                    );
+                } else if constexpr (std::is_same_v<ExecutionPolicy, ::reaktar::SynchronizedExecution>) {
+                    std::lock_guard<std::mutex> lock(this->execution_policy_.mutex());
+                    return result_adapter<reaktar::Future<ara::core::Vector<vehicle_data::EmergencyAlert>>, decltype(self().on_set(vehicle_supervisor::fields::ActiveAlerts{}, val))>::adapt(
+                        self().on_set(vehicle_supervisor::fields::ActiveAlerts{}, val)
+                    );
+                } else {
+                    return this->execution_policy_.execute([&] {
+                        return result_adapter<reaktar::Future<ara::core::Vector<vehicle_data::EmergencyAlert>>, decltype(self().on_set(vehicle_supervisor::fields::ActiveAlerts{}, val))>::adapt(
+                            self().on_set(vehicle_supervisor::fields::ActiveAlerts{}, val)
+                        );
+                    });
+                }
+            });
+        }
+        else if constexpr (has_on_direct_field_set_v<Derived, ara::core::Vector<vehicle_data::EmergencyAlert>>) {
+            supervisorport_skeleton_.ActiveAlerts.RegisterSetHandler([this](const ara::core::Vector<vehicle_data::EmergencyAlert>& val) {
+                if constexpr (std::is_same_v<ExecutionPolicy, ::reaktar::DirectExecution>) {
+                    return result_adapter<reaktar::Future<ara::core::Vector<vehicle_data::EmergencyAlert>>, decltype(self().on_set(val))>::adapt(
+                        self().on_set(val)
+                    );
+                } else if constexpr (std::is_same_v<ExecutionPolicy, ::reaktar::SynchronizedExecution>) {
+                    std::lock_guard<std::mutex> lock(this->execution_policy_.mutex());
+                    return result_adapter<reaktar::Future<ara::core::Vector<vehicle_data::EmergencyAlert>>, decltype(self().on_set(val))>::adapt(
+                        self().on_set(val)
+                    );
+                } else {
+                    return this->execution_policy_.execute([&] {
+                        return result_adapter<reaktar::Future<ara::core::Vector<vehicle_data::EmergencyAlert>>, decltype(self().on_set(val))>::adapt(
+                            self().on_set(val)
+                        );
+                    });
+                }
+            });
+        }
         if constexpr (has_on_field_set_v<Derived, vehicle_supervisor::fields::CalibrationKey, uint32_t>) {
             supervisorport_skeleton_.CalibrationKey.RegisterSetHandler([this](const uint32_t& val) {
                 if constexpr (std::is_same_v<ExecutionPolicy, ::reaktar::DirectExecution>) {
@@ -1350,18 +1778,118 @@ private:
             });
         }
         // Initialise field value before OfferService (required by AUTOSAR Adaptive caching/notifier semantics)
+        supervisorport_skeleton_.FeatureFlags.Update({});
+        if constexpr (has_on_field_set_v<Derived, vehicle_supervisor::fields::FeatureFlags, ara::core::Map<ara::core::String, bool>>) {
+            supervisorport_skeleton_.FeatureFlags.RegisterSetHandler([this](const ara::core::Map<ara::core::String, bool>& val) {
+                if constexpr (std::is_same_v<ExecutionPolicy, ::reaktar::DirectExecution>) {
+                    return result_adapter<reaktar::Future<ara::core::Map<ara::core::String, bool>>, decltype(self().on_set(vehicle_supervisor::fields::FeatureFlags{}, val))>::adapt(
+                        self().on_set(vehicle_supervisor::fields::FeatureFlags{}, val)
+                    );
+                } else if constexpr (std::is_same_v<ExecutionPolicy, ::reaktar::SynchronizedExecution>) {
+                    std::lock_guard<std::mutex> lock(this->execution_policy_.mutex());
+                    return result_adapter<reaktar::Future<ara::core::Map<ara::core::String, bool>>, decltype(self().on_set(vehicle_supervisor::fields::FeatureFlags{}, val))>::adapt(
+                        self().on_set(vehicle_supervisor::fields::FeatureFlags{}, val)
+                    );
+                } else {
+                    return this->execution_policy_.execute([&] {
+                        return result_adapter<reaktar::Future<ara::core::Map<ara::core::String, bool>>, decltype(self().on_set(vehicle_supervisor::fields::FeatureFlags{}, val))>::adapt(
+                            self().on_set(vehicle_supervisor::fields::FeatureFlags{}, val)
+                        );
+                    });
+                }
+            });
+        }
+        else if constexpr (has_on_direct_field_set_v<Derived, ara::core::Map<ara::core::String, bool>>) {
+            supervisorport_skeleton_.FeatureFlags.RegisterSetHandler([this](const ara::core::Map<ara::core::String, bool>& val) {
+                if constexpr (std::is_same_v<ExecutionPolicy, ::reaktar::DirectExecution>) {
+                    return result_adapter<reaktar::Future<ara::core::Map<ara::core::String, bool>>, decltype(self().on_set(val))>::adapt(
+                        self().on_set(val)
+                    );
+                } else if constexpr (std::is_same_v<ExecutionPolicy, ::reaktar::SynchronizedExecution>) {
+                    std::lock_guard<std::mutex> lock(this->execution_policy_.mutex());
+                    return result_adapter<reaktar::Future<ara::core::Map<ara::core::String, bool>>, decltype(self().on_set(val))>::adapt(
+                        self().on_set(val)
+                    );
+                } else {
+                    return this->execution_policy_.execute([&] {
+                        return result_adapter<reaktar::Future<ara::core::Map<ara::core::String, bool>>, decltype(self().on_set(val))>::adapt(
+                            self().on_set(val)
+                        );
+                    });
+                }
+            });
+        }
+        // Initialise field value before OfferService (required by AUTOSAR Adaptive caching/notifier semantics)
         supervisorport_skeleton_.HardwareRevision.Update({});
+        // Initialise field value before OfferService (required by AUTOSAR Adaptive caching/notifier semantics)
+        supervisorport_skeleton_.SystemMatrix.Update({});
+        // Initialise field value before OfferService (required by AUTOSAR Adaptive caching/notifier semantics)
+        supervisorport_skeleton_.VehicleConfig.Update({});
+        if constexpr (has_on_field_set_v<Derived, vehicle_supervisor::fields::VehicleConfig, ara::core::Map<ara::core::String, ara::core::String>>) {
+            supervisorport_skeleton_.VehicleConfig.RegisterSetHandler([this](const ara::core::Map<ara::core::String, ara::core::String>& val) {
+                if constexpr (std::is_same_v<ExecutionPolicy, ::reaktar::DirectExecution>) {
+                    return result_adapter<reaktar::Future<ara::core::Map<ara::core::String, ara::core::String>>, decltype(self().on_set(vehicle_supervisor::fields::VehicleConfig{}, val))>::adapt(
+                        self().on_set(vehicle_supervisor::fields::VehicleConfig{}, val)
+                    );
+                } else if constexpr (std::is_same_v<ExecutionPolicy, ::reaktar::SynchronizedExecution>) {
+                    std::lock_guard<std::mutex> lock(this->execution_policy_.mutex());
+                    return result_adapter<reaktar::Future<ara::core::Map<ara::core::String, ara::core::String>>, decltype(self().on_set(vehicle_supervisor::fields::VehicleConfig{}, val))>::adapt(
+                        self().on_set(vehicle_supervisor::fields::VehicleConfig{}, val)
+                    );
+                } else {
+                    return this->execution_policy_.execute([&] {
+                        return result_adapter<reaktar::Future<ara::core::Map<ara::core::String, ara::core::String>>, decltype(self().on_set(vehicle_supervisor::fields::VehicleConfig{}, val))>::adapt(
+                            self().on_set(vehicle_supervisor::fields::VehicleConfig{}, val)
+                        );
+                    });
+                }
+            });
+        }
+        else if constexpr (has_on_direct_field_set_v<Derived, ara::core::Map<ara::core::String, ara::core::String>>) {
+            supervisorport_skeleton_.VehicleConfig.RegisterSetHandler([this](const ara::core::Map<ara::core::String, ara::core::String>& val) {
+                if constexpr (std::is_same_v<ExecutionPolicy, ::reaktar::DirectExecution>) {
+                    return result_adapter<reaktar::Future<ara::core::Map<ara::core::String, ara::core::String>>, decltype(self().on_set(val))>::adapt(
+                        self().on_set(val)
+                    );
+                } else if constexpr (std::is_same_v<ExecutionPolicy, ::reaktar::SynchronizedExecution>) {
+                    std::lock_guard<std::mutex> lock(this->execution_policy_.mutex());
+                    return result_adapter<reaktar::Future<ara::core::Map<ara::core::String, ara::core::String>>, decltype(self().on_set(val))>::adapt(
+                        self().on_set(val)
+                    );
+                } else {
+                    return this->execution_policy_.execute([&] {
+                        return result_adapter<reaktar::Future<ara::core::Map<ara::core::String, ara::core::String>>, decltype(self().on_set(val))>::adapt(
+                            self().on_set(val)
+                        );
+                    });
+                }
+            });
+        }
     }
 
-    void bind_body_control_events(body_control::proxy::BodyControlProxy* proxy) {
-        if (!proxy) return;
+    static constexpr bool kHas_body_control_OutsideAirQuality_tagged = has_on_event_v<Derived, body_control::fields::OutsideAirQuality, uint32_t>;
+    static constexpr bool kHas_body_control_OutsideAirQuality_direct = has_on_direct_event_v<Derived, uint32_t>;
+    static constexpr bool kSub_body_control_OutsideAirQuality = kHas_body_control_OutsideAirQuality_tagged || kHas_body_control_OutsideAirQuality_direct;
+    static constexpr bool kHas_body_control_RainSensorLevel_tagged = has_on_event_v<Derived, body_control::fields::RainSensorLevel, uint32_t>;
+    static constexpr bool kHas_body_control_RainSensorLevel_direct = has_on_direct_event_v<Derived, uint32_t>;
+    static constexpr bool kSub_body_control_RainSensorLevel = kHas_body_control_RainSensorLevel_tagged || kHas_body_control_RainSensorLevel_direct;
+    static constexpr bool kHas_body_control_TargetCabinTemperature_tagged = has_on_event_v<Derived, body_control::fields::TargetCabinTemperature, float>;
+    static constexpr bool kHas_body_control_TargetCabinTemperature_direct = has_on_direct_event_v<Derived, float>;
+    static constexpr bool kSub_body_control_TargetCabinTemperature = kHas_body_control_TargetCabinTemperature_tagged || kHas_body_control_TargetCabinTemperature_direct;
+    static constexpr bool kHas_body_control_WindowPosition_tagged = has_on_event_v<Derived, body_control::fields::WindowPosition, uint32_t>;
+    static constexpr bool kHas_body_control_WindowPosition_direct = has_on_direct_event_v<Derived, uint32_t>;
+    static constexpr bool kSub_body_control_WindowPosition = kHas_body_control_WindowPosition_tagged || kHas_body_control_WindowPosition_direct;
+
+    void bind_body_control_events([[maybe_unused]] body_control::proxy::BodyControlProxy& proxy) {
     }
 
-    void bind_body_control_fields(body_control::proxy::BodyControlProxy* proxy) {
-        if (!proxy) return;
+    void subscribe_body_control_events([[maybe_unused]] body_control::proxy::BodyControlProxy& proxy) {
+    }
+
+    void bind_body_control_fields([[maybe_unused]] body_control::proxy::BodyControlProxy& proxy) {
         // Field Notifier: OutsideAirQuality (uint32_t)
-        if constexpr (has_on_event_v<Derived, body_control::fields::OutsideAirQuality, uint32_t>) {
-            proxy->OutsideAirQuality.SetReceiveHandler([this]() {
+        if constexpr (kHas_body_control_OutsideAirQuality_tagged) {
+            proxy.OutsideAirQuality.SetReceiveHandler([this]() {
                 auto lease = this->body_control_slot_.try_acquire();
                 if (lease) {
                     lease->OutsideAirQuality.GetNewSamples([this](auto&& s) {
@@ -1378,14 +1906,13 @@ private:
                     });
                 }
             });
-            proxy->OutsideAirQuality.Subscribe(10);
         }
-        else if constexpr (has_on_direct_event_v<Derived, uint32_t>) {
+        else if constexpr (kHas_body_control_OutsideAirQuality_direct) {
             static_assert(!sizeof(Derived*), "reaktar::on() collision: type 'uint32_t' is shared across multiple incoming channels (events/fields). You must specify the tag: void on(body_control::fields::OutsideAirQuality, const uint32_t& val).");
         }
         // Field Notifier: RainSensorLevel (uint32_t)
-        if constexpr (has_on_event_v<Derived, body_control::fields::RainSensorLevel, uint32_t>) {
-            proxy->RainSensorLevel.SetReceiveHandler([this]() {
+        if constexpr (kHas_body_control_RainSensorLevel_tagged) {
+            proxy.RainSensorLevel.SetReceiveHandler([this]() {
                 auto lease = this->body_control_slot_.try_acquire();
                 if (lease) {
                     lease->RainSensorLevel.GetNewSamples([this](auto&& s) {
@@ -1402,14 +1929,13 @@ private:
                     });
                 }
             });
-            proxy->RainSensorLevel.Subscribe(10);
         }
-        else if constexpr (has_on_direct_event_v<Derived, uint32_t>) {
+        else if constexpr (kHas_body_control_RainSensorLevel_direct) {
             static_assert(!sizeof(Derived*), "reaktar::on() collision: type 'uint32_t' is shared across multiple incoming channels (events/fields). You must specify the tag: void on(body_control::fields::RainSensorLevel, const uint32_t& val).");
         }
         // Field Notifier: TargetCabinTemperature (float)
-        if constexpr (has_on_event_v<Derived, body_control::fields::TargetCabinTemperature, float>) {
-            proxy->TargetCabinTemperature.SetReceiveHandler([this]() {
+        if constexpr (kHas_body_control_TargetCabinTemperature_tagged) {
+            proxy.TargetCabinTemperature.SetReceiveHandler([this]() {
                 auto lease = this->body_control_slot_.try_acquire();
                 if (lease) {
                     lease->TargetCabinTemperature.GetNewSamples([this](auto&& s) {
@@ -1426,10 +1952,9 @@ private:
                     });
                 }
             });
-            proxy->TargetCabinTemperature.Subscribe(10);
         }
-        else if constexpr (has_on_direct_event_v<Derived, float>) {
-            proxy->TargetCabinTemperature.SetReceiveHandler([this]() {
+        else if constexpr (kHas_body_control_TargetCabinTemperature_direct) {
+            proxy.TargetCabinTemperature.SetReceiveHandler([this]() {
                 auto lease = this->body_control_slot_.try_acquire();
                 if (lease) {
                     lease->TargetCabinTemperature.GetNewSamples([this](auto&& s) {
@@ -1446,11 +1971,10 @@ private:
                     });
                 }
             });
-            proxy->TargetCabinTemperature.Subscribe(10);
         }
         // Field Notifier: WindowPosition (uint32_t)
-        if constexpr (has_on_event_v<Derived, body_control::fields::WindowPosition, uint32_t>) {
-            proxy->WindowPosition.SetReceiveHandler([this]() {
+        if constexpr (kHas_body_control_WindowPosition_tagged) {
+            proxy.WindowPosition.SetReceiveHandler([this]() {
                 auto lease = this->body_control_slot_.try_acquire();
                 if (lease) {
                     lease->WindowPosition.GetNewSamples([this](auto&& s) {
@@ -1467,17 +1991,76 @@ private:
                     });
                 }
             });
-            proxy->WindowPosition.Subscribe(10);
         }
-        else if constexpr (has_on_direct_event_v<Derived, uint32_t>) {
+        else if constexpr (kHas_body_control_WindowPosition_direct) {
             static_assert(!sizeof(Derived*), "reaktar::on() collision: type 'uint32_t' is shared across multiple incoming channels (events/fields). You must specify the tag: void on(body_control::fields::WindowPosition, const uint32_t& val).");
         }
     }
-    void bind_navigation_events(infotainment::geo::navigation::proxy::NavigationProxy* proxy) {
-        if (!proxy) return;
+
+    void subscribe_body_control_fields([[maybe_unused]] body_control::proxy::BodyControlProxy& proxy) {
+        if constexpr (kSub_body_control_OutsideAirQuality) {
+            proxy.OutsideAirQuality.Subscribe(10);
+        }
+        if constexpr (kSub_body_control_RainSensorLevel) {
+            proxy.RainSensorLevel.Subscribe(10);
+        }
+        if constexpr (kSub_body_control_TargetCabinTemperature) {
+            proxy.TargetCabinTemperature.Subscribe(10);
+        }
+        if constexpr (kSub_body_control_WindowPosition) {
+            proxy.WindowPosition.Subscribe(10);
+        }
+    }
+    static constexpr bool kHas_navigation_ActiveRoute_tagged = has_on_event_v<Derived, infotainment::geo::navigation::events::ActiveRoute, ara::core::Vector<vehicle_data::LocationPoint>>;
+    static constexpr bool kHas_navigation_ActiveRoute_direct = has_on_direct_event_v<Derived, ara::core::Vector<vehicle_data::LocationPoint>>;
+    static constexpr bool kSub_navigation_ActiveRoute = kHas_navigation_ActiveRoute_tagged || kHas_navigation_ActiveRoute_direct;
+    static constexpr bool kHas_navigation_CurrentLocation_tagged = has_on_event_v<Derived, infotainment::geo::navigation::events::CurrentLocation, vehicle_data::LocationPoint>;
+    static constexpr bool kHas_navigation_CurrentLocation_direct = has_on_direct_event_v<Derived, vehicle_data::LocationPoint>;
+    static constexpr bool kSub_navigation_CurrentLocation = kHas_navigation_CurrentLocation_tagged || kHas_navigation_CurrentLocation_direct;
+
+    void bind_navigation_events([[maybe_unused]] infotainment::geo::navigation::proxy::NavigationProxy& proxy) {
+        // Event: ActiveRoute (ara::core::Vector<vehicle_data::LocationPoint>)
+        if constexpr (kHas_navigation_ActiveRoute_tagged) {
+            proxy.ActiveRoute.SetReceiveHandler([this]() {
+                auto lease = this->navigation_slot_.try_acquire();
+                if (lease) {
+                    lease->ActiveRoute.GetNewSamples([this](auto&& s) {
+                        if constexpr (std::is_same_v<ExecutionPolicy, ::reaktar::DirectExecution>) {
+                            self().on(infotainment::geo::navigation::events::ActiveRoute{}, *s);
+                        } else if constexpr (std::is_same_v<ExecutionPolicy, ::reaktar::SynchronizedExecution>) {
+                            std::lock_guard<std::mutex> lock(this->execution_policy_.mutex());
+                            self().on(infotainment::geo::navigation::events::ActiveRoute{}, *s);
+                        } else {
+                            this->execution_policy_.execute([&] {
+                                self().on(infotainment::geo::navigation::events::ActiveRoute{}, *s);
+                            });
+                        }
+                    });
+                }
+            });
+        }
+        else if constexpr (kHas_navigation_ActiveRoute_direct) {
+            proxy.ActiveRoute.SetReceiveHandler([this]() {
+                auto lease = this->navigation_slot_.try_acquire();
+                if (lease) {
+                    lease->ActiveRoute.GetNewSamples([this](auto&& s) {
+                        if constexpr (std::is_same_v<ExecutionPolicy, ::reaktar::DirectExecution>) {
+                            self().on(*s);
+                        } else if constexpr (std::is_same_v<ExecutionPolicy, ::reaktar::SynchronizedExecution>) {
+                            std::lock_guard<std::mutex> lock(this->execution_policy_.mutex());
+                            self().on(*s);
+                        } else {
+                            this->execution_policy_.execute([&] {
+                                self().on(*s);
+                            });
+                        }
+                    });
+                }
+            });
+        }
         // Event: CurrentLocation (vehicle_data::LocationPoint)
-        if constexpr (has_on_event_v<Derived, infotainment::geo::navigation::events::CurrentLocation, vehicle_data::LocationPoint>) {
-            proxy->CurrentLocation.SetReceiveHandler([this]() {
+        if constexpr (kHas_navigation_CurrentLocation_tagged) {
+            proxy.CurrentLocation.SetReceiveHandler([this]() {
                 auto lease = this->navigation_slot_.try_acquire();
                 if (lease) {
                     lease->CurrentLocation.GetNewSamples([this](auto&& s) {
@@ -1494,10 +2077,9 @@ private:
                     });
                 }
             });
-            proxy->CurrentLocation.Subscribe(10);
         }
-        else if constexpr (has_on_direct_event_v<Derived, vehicle_data::LocationPoint>) {
-            proxy->CurrentLocation.SetReceiveHandler([this]() {
+        else if constexpr (kHas_navigation_CurrentLocation_direct) {
+            proxy.CurrentLocation.SetReceiveHandler([this]() {
                 auto lease = this->navigation_slot_.try_acquire();
                 if (lease) {
                     lease->CurrentLocation.GetNewSamples([this](auto&& s) {
@@ -1514,18 +2096,82 @@ private:
                     });
                 }
             });
-            proxy->CurrentLocation.Subscribe(10);
         }
     }
 
-    void bind_navigation_fields(infotainment::geo::navigation::proxy::NavigationProxy* proxy) {
-        if (!proxy) return;
+    void subscribe_navigation_events([[maybe_unused]] infotainment::geo::navigation::proxy::NavigationProxy& proxy) {
+        if constexpr (kSub_navigation_ActiveRoute) {
+            proxy.ActiveRoute.Subscribe(10);
+        }
+        if constexpr (kSub_navigation_CurrentLocation) {
+            proxy.CurrentLocation.Subscribe(10);
+        }
     }
-    void bind_powertrain_events(powertrain::proxy::PowertrainProxy* proxy) {
-        if (!proxy) return;
+
+    void bind_navigation_fields([[maybe_unused]] infotainment::geo::navigation::proxy::NavigationProxy& proxy) {
+    }
+
+    void subscribe_navigation_fields([[maybe_unused]] infotainment::geo::navigation::proxy::NavigationProxy& proxy) {
+    }
+    static constexpr bool kHas_powertrain_BatteryModuleStatus_tagged = has_on_event_v<Derived, powertrain::events::BatteryModuleStatus, ara::core::Array<vehicle_data::BatteryCell, 4>>;
+    static constexpr bool kHas_powertrain_BatteryModuleStatus_direct = has_on_direct_event_v<Derived, ara::core::Array<vehicle_data::BatteryCell, 4>>;
+    static constexpr bool kSub_powertrain_BatteryModuleStatus = kHas_powertrain_BatteryModuleStatus_tagged || kHas_powertrain_BatteryModuleStatus_direct;
+    static constexpr bool kHas_powertrain_CabinSensors_tagged = has_on_event_v<Derived, powertrain::events::CabinSensors, vehicle_data::CabinSensorData>;
+    static constexpr bool kHas_powertrain_CabinSensors_direct = has_on_direct_event_v<Derived, vehicle_data::CabinSensorData>;
+    static constexpr bool kSub_powertrain_CabinSensors = kHas_powertrain_CabinSensors_tagged || kHas_powertrain_CabinSensors_direct;
+    static constexpr bool kHas_powertrain_SpeedHistory_tagged = has_on_event_v<Derived, powertrain::events::SpeedHistory, ara::core::Vector<float>>;
+    static constexpr bool kHas_powertrain_SpeedHistory_direct = has_on_direct_event_v<Derived, ara::core::Vector<float>>;
+    static constexpr bool kSub_powertrain_SpeedHistory = kHas_powertrain_SpeedHistory_tagged || kHas_powertrain_SpeedHistory_direct;
+    static constexpr bool kHas_powertrain_VehicleSpeed_tagged = has_on_event_v<Derived, powertrain::events::VehicleSpeed, vehicle_data::SpeedData>;
+    static constexpr bool kHas_powertrain_VehicleSpeed_direct = has_on_direct_event_v<Derived, vehicle_data::SpeedData>;
+    static constexpr bool kSub_powertrain_VehicleSpeed = kHas_powertrain_VehicleSpeed_tagged || kHas_powertrain_VehicleSpeed_direct;
+    static constexpr bool kHas_powertrain_WheelSpeeds_tagged = has_on_event_v<Derived, powertrain::events::WheelSpeeds, ara::core::Array<float, 4>>;
+    static constexpr bool kHas_powertrain_WheelSpeeds_direct = has_on_direct_event_v<Derived, ara::core::Array<float, 4>>;
+    static constexpr bool kSub_powertrain_WheelSpeeds = kHas_powertrain_WheelSpeeds_tagged || kHas_powertrain_WheelSpeeds_direct;
+
+    void bind_powertrain_events([[maybe_unused]] powertrain::proxy::PowertrainProxy& proxy) {
+        // Event: BatteryModuleStatus (ara::core::Array<vehicle_data::BatteryCell, 4>)
+        if constexpr (kHas_powertrain_BatteryModuleStatus_tagged) {
+            proxy.BatteryModuleStatus.SetReceiveHandler([this]() {
+                auto lease = this->powertrain_slot_.try_acquire();
+                if (lease) {
+                    lease->BatteryModuleStatus.GetNewSamples([this](auto&& s) {
+                        if constexpr (std::is_same_v<ExecutionPolicy, ::reaktar::DirectExecution>) {
+                            self().on(powertrain::events::BatteryModuleStatus{}, *s);
+                        } else if constexpr (std::is_same_v<ExecutionPolicy, ::reaktar::SynchronizedExecution>) {
+                            std::lock_guard<std::mutex> lock(this->execution_policy_.mutex());
+                            self().on(powertrain::events::BatteryModuleStatus{}, *s);
+                        } else {
+                            this->execution_policy_.execute([&] {
+                                self().on(powertrain::events::BatteryModuleStatus{}, *s);
+                            });
+                        }
+                    });
+                }
+            });
+        }
+        else if constexpr (kHas_powertrain_BatteryModuleStatus_direct) {
+            proxy.BatteryModuleStatus.SetReceiveHandler([this]() {
+                auto lease = this->powertrain_slot_.try_acquire();
+                if (lease) {
+                    lease->BatteryModuleStatus.GetNewSamples([this](auto&& s) {
+                        if constexpr (std::is_same_v<ExecutionPolicy, ::reaktar::DirectExecution>) {
+                            self().on(*s);
+                        } else if constexpr (std::is_same_v<ExecutionPolicy, ::reaktar::SynchronizedExecution>) {
+                            std::lock_guard<std::mutex> lock(this->execution_policy_.mutex());
+                            self().on(*s);
+                        } else {
+                            this->execution_policy_.execute([&] {
+                                self().on(*s);
+                            });
+                        }
+                    });
+                }
+            });
+        }
         // Event: CabinSensors (vehicle_data::CabinSensorData)
-        if constexpr (has_on_event_v<Derived, powertrain::events::CabinSensors, vehicle_data::CabinSensorData>) {
-            proxy->CabinSensors.SetReceiveHandler([this]() {
+        if constexpr (kHas_powertrain_CabinSensors_tagged) {
+            proxy.CabinSensors.SetReceiveHandler([this]() {
                 auto lease = this->powertrain_slot_.try_acquire();
                 if (lease) {
                     lease->CabinSensors.GetNewSamples([this](auto&& s) {
@@ -1542,10 +2188,9 @@ private:
                     });
                 }
             });
-            proxy->CabinSensors.Subscribe(10);
         }
-        else if constexpr (has_on_direct_event_v<Derived, vehicle_data::CabinSensorData>) {
-            proxy->CabinSensors.SetReceiveHandler([this]() {
+        else if constexpr (kHas_powertrain_CabinSensors_direct) {
+            proxy.CabinSensors.SetReceiveHandler([this]() {
                 auto lease = this->powertrain_slot_.try_acquire();
                 if (lease) {
                     lease->CabinSensors.GetNewSamples([this](auto&& s) {
@@ -1562,11 +2207,49 @@ private:
                     });
                 }
             });
-            proxy->CabinSensors.Subscribe(10);
+        }
+        // Event: SpeedHistory (ara::core::Vector<float>)
+        if constexpr (kHas_powertrain_SpeedHistory_tagged) {
+            proxy.SpeedHistory.SetReceiveHandler([this]() {
+                auto lease = this->powertrain_slot_.try_acquire();
+                if (lease) {
+                    lease->SpeedHistory.GetNewSamples([this](auto&& s) {
+                        if constexpr (std::is_same_v<ExecutionPolicy, ::reaktar::DirectExecution>) {
+                            self().on(powertrain::events::SpeedHistory{}, *s);
+                        } else if constexpr (std::is_same_v<ExecutionPolicy, ::reaktar::SynchronizedExecution>) {
+                            std::lock_guard<std::mutex> lock(this->execution_policy_.mutex());
+                            self().on(powertrain::events::SpeedHistory{}, *s);
+                        } else {
+                            this->execution_policy_.execute([&] {
+                                self().on(powertrain::events::SpeedHistory{}, *s);
+                            });
+                        }
+                    });
+                }
+            });
+        }
+        else if constexpr (kHas_powertrain_SpeedHistory_direct) {
+            proxy.SpeedHistory.SetReceiveHandler([this]() {
+                auto lease = this->powertrain_slot_.try_acquire();
+                if (lease) {
+                    lease->SpeedHistory.GetNewSamples([this](auto&& s) {
+                        if constexpr (std::is_same_v<ExecutionPolicy, ::reaktar::DirectExecution>) {
+                            self().on(*s);
+                        } else if constexpr (std::is_same_v<ExecutionPolicy, ::reaktar::SynchronizedExecution>) {
+                            std::lock_guard<std::mutex> lock(this->execution_policy_.mutex());
+                            self().on(*s);
+                        } else {
+                            this->execution_policy_.execute([&] {
+                                self().on(*s);
+                            });
+                        }
+                    });
+                }
+            });
         }
         // Event: VehicleSpeed (vehicle_data::SpeedData)
-        if constexpr (has_on_event_v<Derived, powertrain::events::VehicleSpeed, vehicle_data::SpeedData>) {
-            proxy->VehicleSpeed.SetReceiveHandler([this]() {
+        if constexpr (kHas_powertrain_VehicleSpeed_tagged) {
+            proxy.VehicleSpeed.SetReceiveHandler([this]() {
                 auto lease = this->powertrain_slot_.try_acquire();
                 if (lease) {
                     lease->VehicleSpeed.GetNewSamples([this](auto&& s) {
@@ -1583,10 +2266,9 @@ private:
                     });
                 }
             });
-            proxy->VehicleSpeed.Subscribe(10);
         }
-        else if constexpr (has_on_direct_event_v<Derived, vehicle_data::SpeedData>) {
-            proxy->VehicleSpeed.SetReceiveHandler([this]() {
+        else if constexpr (kHas_powertrain_VehicleSpeed_direct) {
+            proxy.VehicleSpeed.SetReceiveHandler([this]() {
                 auto lease = this->powertrain_slot_.try_acquire();
                 if (lease) {
                     lease->VehicleSpeed.GetNewSamples([this](auto&& s) {
@@ -1603,12 +2285,70 @@ private:
                     });
                 }
             });
-            proxy->VehicleSpeed.Subscribe(10);
+        }
+        // Event: WheelSpeeds (ara::core::Array<float, 4>)
+        if constexpr (kHas_powertrain_WheelSpeeds_tagged) {
+            proxy.WheelSpeeds.SetReceiveHandler([this]() {
+                auto lease = this->powertrain_slot_.try_acquire();
+                if (lease) {
+                    lease->WheelSpeeds.GetNewSamples([this](auto&& s) {
+                        if constexpr (std::is_same_v<ExecutionPolicy, ::reaktar::DirectExecution>) {
+                            self().on(powertrain::events::WheelSpeeds{}, *s);
+                        } else if constexpr (std::is_same_v<ExecutionPolicy, ::reaktar::SynchronizedExecution>) {
+                            std::lock_guard<std::mutex> lock(this->execution_policy_.mutex());
+                            self().on(powertrain::events::WheelSpeeds{}, *s);
+                        } else {
+                            this->execution_policy_.execute([&] {
+                                self().on(powertrain::events::WheelSpeeds{}, *s);
+                            });
+                        }
+                    });
+                }
+            });
+        }
+        else if constexpr (kHas_powertrain_WheelSpeeds_direct) {
+            proxy.WheelSpeeds.SetReceiveHandler([this]() {
+                auto lease = this->powertrain_slot_.try_acquire();
+                if (lease) {
+                    lease->WheelSpeeds.GetNewSamples([this](auto&& s) {
+                        if constexpr (std::is_same_v<ExecutionPolicy, ::reaktar::DirectExecution>) {
+                            self().on(*s);
+                        } else if constexpr (std::is_same_v<ExecutionPolicy, ::reaktar::SynchronizedExecution>) {
+                            std::lock_guard<std::mutex> lock(this->execution_policy_.mutex());
+                            self().on(*s);
+                        } else {
+                            this->execution_policy_.execute([&] {
+                                self().on(*s);
+                            });
+                        }
+                    });
+                }
+            });
         }
     }
 
-    void bind_powertrain_fields(powertrain::proxy::PowertrainProxy* proxy) {
-        if (!proxy) return;
+    void subscribe_powertrain_events([[maybe_unused]] powertrain::proxy::PowertrainProxy& proxy) {
+        if constexpr (kSub_powertrain_BatteryModuleStatus) {
+            proxy.BatteryModuleStatus.Subscribe(10);
+        }
+        if constexpr (kSub_powertrain_CabinSensors) {
+            proxy.CabinSensors.Subscribe(10);
+        }
+        if constexpr (kSub_powertrain_SpeedHistory) {
+            proxy.SpeedHistory.Subscribe(10);
+        }
+        if constexpr (kSub_powertrain_VehicleSpeed) {
+            proxy.VehicleSpeed.Subscribe(10);
+        }
+        if constexpr (kSub_powertrain_WheelSpeeds) {
+            proxy.WheelSpeeds.Subscribe(10);
+        }
+    }
+
+    void bind_powertrain_fields([[maybe_unused]] powertrain::proxy::PowertrainProxy& proxy) {
+    }
+
+    void subscribe_powertrain_fields([[maybe_unused]] powertrain::proxy::PowertrainProxy& proxy) {
     }
 };
 
