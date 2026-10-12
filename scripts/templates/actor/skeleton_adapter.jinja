@@ -14,7 +14,7 @@
 {% for m in skel.methods %}
 {% if m.is_faf %}
         void {{ m.name }}({% for a in m.in_args %}{{ a.pass_type }} {{ a.name }}{{ ", " if not loop.last else "" }}{% endfor %}) override {
-            using Port_ = typename Base::ports::{{ skel.port_name }};
+            using Port_ = typename ActorBase::ports::{{ skel.port_name }};
             using PortMethodTag_ = typename Port_::{{ m.name }};
             using PortAny_ = typename Port_::Any;
             using MethodTag = {{ m.tag }};
@@ -93,7 +93,7 @@
             }
 {% else %}
             else if constexpr (kHas_direct) {
-                static_assert(!sizeof(Derived*), "reaktar::on() collision: RPC method argument signature is shared across multiple methods. You must specify the method tag: on(MethodTag, ...) or port tag: on(typename Base::ports::{{ skel.port_name }}::{{ m.name }}, ...).");
+                static_assert(!sizeof(Derived*), "reaktar::on() collision: RPC method argument signature is shared across multiple methods. You must specify the method tag: on(MethodTag, ...) or port tag: on(typename ActorBase::ports::{{ skel.port_name }}::{{ m.name }}, ...).");
             }
 {% endif %}
             else if constexpr (kHas_global_any) {
@@ -107,7 +107,7 @@
         using {{ m.name }}RetType = decltype(std::declval<{{ skel.cls }}&>().{{ m.name }}({% for a in m.in_args %}std::declval<{{ a.pass_type }}>(){{ ", " if not loop.last else "" }}{% endfor %}));
 
         {{ m.name }}RetType {{ m.name }}({% for a in m.in_args %}{{ a.pass_type }} {{ a.name }}{{ ", " if not loop.last else "" }}{% endfor %}) override {
-            using Port_ = typename Base::ports::{{ skel.port_name }};
+            using Port_ = typename ActorBase::ports::{{ skel.port_name }};
             using PortMethodTag_ = typename Port_::{{ m.name }};
             using PortAny_ = typename Port_::Any;
             using MethodTag = {{ m.tag }};
@@ -192,7 +192,7 @@
             }
 {% else %}
             else if constexpr (kHas_direct) {
-                static_assert(!sizeof(Derived*), "reaktar::on() collision: RPC method argument signature is shared across multiple methods. You must specify the method tag: on(MethodTag, ...) or port tag: on(typename Base::ports::{{ skel.port_name }}::{{ m.name }}, ...).");
+                static_assert(!sizeof(Derived*), "reaktar::on() collision: RPC method argument signature is shared across multiple methods. You must specify the method tag: on(MethodTag, ...) or port tag: on(typename ActorBase::ports::{{ skel.port_name }}::{{ m.name }}, ...).");
             }
 {% endif %}
             else if constexpr (kHas_global_any) {

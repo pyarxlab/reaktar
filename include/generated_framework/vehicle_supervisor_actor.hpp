@@ -75,12 +75,14 @@ public:
     using WindowPosition = ::reaktar::tags::body_control::fields::WindowPosition;
 
     using Any = ::reaktar::Any;
+    using All = Any;
 
     // ------------------------------------------------------------------------
     // Generated AUTOSAR Port Tags
     // ------------------------------------------------------------------------
     struct ports {
         using Any = ::reaktar::Any;
+        using All = Any;
         struct SupervisorPort : public ::reaktar::ProvidedPortTag {
             static constexpr std::string_view name = "SupervisorPort";
             static constexpr size_t port_index = 0;
@@ -91,90 +93,125 @@ public:
                 using port_type = SupervisorPort;
                 static constexpr std::string_view port_name = "SupervisorPort";
             };
+            using All = Any;
             struct ActiveDiagnosticMap {
                 using port_type = SupervisorPort;
                 static constexpr std::string_view port_name = "SupervisorPort";
                 static constexpr std::string_view event_name = "ActiveDiagnosticMap";
+                using Any = ::reaktar::tags::vehicle_supervisor::events::ActiveDiagnosticMap::Any;
+                using All = Any;
             };
             struct DiagnosticsReport {
                 using port_type = SupervisorPort;
                 static constexpr std::string_view port_name = "SupervisorPort";
                 static constexpr std::string_view event_name = "DiagnosticsReport";
+                using Any = ::reaktar::tags::vehicle_supervisor::events::DiagnosticsReport::Any;
+                using All = Any;
             };
             struct DriveHistory {
                 using port_type = SupervisorPort;
                 static constexpr std::string_view port_name = "SupervisorPort";
                 static constexpr std::string_view event_name = "DriveHistory";
+                using Any = ::reaktar::tags::vehicle_supervisor::events::DriveHistory::Any;
+                using All = Any;
             };
             struct EmergencyAlert {
                 using port_type = SupervisorPort;
                 static constexpr std::string_view port_name = "SupervisorPort";
                 static constexpr std::string_view event_name = "EmergencyAlert";
+                using Any = ::reaktar::tags::vehicle_supervisor::events::EmergencyAlert::Any;
+                using All = Any;
             };
             struct PrimaryWarning {
                 using port_type = SupervisorPort;
                 static constexpr std::string_view port_name = "SupervisorPort";
                 static constexpr std::string_view event_name = "PrimaryWarning";
+                using Any = ::reaktar::tags::vehicle_supervisor::events::PrimaryWarning::Any;
+                using All = Any;
             };
             struct SecondaryWarning {
                 using port_type = SupervisorPort;
                 static constexpr std::string_view port_name = "SupervisorPort";
                 static constexpr std::string_view event_name = "SecondaryWarning";
+                using Any = ::reaktar::tags::vehicle_supervisor::events::SecondaryWarning::Any;
+                using All = Any;
             };
             struct ActiveAlerts {
                 using port_type = SupervisorPort;
                 static constexpr std::string_view port_name = "SupervisorPort";
                 static constexpr std::string_view field_name = "ActiveAlerts";
+                using Any = ::reaktar::tags::vehicle_supervisor::fields::ActiveAlerts::Any;
+                using All = Any;
             };
             struct CalibrationKey {
                 using port_type = SupervisorPort;
                 static constexpr std::string_view port_name = "SupervisorPort";
                 static constexpr std::string_view field_name = "CalibrationKey";
+                using Any = ::reaktar::tags::vehicle_supervisor::fields::CalibrationKey::Any;
+                using All = Any;
             };
             struct CurrentDriveMode {
                 using port_type = SupervisorPort;
                 static constexpr std::string_view port_name = "SupervisorPort";
                 static constexpr std::string_view field_name = "CurrentDriveMode";
+                using Any = ::reaktar::tags::vehicle_supervisor::fields::CurrentDriveMode::Any;
+                using All = Any;
             };
             struct FeatureFlags {
                 using port_type = SupervisorPort;
                 static constexpr std::string_view port_name = "SupervisorPort";
                 static constexpr std::string_view field_name = "FeatureFlags";
+                using Any = ::reaktar::tags::vehicle_supervisor::fields::FeatureFlags::Any;
+                using All = Any;
             };
             struct HardwareRevision {
                 using port_type = SupervisorPort;
                 static constexpr std::string_view port_name = "SupervisorPort";
                 static constexpr std::string_view field_name = "HardwareRevision";
+                using Any = ::reaktar::tags::vehicle_supervisor::fields::HardwareRevision::Any;
+                using All = Any;
             };
             struct SystemMatrix {
                 using port_type = SupervisorPort;
                 static constexpr std::string_view port_name = "SupervisorPort";
                 static constexpr std::string_view field_name = "SystemMatrix";
+                using Any = ::reaktar::tags::vehicle_supervisor::fields::SystemMatrix::Any;
+                using All = Any;
             };
             struct VehicleConfig {
                 using port_type = SupervisorPort;
                 static constexpr std::string_view port_name = "SupervisorPort";
                 static constexpr std::string_view field_name = "VehicleConfig";
+                using Any = ::reaktar::tags::vehicle_supervisor::fields::VehicleConfig::Any;
+                using All = Any;
             };
             struct CalibrateOdometer {
                 using port_type = SupervisorPort;
                 static constexpr std::string_view port_name = "SupervisorPort";
                 static constexpr std::string_view method_name = "CalibrateOdometer";
+                using Any = ::reaktar::tags::vehicle_supervisor::methods::CalibrateOdometer::Any;
+                using All = Any;
             };
             struct ResetTripMeter {
                 using port_type = SupervisorPort;
                 static constexpr std::string_view port_name = "SupervisorPort";
                 static constexpr std::string_view method_name = "ResetTripMeter";
+                using Any = ::reaktar::tags::vehicle_supervisor::methods::ResetTripMeter::Any;
+                using All = Any;
             };
             struct SetSpeedLimiter {
                 using port_type = SupervisorPort;
                 static constexpr std::string_view port_name = "SupervisorPort";
                 static constexpr std::string_view method_name = "SetSpeedLimiter";
+                using Any = ::reaktar::tags::vehicle_supervisor::methods::SetSpeedLimiter::Any;
+                using All = Any;
             };
             struct TriggerDiagnostic {
                 using port_type = SupervisorPort;
                 static constexpr std::string_view port_name = "SupervisorPort";
                 static constexpr std::string_view method_name = "TriggerDiagnostic";
+                using Any = ::reaktar::tags::vehicle_supervisor::methods::TriggerDiagnostic::Any;
+                using All = Any;
             };
         };
         struct BodyControlIn : public ::reaktar::RequiredPortTag {
@@ -187,35 +224,48 @@ public:
                 using port_type = BodyControlIn;
                 static constexpr std::string_view port_name = "BodyControlIn";
             };
+            using All = Any;
             struct OutsideAirQuality {
                 using port_type = BodyControlIn;
                 static constexpr std::string_view port_name = "BodyControlIn";
                 static constexpr std::string_view field_name = "OutsideAirQuality";
+                using Any = ::reaktar::tags::body_control::fields::OutsideAirQuality::Any;
+                using All = Any;
             };
             struct RainSensorLevel {
                 using port_type = BodyControlIn;
                 static constexpr std::string_view port_name = "BodyControlIn";
                 static constexpr std::string_view field_name = "RainSensorLevel";
+                using Any = ::reaktar::tags::body_control::fields::RainSensorLevel::Any;
+                using All = Any;
             };
             struct TargetCabinTemperature {
                 using port_type = BodyControlIn;
                 static constexpr std::string_view port_name = "BodyControlIn";
                 static constexpr std::string_view field_name = "TargetCabinTemperature";
+                using Any = ::reaktar::tags::body_control::fields::TargetCabinTemperature::Any;
+                using All = Any;
             };
             struct WindowPosition {
                 using port_type = BodyControlIn;
                 static constexpr std::string_view port_name = "BodyControlIn";
                 static constexpr std::string_view field_name = "WindowPosition";
+                using Any = ::reaktar::tags::body_control::fields::WindowPosition::Any;
+                using All = Any;
             };
             struct FlashLights {
                 using port_type = BodyControlIn;
                 static constexpr std::string_view port_name = "BodyControlIn";
                 static constexpr std::string_view method_name = "FlashLights";
+                using Any = ::reaktar::tags::body_control::methods::FlashLights::Any;
+                using All = Any;
             };
             struct LockDoors {
                 using port_type = BodyControlIn;
                 static constexpr std::string_view port_name = "BodyControlIn";
                 static constexpr std::string_view method_name = "LockDoors";
+                using Any = ::reaktar::tags::body_control::methods::LockDoors::Any;
+                using All = Any;
             };
         };
         struct PowertrainIn : public ::reaktar::RequiredPortTag {
@@ -228,30 +278,41 @@ public:
                 using port_type = PowertrainIn;
                 static constexpr std::string_view port_name = "PowertrainIn";
             };
+            using All = Any;
             struct BatteryModuleStatus {
                 using port_type = PowertrainIn;
                 static constexpr std::string_view port_name = "PowertrainIn";
                 static constexpr std::string_view event_name = "BatteryModuleStatus";
+                using Any = ::reaktar::tags::powertrain::events::BatteryModuleStatus::Any;
+                using All = Any;
             };
             struct CabinSensors {
                 using port_type = PowertrainIn;
                 static constexpr std::string_view port_name = "PowertrainIn";
                 static constexpr std::string_view event_name = "CabinSensors";
+                using Any = ::reaktar::tags::powertrain::events::CabinSensors::Any;
+                using All = Any;
             };
             struct SpeedHistory {
                 using port_type = PowertrainIn;
                 static constexpr std::string_view port_name = "PowertrainIn";
                 static constexpr std::string_view event_name = "SpeedHistory";
+                using Any = ::reaktar::tags::powertrain::events::SpeedHistory::Any;
+                using All = Any;
             };
             struct VehicleSpeed {
                 using port_type = PowertrainIn;
                 static constexpr std::string_view port_name = "PowertrainIn";
                 static constexpr std::string_view event_name = "VehicleSpeed";
+                using Any = ::reaktar::tags::powertrain::events::VehicleSpeed::Any;
+                using All = Any;
             };
             struct WheelSpeeds {
                 using port_type = PowertrainIn;
                 static constexpr std::string_view port_name = "PowertrainIn";
                 static constexpr std::string_view event_name = "WheelSpeeds";
+                using Any = ::reaktar::tags::powertrain::events::WheelSpeeds::Any;
+                using All = Any;
             };
         };
         static constexpr size_t kPortCount = 3;
@@ -281,6 +342,177 @@ public:
         using BodyControl = BodyControlIn;
         using Powertrain = PowertrainIn;
         using Supervisor = SupervisorPort;
+    };
+
+    // ------------------------------------------------------------------------
+    // Type Traits for Low-Level Static & Unit-Level Invocability Testing
+    // ------------------------------------------------------------------------
+    struct traits {
+        // --- 1. Bare Untagged emit(payload) Traits ---
+        template <typename Payload>
+        static constexpr bool is_ambiguous_emit_v =
+            std::is_same_v<std::decay_t<Payload>, uint16_t> ||
+            false;
+
+        template <typename Payload>
+        static constexpr bool can_emit_v =
+            std::is_same_v<std::decay_t<Payload>, ara::core::Map<uint32_t, vehicle_data::EmergencyAlert>> ||
+            std::is_same_v<std::decay_t<Payload>, vehicle_data::VehicleDiagnostics> ||
+            std::is_same_v<std::decay_t<Payload>, ara::core::Vector<vehicle_data::DriveMode>> ||
+            std::is_same_v<std::decay_t<Payload>, vehicle_data::EmergencyAlert> ||
+            std::is_same_v<std::decay_t<Payload>, ara::core::Vector<vehicle_data::EmergencyAlert>> ||
+            std::is_same_v<std::decay_t<Payload>, ara::core::Array<vehicle_data::SystemStatus, 4>> ||
+            std::is_same_v<std::decay_t<Payload>, bool> ||
+            std::is_same_v<std::decay_t<Payload>, float> ||
+            std::is_same_v<std::decay_t<Payload>, uint32_t> ||
+            false;
+
+        // --- 2. Port Validity & Capability Traits ---
+        template <typename Port>
+        static constexpr bool is_valid_port_v =
+            std::is_same_v<Port, ports::SupervisorPort> ||
+            std::is_same_v<Port, ports::BodyControlIn> ||
+            std::is_same_v<Port, ports::PowertrainIn> ||
+            false;
+
+        template <typename Port>
+        static constexpr bool has_port_outbound_v =
+            std::is_same_v<Port, ports::BodyControlIn> ||
+            std::is_same_v<Port, ports::SupervisorPort> ||
+            false;
+
+        // --- 3. Port-Targeted emit<Port>(payload) Traits ---
+        template <typename Port, typename Payload>
+        static constexpr bool is_port_payload_ambiguous_v =
+            (std::is_same_v<Port, ports::SupervisorPort> && std::is_same_v<std::decay_t<Payload>, uint16_t>) ||
+            false;
+
+        template <typename Port, typename Payload>
+        static constexpr bool can_port_emit_v =
+            (std::is_same_v<Port, ports::BodyControlIn> && std::is_same_v<std::decay_t<Payload>, bool>) ||
+            (std::is_same_v<Port, ports::BodyControlIn> && std::is_same_v<std::decay_t<Payload>, float>) ||
+            (std::is_same_v<Port, ports::BodyControlIn> && std::is_same_v<std::decay_t<Payload>, uint32_t>) ||
+            (std::is_same_v<Port, ports::SupervisorPort> && std::is_same_v<std::decay_t<Payload>, ara::core::Array<vehicle_data::SystemStatus, 4>>) ||
+            (std::is_same_v<Port, ports::SupervisorPort> && std::is_same_v<std::decay_t<Payload>, ara::core::Map<uint32_t, vehicle_data::EmergencyAlert>>) ||
+            (std::is_same_v<Port, ports::SupervisorPort> && std::is_same_v<std::decay_t<Payload>, ara::core::Vector<vehicle_data::DriveMode>>) ||
+            (std::is_same_v<Port, ports::SupervisorPort> && std::is_same_v<std::decay_t<Payload>, ara::core::Vector<vehicle_data::EmergencyAlert>>) ||
+            (std::is_same_v<Port, ports::SupervisorPort> && std::is_same_v<std::decay_t<Payload>, vehicle_data::EmergencyAlert>) ||
+            (std::is_same_v<Port, ports::SupervisorPort> && std::is_same_v<std::decay_t<Payload>, vehicle_data::VehicleDiagnostics>) ||
+            false;
+
+        // --- 4. Tag Invocability & Ambiguity Traits ---
+        template <typename Tag>
+        static constexpr bool is_ambiguous_tag_v =
+            false;
+
+        template <typename Tag>
+        static constexpr bool can_tag_emit_v =
+            std::is_same_v<Tag, ports::SupervisorPort::ActiveDiagnosticMap> ||
+            std::is_same_v<Tag, ::reaktar::tags::vehicle_supervisor::events::ActiveDiagnosticMap> ||
+            std::is_same_v<Tag, ports::SupervisorPort::DiagnosticsReport> ||
+            std::is_same_v<Tag, ::reaktar::tags::vehicle_supervisor::events::DiagnosticsReport> ||
+            std::is_same_v<Tag, ports::SupervisorPort::DriveHistory> ||
+            std::is_same_v<Tag, ::reaktar::tags::vehicle_supervisor::events::DriveHistory> ||
+            std::is_same_v<Tag, ports::SupervisorPort::EmergencyAlert> ||
+            std::is_same_v<Tag, ::reaktar::tags::vehicle_supervisor::events::EmergencyAlert> ||
+            std::is_same_v<Tag, ports::SupervisorPort::PrimaryWarning> ||
+            std::is_same_v<Tag, ::reaktar::tags::vehicle_supervisor::events::PrimaryWarning> ||
+            std::is_same_v<Tag, ports::SupervisorPort::SecondaryWarning> ||
+            std::is_same_v<Tag, ::reaktar::tags::vehicle_supervisor::events::SecondaryWarning> ||
+            std::is_same_v<Tag, ports::SupervisorPort::ActiveAlerts> ||
+            std::is_same_v<Tag, ::reaktar::tags::vehicle_supervisor::fields::ActiveAlerts> ||
+            std::is_same_v<Tag, ports::SupervisorPort::SystemMatrix> ||
+            std::is_same_v<Tag, ::reaktar::tags::vehicle_supervisor::fields::SystemMatrix> ||
+            std::is_same_v<Tag, ports::BodyControlIn::FlashLights> ||
+            std::is_same_v<Tag, ::reaktar::tags::body_control::methods::FlashLights> ||
+            std::is_same_v<Tag, ports::BodyControlIn::LockDoors> ||
+            std::is_same_v<Tag, ::reaktar::tags::body_control::methods::LockDoors> ||
+            std::is_same_v<Tag, ports::BodyControlIn::TargetCabinTemperature> ||
+            std::is_same_v<Tag, ::reaktar::tags::body_control::fields::TargetCabinTemperature> ||
+            std::is_same_v<Tag, ports::BodyControlIn::WindowPosition> ||
+            std::is_same_v<Tag, ::reaktar::tags::body_control::fields::WindowPosition> ||
+            false;
+
+        // --- 5. Global Wildcard Fan-Out (emit<reaktar::Any>(payload)) ---
+        template <typename Payload>
+        static constexpr bool can_fan_out_v =
+            std::is_same_v<std::decay_t<Payload>, ara::core::Array<vehicle_data::SystemStatus, 4>> ||
+            std::is_same_v<std::decay_t<Payload>, ara::core::Map<uint32_t, vehicle_data::EmergencyAlert>> ||
+            std::is_same_v<std::decay_t<Payload>, ara::core::Vector<vehicle_data::DriveMode>> ||
+            std::is_same_v<std::decay_t<Payload>, ara::core::Vector<vehicle_data::EmergencyAlert>> ||
+            std::is_same_v<std::decay_t<Payload>, uint16_t> ||
+            std::is_same_v<std::decay_t<Payload>, vehicle_data::EmergencyAlert> ||
+            std::is_same_v<std::decay_t<Payload>, vehicle_data::VehicleDiagnostics> ||
+            false;
+
+        template <typename Payload>
+        static constexpr size_t fan_out_target_count_v =
+            std::is_same_v<std::decay_t<Payload>, ara::core::Array<vehicle_data::SystemStatus, 4>> ? 1 :
+            std::is_same_v<std::decay_t<Payload>, ara::core::Map<uint32_t, vehicle_data::EmergencyAlert>> ? 1 :
+            std::is_same_v<std::decay_t<Payload>, ara::core::Vector<vehicle_data::DriveMode>> ? 1 :
+            std::is_same_v<std::decay_t<Payload>, ara::core::Vector<vehicle_data::EmergencyAlert>> ? 1 :
+            std::is_same_v<std::decay_t<Payload>, uint16_t> ? 2 :
+            std::is_same_v<std::decay_t<Payload>, vehicle_data::EmergencyAlert> ? 1 :
+            std::is_same_v<std::decay_t<Payload>, vehicle_data::VehicleDiagnostics> ? 1 :
+            0;
+
+        // --- 6. Tagged Wildcard Fan-Out (emit<Tag::Any>(args...)) ---
+        template <typename Tag>
+        static constexpr bool can_tag_fan_out_v =
+            std::is_same_v<Tag, ::reaktar::tags::body_control::methods::FlashLights::Any> ||
+            std::is_same_v<Tag, ::reaktar::tags::powertrain::events::BatteryModuleStatus::Any> ||
+            std::is_same_v<Tag, ::reaktar::tags::powertrain::events::CabinSensors::Any> ||
+            std::is_same_v<Tag, ::reaktar::tags::powertrain::events::SpeedHistory::Any> ||
+            std::is_same_v<Tag, ::reaktar::tags::powertrain::events::VehicleSpeed::Any> ||
+            std::is_same_v<Tag, ::reaktar::tags::powertrain::events::WheelSpeeds::Any> ||
+            std::is_same_v<Tag, ::reaktar::tags::vehicle_supervisor::events::ActiveDiagnosticMap::Any> ||
+            std::is_same_v<Tag, ::reaktar::tags::vehicle_supervisor::events::DiagnosticsReport::Any> ||
+            std::is_same_v<Tag, ::reaktar::tags::vehicle_supervisor::events::DriveHistory::Any> ||
+            std::is_same_v<Tag, ::reaktar::tags::vehicle_supervisor::events::EmergencyAlert::Any> ||
+            std::is_same_v<Tag, ::reaktar::tags::vehicle_supervisor::events::PrimaryWarning::Any> ||
+            std::is_same_v<Tag, ::reaktar::tags::vehicle_supervisor::events::SecondaryWarning::Any> ||
+            std::is_same_v<Tag, ::reaktar::tags::vehicle_supervisor::methods::ResetTripMeter::Any> ||
+            std::is_same_v<Tag, ::reaktar::tags::vehicle_supervisor::fields::ActiveAlerts::Any> ||
+            std::is_same_v<Tag, ::reaktar::tags::vehicle_supervisor::fields::SystemMatrix::Any> ||
+            false;
+
+        template <typename Tag>
+        static constexpr bool is_rejected_fan_out_tag_v =
+            std::is_same_v<Tag, ::reaktar::tags::body_control::methods::LockDoors::Any> ||
+            std::is_same_v<Tag, ::reaktar::tags::body_control::fields::OutsideAirQuality::Any> ||
+            std::is_same_v<Tag, ::reaktar::tags::body_control::fields::RainSensorLevel::Any> ||
+            std::is_same_v<Tag, ::reaktar::tags::body_control::fields::TargetCabinTemperature::Any> ||
+            std::is_same_v<Tag, ::reaktar::tags::body_control::fields::WindowPosition::Any> ||
+            std::is_same_v<Tag, ::reaktar::tags::vehicle_supervisor::methods::CalibrateOdometer::Any> ||
+            std::is_same_v<Tag, ::reaktar::tags::vehicle_supervisor::methods::SetSpeedLimiter::Any> ||
+            std::is_same_v<Tag, ::reaktar::tags::vehicle_supervisor::methods::TriggerDiagnostic::Any> ||
+            std::is_same_v<Tag, ::reaktar::tags::vehicle_supervisor::fields::ActiveAlerts::Any> ||
+            std::is_same_v<Tag, ::reaktar::tags::vehicle_supervisor::fields::CalibrationKey::Any> ||
+            std::is_same_v<Tag, ::reaktar::tags::vehicle_supervisor::fields::CurrentDriveMode::Any> ||
+            std::is_same_v<Tag, ::reaktar::tags::vehicle_supervisor::fields::FeatureFlags::Any> ||
+            std::is_same_v<Tag, ::reaktar::tags::vehicle_supervisor::fields::HardwareRevision::Any> ||
+            std::is_same_v<Tag, ::reaktar::tags::vehicle_supervisor::fields::VehicleConfig::Any> ||
+            false;
+
+        // --- 7. Tagged Wildcard Fan-Out Arguments Matching ---
+        template <typename Tag, typename... Args>
+        static constexpr bool can_tag_fan_out_with_args_v =
+            (std::is_same_v<Tag, ::reaktar::tags::body_control::methods::FlashLights::Any> && std::is_same_v<std::tuple<std::decay_t<Args>...>, std::tuple<uint32_t, uint32_t>>) ||
+            (std::is_same_v<Tag, ::reaktar::tags::powertrain::events::BatteryModuleStatus::Any> && std::is_same_v<std::tuple<std::decay_t<Args>...>, std::tuple<ara::core::Array<vehicle_data::BatteryCell, 4>>>) ||
+            (std::is_same_v<Tag, ::reaktar::tags::powertrain::events::CabinSensors::Any> && std::is_same_v<std::tuple<std::decay_t<Args>...>, std::tuple<vehicle_data::CabinSensorData>>) ||
+            (std::is_same_v<Tag, ::reaktar::tags::powertrain::events::SpeedHistory::Any> && std::is_same_v<std::tuple<std::decay_t<Args>...>, std::tuple<ara::core::Vector<float>>>) ||
+            (std::is_same_v<Tag, ::reaktar::tags::powertrain::events::VehicleSpeed::Any> && std::is_same_v<std::tuple<std::decay_t<Args>...>, std::tuple<vehicle_data::SpeedData>>) ||
+            (std::is_same_v<Tag, ::reaktar::tags::powertrain::events::WheelSpeeds::Any> && std::is_same_v<std::tuple<std::decay_t<Args>...>, std::tuple<ara::core::Array<float, 4>>>) ||
+            (std::is_same_v<Tag, ::reaktar::tags::vehicle_supervisor::events::ActiveDiagnosticMap::Any> && std::is_same_v<std::tuple<std::decay_t<Args>...>, std::tuple<ara::core::Map<uint32_t, vehicle_data::EmergencyAlert>>>) ||
+            (std::is_same_v<Tag, ::reaktar::tags::vehicle_supervisor::events::DiagnosticsReport::Any> && std::is_same_v<std::tuple<std::decay_t<Args>...>, std::tuple<vehicle_data::VehicleDiagnostics>>) ||
+            (std::is_same_v<Tag, ::reaktar::tags::vehicle_supervisor::events::DriveHistory::Any> && std::is_same_v<std::tuple<std::decay_t<Args>...>, std::tuple<ara::core::Vector<vehicle_data::DriveMode>>>) ||
+            (std::is_same_v<Tag, ::reaktar::tags::vehicle_supervisor::events::EmergencyAlert::Any> && std::is_same_v<std::tuple<std::decay_t<Args>...>, std::tuple<vehicle_data::EmergencyAlert>>) ||
+            (std::is_same_v<Tag, ::reaktar::tags::vehicle_supervisor::events::PrimaryWarning::Any> && std::is_same_v<std::tuple<std::decay_t<Args>...>, std::tuple<uint16_t>>) ||
+            (std::is_same_v<Tag, ::reaktar::tags::vehicle_supervisor::events::SecondaryWarning::Any> && std::is_same_v<std::tuple<std::decay_t<Args>...>, std::tuple<uint16_t>>) ||
+            (std::is_same_v<Tag, ::reaktar::tags::vehicle_supervisor::methods::ResetTripMeter::Any> && std::is_same_v<std::tuple<std::decay_t<Args>...>, std::tuple<>>) ||
+            (std::is_same_v<Tag, ::reaktar::tags::vehicle_supervisor::fields::ActiveAlerts::Any> && std::is_same_v<std::tuple<std::decay_t<Args>...>, std::tuple<ara::core::Vector<vehicle_data::EmergencyAlert>>>) ||
+            (std::is_same_v<Tag, ::reaktar::tags::vehicle_supervisor::fields::SystemMatrix::Any> && std::is_same_v<std::tuple<std::decay_t<Args>...>, std::tuple<ara::core::Array<vehicle_data::SystemStatus, 4>>>) ||
+            false;
     };
 
     VehicleSupervisorActorBase() = default;
@@ -428,28 +660,29 @@ protected:
 template <typename Derived, typename ExecutionPolicy = ::reaktar::DirectExecution>
 class VehicleSupervisorActor : public VehicleSupervisorActorBase {
 public:
-    using Base = VehicleSupervisorActorBase;
-    using Base::ports;
+    using ActorBase = VehicleSupervisorActorBase;
+    using ActorBase::ports;
+    using ActorBase::traits;
     using execution_policy_type = ExecutionPolicy;
-    using Base::get_bodycontrolin_proxy;
-    using Base::is_bodycontrolin_ready;
-    using Base::acquire_bodycontrolin_proxy;
-    using Base::get_bodycontrolin_handle;
-    using Base::get_body_control_proxy;
-    using Base::is_body_control_ready;
-    using Base::acquire_body_control_proxy;
-    using Base::get_body_control_handle;
-    using Base::get_powertrainin_proxy;
-    using Base::is_powertrainin_ready;
-    using Base::acquire_powertrainin_proxy;
-    using Base::get_powertrainin_handle;
-    using Base::get_powertrain_proxy;
-    using Base::is_powertrain_ready;
-    using Base::acquire_powertrain_proxy;
-    using Base::get_powertrain_handle;
-    using Base::get_proxy;
-    using Base::is_port_ready;
-    using Base::acquire_proxy;
+    using ActorBase::get_bodycontrolin_proxy;
+    using ActorBase::is_bodycontrolin_ready;
+    using ActorBase::acquire_bodycontrolin_proxy;
+    using ActorBase::get_bodycontrolin_handle;
+    using ActorBase::get_body_control_proxy;
+    using ActorBase::is_body_control_ready;
+    using ActorBase::acquire_body_control_proxy;
+    using ActorBase::get_body_control_handle;
+    using ActorBase::get_powertrainin_proxy;
+    using ActorBase::is_powertrainin_ready;
+    using ActorBase::acquire_powertrainin_proxy;
+    using ActorBase::get_powertrainin_handle;
+    using ActorBase::get_powertrain_proxy;
+    using ActorBase::is_powertrain_ready;
+    using ActorBase::acquire_powertrain_proxy;
+    using ActorBase::get_powertrain_handle;
+    using ActorBase::get_proxy;
+    using ActorBase::is_port_ready;
+    using ActorBase::acquire_proxy;
 
     ExecutionPolicy& execution_policy() noexcept { return execution_policy_; }
     const ExecutionPolicy& execution_policy() const noexcept { return execution_policy_; }
@@ -492,7 +725,7 @@ public:
         using CalibrateOdometerRetType = decltype(std::declval<vehicle_supervisor::skeleton::VehicleSupervisorSkeleton&>().CalibrateOdometer(std::declval<const uint32_t&>()));
 
         CalibrateOdometerRetType CalibrateOdometer(const uint32_t& current_km) override {
-            using Port_ = typename Base::ports::SupervisorPort;
+            using Port_ = typename ActorBase::ports::SupervisorPort;
             using PortMethodTag_ = typename Port_::CalibrateOdometer;
             using PortAny_ = typename Port_::Any;
             using MethodTag = ::reaktar::tags::vehicle_supervisor::methods::CalibrateOdometer;
@@ -563,7 +796,7 @@ public:
                 return dispatch([&] { return actor_->self().on(MethodTag{}, current_km); });
             }
             else if constexpr (kHas_direct) {
-                static_assert(!sizeof(Derived*), "reaktar::on() collision: RPC method argument signature is shared across multiple methods. You must specify the method tag: on(MethodTag, ...) or port tag: on(typename Base::ports::SupervisorPort::CalibrateOdometer, ...).");
+                static_assert(!sizeof(Derived*), "reaktar::on() collision: RPC method argument signature is shared across multiple methods. You must specify the method tag: on(MethodTag, ...) or port tag: on(typename ActorBase::ports::SupervisorPort::CalibrateOdometer, ...).");
             }
             else if constexpr (kHas_global_any) {
                 return dispatch([&] { return actor_->self().on(GlobalAny_{}, current_km); });
@@ -573,7 +806,7 @@ public:
             }
         }
         void ResetTripMeter() override {
-            using Port_ = typename Base::ports::SupervisorPort;
+            using Port_ = typename ActorBase::ports::SupervisorPort;
             using PortMethodTag_ = typename Port_::ResetTripMeter;
             using PortAny_ = typename Port_::Any;
             using MethodTag = ::reaktar::tags::vehicle_supervisor::methods::ResetTripMeter;
@@ -650,7 +883,7 @@ public:
         using SetSpeedLimiterRetType = decltype(std::declval<vehicle_supervisor::skeleton::VehicleSupervisorSkeleton&>().SetSpeedLimiter(std::declval<const float&>(), std::declval<const bool&>()));
 
         SetSpeedLimiterRetType SetSpeedLimiter(const float& max_kmh, const bool& active) override {
-            using Port_ = typename Base::ports::SupervisorPort;
+            using Port_ = typename ActorBase::ports::SupervisorPort;
             using PortMethodTag_ = typename Port_::SetSpeedLimiter;
             using PortAny_ = typename Port_::Any;
             using MethodTag = ::reaktar::tags::vehicle_supervisor::methods::SetSpeedLimiter;
@@ -733,7 +966,7 @@ public:
         using TriggerDiagnosticRetType = decltype(std::declval<vehicle_supervisor::skeleton::VehicleSupervisorSkeleton&>().TriggerDiagnostic(std::declval<const uint32_t&>()));
 
         TriggerDiagnosticRetType TriggerDiagnostic(const uint32_t& code) override {
-            using Port_ = typename Base::ports::SupervisorPort;
+            using Port_ = typename ActorBase::ports::SupervisorPort;
             using PortMethodTag_ = typename Port_::TriggerDiagnostic;
             using PortAny_ = typename Port_::Any;
             using MethodTag = ::reaktar::tags::vehicle_supervisor::methods::TriggerDiagnostic;
@@ -804,7 +1037,7 @@ public:
                 return dispatch([&] { return actor_->self().on(MethodTag{}, code); });
             }
             else if constexpr (kHas_direct) {
-                static_assert(!sizeof(Derived*), "reaktar::on() collision: RPC method argument signature is shared across multiple methods. You must specify the method tag: on(MethodTag, ...) or port tag: on(typename Base::ports::SupervisorPort::TriggerDiagnostic, ...).");
+                static_assert(!sizeof(Derived*), "reaktar::on() collision: RPC method argument signature is shared across multiple methods. You must specify the method tag: on(MethodTag, ...) or port tag: on(typename ActorBase::ports::SupervisorPort::TriggerDiagnostic, ...).");
             }
             else if constexpr (kHas_global_any) {
                 return dispatch([&] { return actor_->self().on(GlobalAny_{}, code); });
@@ -824,12 +1057,12 @@ public:
     using legal_signatures = std::tuple<
         reaktar::sig<>,
         reaktar::sig<::reaktar::Any>,
-        reaktar::sig<::reaktar::Connected<typename Base::ports::BodyControlIn>>,
-        reaktar::sig<::reaktar::Connected<typename Base::ports::PowertrainIn>>,
-        reaktar::sig<::reaktar::Connected<typename Base::ports::SupervisorPort>>,
-        reaktar::sig<::reaktar::Disconnected<typename Base::ports::BodyControlIn>>,
-        reaktar::sig<::reaktar::Disconnected<typename Base::ports::PowertrainIn>>,
-        reaktar::sig<::reaktar::Disconnected<typename Base::ports::SupervisorPort>>,
+        reaktar::sig<::reaktar::Connected<typename ActorBase::ports::BodyControlIn>>,
+        reaktar::sig<::reaktar::Connected<typename ActorBase::ports::PowertrainIn>>,
+        reaktar::sig<::reaktar::Connected<typename ActorBase::ports::SupervisorPort>>,
+        reaktar::sig<::reaktar::Disconnected<typename ActorBase::ports::BodyControlIn>>,
+        reaktar::sig<::reaktar::Disconnected<typename ActorBase::ports::PowertrainIn>>,
+        reaktar::sig<::reaktar::Disconnected<typename ActorBase::ports::SupervisorPort>>,
         reaktar::sig<::reaktar::tags::vehicle_supervisor::methods::ResetTripMeter>,
         reaktar::sig<::reaktar::tags::vehicle_supervisor::methods::ResetTripMeter::Any>,
         reaktar::sig<ara::core::Array<float, 4>>,
@@ -839,9 +1072,9 @@ public:
         reaktar::sig<ara::core::Vector<float>>,
         reaktar::sig<ara::core::Vector<vehicle_data::EmergencyAlert>>,
         reaktar::sig<float>,
-        reaktar::sig<typename Base::ports::SupervisorPort>,
-        reaktar::sig<typename Base::ports::SupervisorPort::Any>,
-        reaktar::sig<typename Base::ports::SupervisorPort::ResetTripMeter>,
+        reaktar::sig<typename ActorBase::ports::SupervisorPort>,
+        reaktar::sig<typename ActorBase::ports::SupervisorPort::Any>,
+        reaktar::sig<typename ActorBase::ports::SupervisorPort::ResetTripMeter>,
         reaktar::sig<uint32_t>,
         reaktar::sig<vehicle_data::CabinSensorData>,
         reaktar::sig<vehicle_data::DriveMode>,
@@ -886,52 +1119,52 @@ public:
         reaktar::sig<::reaktar::tags::vehicle_supervisor::methods::TriggerDiagnostic, uint32_t>,
         reaktar::sig<::reaktar::tags::vehicle_supervisor::methods::TriggerDiagnostic::Any, uint32_t>,
         reaktar::sig<float, bool>,
-        reaktar::sig<typename Base::ports::BodyControlIn, float>,
-        reaktar::sig<typename Base::ports::BodyControlIn, uint32_t>,
-        reaktar::sig<typename Base::ports::BodyControlIn::Any, float>,
-        reaktar::sig<typename Base::ports::BodyControlIn::Any, uint32_t>,
-        reaktar::sig<typename Base::ports::BodyControlIn::OutsideAirQuality, uint32_t>,
-        reaktar::sig<typename Base::ports::BodyControlIn::RainSensorLevel, uint32_t>,
-        reaktar::sig<typename Base::ports::BodyControlIn::TargetCabinTemperature, float>,
-        reaktar::sig<typename Base::ports::BodyControlIn::WindowPosition, uint32_t>,
-        reaktar::sig<typename Base::ports::PowertrainIn, ara::core::Array<float, 4>>,
-        reaktar::sig<typename Base::ports::PowertrainIn, ara::core::Array<vehicle_data::BatteryCell, 4>>,
-        reaktar::sig<typename Base::ports::PowertrainIn, ara::core::Vector<float>>,
-        reaktar::sig<typename Base::ports::PowertrainIn, vehicle_data::CabinSensorData>,
-        reaktar::sig<typename Base::ports::PowertrainIn, vehicle_data::SpeedData>,
-        reaktar::sig<typename Base::ports::PowertrainIn::Any, ara::core::Array<float, 4>>,
-        reaktar::sig<typename Base::ports::PowertrainIn::Any, ara::core::Array<vehicle_data::BatteryCell, 4>>,
-        reaktar::sig<typename Base::ports::PowertrainIn::Any, ara::core::Vector<float>>,
-        reaktar::sig<typename Base::ports::PowertrainIn::Any, vehicle_data::CabinSensorData>,
-        reaktar::sig<typename Base::ports::PowertrainIn::Any, vehicle_data::SpeedData>,
-        reaktar::sig<typename Base::ports::PowertrainIn::BatteryModuleStatus, ara::core::Array<vehicle_data::BatteryCell, 4>>,
-        reaktar::sig<typename Base::ports::PowertrainIn::CabinSensors, vehicle_data::CabinSensorData>,
-        reaktar::sig<typename Base::ports::PowertrainIn::SpeedHistory, ara::core::Vector<float>>,
-        reaktar::sig<typename Base::ports::PowertrainIn::VehicleSpeed, vehicle_data::SpeedData>,
-        reaktar::sig<typename Base::ports::PowertrainIn::WheelSpeeds, ara::core::Array<float, 4>>,
-        reaktar::sig<typename Base::ports::SupervisorPort, ara::core::Map<ara::core::String, ara::core::String>>,
-        reaktar::sig<typename Base::ports::SupervisorPort, ara::core::Map<ara::core::String, bool>>,
-        reaktar::sig<typename Base::ports::SupervisorPort, ara::core::Vector<vehicle_data::EmergencyAlert>>,
-        reaktar::sig<typename Base::ports::SupervisorPort, uint32_t>,
-        reaktar::sig<typename Base::ports::SupervisorPort, vehicle_data::DriveMode>,
-        reaktar::sig<typename Base::ports::SupervisorPort::ActiveAlerts, ara::core::Vector<vehicle_data::EmergencyAlert>>,
-        reaktar::sig<typename Base::ports::SupervisorPort::Any, ara::core::Map<ara::core::String, ara::core::String>>,
-        reaktar::sig<typename Base::ports::SupervisorPort::Any, ara::core::Map<ara::core::String, bool>>,
-        reaktar::sig<typename Base::ports::SupervisorPort::Any, ara::core::Vector<vehicle_data::EmergencyAlert>>,
-        reaktar::sig<typename Base::ports::SupervisorPort::Any, uint32_t>,
-        reaktar::sig<typename Base::ports::SupervisorPort::Any, vehicle_data::DriveMode>,
-        reaktar::sig<typename Base::ports::SupervisorPort::CalibrateOdometer, uint32_t>,
-        reaktar::sig<typename Base::ports::SupervisorPort::CalibrationKey, uint32_t>,
-        reaktar::sig<typename Base::ports::SupervisorPort::CurrentDriveMode, vehicle_data::DriveMode>,
-        reaktar::sig<typename Base::ports::SupervisorPort::FeatureFlags, ara::core::Map<ara::core::String, bool>>,
-        reaktar::sig<typename Base::ports::SupervisorPort::TriggerDiagnostic, uint32_t>,
-        reaktar::sig<typename Base::ports::SupervisorPort::VehicleConfig, ara::core::Map<ara::core::String, ara::core::String>>,
+        reaktar::sig<typename ActorBase::ports::BodyControlIn, float>,
+        reaktar::sig<typename ActorBase::ports::BodyControlIn, uint32_t>,
+        reaktar::sig<typename ActorBase::ports::BodyControlIn::Any, float>,
+        reaktar::sig<typename ActorBase::ports::BodyControlIn::Any, uint32_t>,
+        reaktar::sig<typename ActorBase::ports::BodyControlIn::OutsideAirQuality, uint32_t>,
+        reaktar::sig<typename ActorBase::ports::BodyControlIn::RainSensorLevel, uint32_t>,
+        reaktar::sig<typename ActorBase::ports::BodyControlIn::TargetCabinTemperature, float>,
+        reaktar::sig<typename ActorBase::ports::BodyControlIn::WindowPosition, uint32_t>,
+        reaktar::sig<typename ActorBase::ports::PowertrainIn, ara::core::Array<float, 4>>,
+        reaktar::sig<typename ActorBase::ports::PowertrainIn, ara::core::Array<vehicle_data::BatteryCell, 4>>,
+        reaktar::sig<typename ActorBase::ports::PowertrainIn, ara::core::Vector<float>>,
+        reaktar::sig<typename ActorBase::ports::PowertrainIn, vehicle_data::CabinSensorData>,
+        reaktar::sig<typename ActorBase::ports::PowertrainIn, vehicle_data::SpeedData>,
+        reaktar::sig<typename ActorBase::ports::PowertrainIn::Any, ara::core::Array<float, 4>>,
+        reaktar::sig<typename ActorBase::ports::PowertrainIn::Any, ara::core::Array<vehicle_data::BatteryCell, 4>>,
+        reaktar::sig<typename ActorBase::ports::PowertrainIn::Any, ara::core::Vector<float>>,
+        reaktar::sig<typename ActorBase::ports::PowertrainIn::Any, vehicle_data::CabinSensorData>,
+        reaktar::sig<typename ActorBase::ports::PowertrainIn::Any, vehicle_data::SpeedData>,
+        reaktar::sig<typename ActorBase::ports::PowertrainIn::BatteryModuleStatus, ara::core::Array<vehicle_data::BatteryCell, 4>>,
+        reaktar::sig<typename ActorBase::ports::PowertrainIn::CabinSensors, vehicle_data::CabinSensorData>,
+        reaktar::sig<typename ActorBase::ports::PowertrainIn::SpeedHistory, ara::core::Vector<float>>,
+        reaktar::sig<typename ActorBase::ports::PowertrainIn::VehicleSpeed, vehicle_data::SpeedData>,
+        reaktar::sig<typename ActorBase::ports::PowertrainIn::WheelSpeeds, ara::core::Array<float, 4>>,
+        reaktar::sig<typename ActorBase::ports::SupervisorPort, ara::core::Map<ara::core::String, ara::core::String>>,
+        reaktar::sig<typename ActorBase::ports::SupervisorPort, ara::core::Map<ara::core::String, bool>>,
+        reaktar::sig<typename ActorBase::ports::SupervisorPort, ara::core::Vector<vehicle_data::EmergencyAlert>>,
+        reaktar::sig<typename ActorBase::ports::SupervisorPort, uint32_t>,
+        reaktar::sig<typename ActorBase::ports::SupervisorPort, vehicle_data::DriveMode>,
+        reaktar::sig<typename ActorBase::ports::SupervisorPort::ActiveAlerts, ara::core::Vector<vehicle_data::EmergencyAlert>>,
+        reaktar::sig<typename ActorBase::ports::SupervisorPort::Any, ara::core::Map<ara::core::String, ara::core::String>>,
+        reaktar::sig<typename ActorBase::ports::SupervisorPort::Any, ara::core::Map<ara::core::String, bool>>,
+        reaktar::sig<typename ActorBase::ports::SupervisorPort::Any, ara::core::Vector<vehicle_data::EmergencyAlert>>,
+        reaktar::sig<typename ActorBase::ports::SupervisorPort::Any, uint32_t>,
+        reaktar::sig<typename ActorBase::ports::SupervisorPort::Any, vehicle_data::DriveMode>,
+        reaktar::sig<typename ActorBase::ports::SupervisorPort::CalibrateOdometer, uint32_t>,
+        reaktar::sig<typename ActorBase::ports::SupervisorPort::CalibrationKey, uint32_t>,
+        reaktar::sig<typename ActorBase::ports::SupervisorPort::CurrentDriveMode, vehicle_data::DriveMode>,
+        reaktar::sig<typename ActorBase::ports::SupervisorPort::FeatureFlags, ara::core::Map<ara::core::String, bool>>,
+        reaktar::sig<typename ActorBase::ports::SupervisorPort::TriggerDiagnostic, uint32_t>,
+        reaktar::sig<typename ActorBase::ports::SupervisorPort::VehicleConfig, ara::core::Map<ara::core::String, ara::core::String>>,
         reaktar::sig<::reaktar::Any, float, bool>,
         reaktar::sig<::reaktar::tags::vehicle_supervisor::methods::SetSpeedLimiter, float, bool>,
         reaktar::sig<::reaktar::tags::vehicle_supervisor::methods::SetSpeedLimiter::Any, float, bool>,
-        reaktar::sig<typename Base::ports::SupervisorPort, float, bool>,
-        reaktar::sig<typename Base::ports::SupervisorPort::Any, float, bool>,
-        reaktar::sig<typename Base::ports::SupervisorPort::SetSpeedLimiter, float, bool>
+        reaktar::sig<typename ActorBase::ports::SupervisorPort, float, bool>,
+        reaktar::sig<typename ActorBase::ports::SupervisorPort::Any, float, bool>,
+        reaktar::sig<typename ActorBase::ports::SupervisorPort::SetSpeedLimiter, float, bool>
     >;
 
     explicit VehicleSupervisorActor(
@@ -946,12 +1179,12 @@ public:
             using LegalSignaturesTuple = legal_signatures;
 
             static_assert(!reaktar::has_rogue_handler_v<Derived, LegalSignaturesTuple
-                , ::reaktar::Connected<typename Base::ports::BodyControlIn>
-                , ::reaktar::Connected<typename Base::ports::PowertrainIn>
-                , ::reaktar::Connected<typename Base::ports::SupervisorPort>
-                , ::reaktar::Disconnected<typename Base::ports::BodyControlIn>
-                , ::reaktar::Disconnected<typename Base::ports::PowertrainIn>
-                , ::reaktar::Disconnected<typename Base::ports::SupervisorPort>
+                , ::reaktar::Connected<typename ActorBase::ports::BodyControlIn>
+                , ::reaktar::Connected<typename ActorBase::ports::PowertrainIn>
+                , ::reaktar::Connected<typename ActorBase::ports::SupervisorPort>
+                , ::reaktar::Disconnected<typename ActorBase::ports::BodyControlIn>
+                , ::reaktar::Disconnected<typename ActorBase::ports::PowertrainIn>
+                , ::reaktar::Disconnected<typename ActorBase::ports::SupervisorPort>
                 , ara::core::Array<float, 4>
                 , ara::core::Array<vehicle_data::BatteryCell, 4>
                 , ara::core::Map<ara::core::String, ara::core::String>
@@ -1001,30 +1234,30 @@ public:
                 , ::reaktar::tags::vehicle_supervisor::methods::SetSpeedLimiter::Any
                 , ::reaktar::tags::vehicle_supervisor::methods::TriggerDiagnostic
                 , ::reaktar::tags::vehicle_supervisor::methods::TriggerDiagnostic::Any
-                , typename Base::ports::BodyControlIn
-                , typename Base::ports::BodyControlIn::Any
-                , typename Base::ports::BodyControlIn::OutsideAirQuality
-                , typename Base::ports::BodyControlIn::RainSensorLevel
-                , typename Base::ports::BodyControlIn::TargetCabinTemperature
-                , typename Base::ports::BodyControlIn::WindowPosition
-                , typename Base::ports::PowertrainIn
-                , typename Base::ports::PowertrainIn::Any
-                , typename Base::ports::PowertrainIn::BatteryModuleStatus
-                , typename Base::ports::PowertrainIn::CabinSensors
-                , typename Base::ports::PowertrainIn::SpeedHistory
-                , typename Base::ports::PowertrainIn::VehicleSpeed
-                , typename Base::ports::PowertrainIn::WheelSpeeds
-                , typename Base::ports::SupervisorPort
-                , typename Base::ports::SupervisorPort::ActiveAlerts
-                , typename Base::ports::SupervisorPort::Any
-                , typename Base::ports::SupervisorPort::CalibrateOdometer
-                , typename Base::ports::SupervisorPort::CalibrationKey
-                , typename Base::ports::SupervisorPort::CurrentDriveMode
-                , typename Base::ports::SupervisorPort::FeatureFlags
-                , typename Base::ports::SupervisorPort::ResetTripMeter
-                , typename Base::ports::SupervisorPort::SetSpeedLimiter
-                , typename Base::ports::SupervisorPort::TriggerDiagnostic
-                , typename Base::ports::SupervisorPort::VehicleConfig
+                , typename ActorBase::ports::BodyControlIn
+                , typename ActorBase::ports::BodyControlIn::Any
+                , typename ActorBase::ports::BodyControlIn::OutsideAirQuality
+                , typename ActorBase::ports::BodyControlIn::RainSensorLevel
+                , typename ActorBase::ports::BodyControlIn::TargetCabinTemperature
+                , typename ActorBase::ports::BodyControlIn::WindowPosition
+                , typename ActorBase::ports::PowertrainIn
+                , typename ActorBase::ports::PowertrainIn::Any
+                , typename ActorBase::ports::PowertrainIn::BatteryModuleStatus
+                , typename ActorBase::ports::PowertrainIn::CabinSensors
+                , typename ActorBase::ports::PowertrainIn::SpeedHistory
+                , typename ActorBase::ports::PowertrainIn::VehicleSpeed
+                , typename ActorBase::ports::PowertrainIn::WheelSpeeds
+                , typename ActorBase::ports::SupervisorPort
+                , typename ActorBase::ports::SupervisorPort::ActiveAlerts
+                , typename ActorBase::ports::SupervisorPort::Any
+                , typename ActorBase::ports::SupervisorPort::CalibrateOdometer
+                , typename ActorBase::ports::SupervisorPort::CalibrationKey
+                , typename ActorBase::ports::SupervisorPort::CurrentDriveMode
+                , typename ActorBase::ports::SupervisorPort::FeatureFlags
+                , typename ActorBase::ports::SupervisorPort::ResetTripMeter
+                , typename ActorBase::ports::SupervisorPort::SetSpeedLimiter
+                , typename ActorBase::ports::SupervisorPort::TriggerDiagnostic
+                , typename ActorBase::ports::SupervisorPort::VehicleConfig
             >,
             "\n"
             "====================================================================================\n"
@@ -1043,12 +1276,722 @@ public:
     // ------------------------------------------------------------------------
     // OUTBOUND: emit<Tag>(args...) OR untagged emit(val)
     // ------------------------------------------------------------------------
+    template <typename Tag1, typename Tag2, typename... Rest, typename... Args>
+    void emit(Args&&...) {
+        static_assert(!sizeof(Tag1*), "reaktar: emit requires exactly one template argument.");
+    }
+
+    template <typename Tag1, typename Tag2, typename... Rest, typename... Args>
+    void call(Args&&...) {
+        static_assert(!sizeof(Tag1*), "reaktar: emit requires exactly one template argument.");
+    }
+
     template <typename Tag, typename... Args>
     auto emit(Args&&... args) {
-        if constexpr (std::is_same_v<Tag, typename Base::ports::BodyControlIn>) {
+        // Tier 4: Global Wildcard Broadcast (emit<reaktar::Any>(payload) and emit<reaktar::All>(payload))
+        if constexpr (std::is_same_v<Tag, ::reaktar::Any>) {
             if constexpr (sizeof...(Args) == 1) {
                 using PayloadType = std::decay_t<typename std::tuple_element<0, std::tuple<Args...>>::type>;
-                if constexpr (std::is_same_v<PayloadType, bool>) {
+                if constexpr (!ActorBase::traits::template can_fan_out_v<PayloadType>) {
+                    static_assert(!sizeof(Tag*), "reaktar: emit<reaktar::Any>(payload) failed! The payload type does not match any outbound event or fire-and-forget method in this Actor.");
+                } else {
+                    if constexpr (std::is_same_v<PayloadType, ara::core::Array<vehicle_data::SystemStatus, 4>>) {
+                        ::reaktar::FanOutResult res{};
+                        res.attempted++;
+                        supervisorport_skeleton_.SystemMatrix.Update(std::forward<Args>(args)...);
+                        res.delivered++;
+                        return res;
+                    }
+                    else if constexpr (std::is_same_v<PayloadType, ara::core::Map<uint32_t, vehicle_data::EmergencyAlert>>) {
+                        ::reaktar::FanOutResult res{};
+                        res.attempted++;
+                        supervisorport_skeleton_.ActiveDiagnosticMap.Send(std::forward<Args>(args)...);
+                        res.delivered++;
+                        return res;
+                    }
+                    else if constexpr (std::is_same_v<PayloadType, ara::core::Vector<vehicle_data::DriveMode>>) {
+                        ::reaktar::FanOutResult res{};
+                        res.attempted++;
+                        supervisorport_skeleton_.DriveHistory.Send(std::forward<Args>(args)...);
+                        res.delivered++;
+                        return res;
+                    }
+                    else if constexpr (std::is_same_v<PayloadType, ara::core::Vector<vehicle_data::EmergencyAlert>>) {
+                        ::reaktar::FanOutResult res{};
+                        res.attempted++;
+                        supervisorport_skeleton_.ActiveAlerts.Update(std::forward<Args>(args)...);
+                        res.delivered++;
+                        return res;
+                    }
+                    else if constexpr (std::is_same_v<PayloadType, uint16_t>) {
+                        ::reaktar::FanOutResult res{};
+                        res.attempted++;
+                        supervisorport_skeleton_.PrimaryWarning.Send(std::forward<Args>(args)...);
+                        res.delivered++;
+                        res.attempted++;
+                        supervisorport_skeleton_.SecondaryWarning.Send(std::forward<Args>(args)...);
+                        res.delivered++;
+                        return res;
+                    }
+                    else if constexpr (std::is_same_v<PayloadType, vehicle_data::EmergencyAlert>) {
+                        ::reaktar::FanOutResult res{};
+                        res.attempted++;
+                        supervisorport_skeleton_.EmergencyAlert.Send(std::forward<Args>(args)...);
+                        res.delivered++;
+                        return res;
+                    }
+                    else if constexpr (std::is_same_v<PayloadType, vehicle_data::VehicleDiagnostics>) {
+                        ::reaktar::FanOutResult res{};
+                        res.attempted++;
+                        supervisorport_skeleton_.DiagnosticsReport.Send(std::forward<Args>(args)...);
+                        res.delivered++;
+                        return res;
+                    }
+                }
+            } else {
+                static_assert(!sizeof(Tag*), "reaktar: emit<reaktar::Any>(payload) requires exactly one payload argument.");
+            }
+        }
+        // Tier 2: Port-Level Wildcard Broadcast (emit<ports::BodyControlIn::Any>(payload) and emit<ports::BodyControlIn::All>(payload))
+        else if constexpr (std::is_same_v<Tag, typename ActorBase::ports::BodyControlIn::Any>) {
+            if constexpr (sizeof...(Args) == 1) {
+                static_assert(!sizeof(Tag*), "reaktar: emit<ports::P::Any>(payload) failed! Port 'BodyControlIn' has no outbound events or fire-and-forget methods.");
+            } else {
+                static_assert(!sizeof(Tag*), "reaktar: emit<ports::P::Any>(payload) requires exactly one payload argument.");
+            }
+        }
+        // Tier 1: Port-Only Point-to-Point Dispatch
+        else if constexpr (std::is_same_v<Tag, typename ActorBase::ports::BodyControlIn>) {
+            if constexpr (sizeof...(Args) == 1) {
+                using PayloadType = std::decay_t<typename std::tuple_element<0, std::tuple<Args...>>::type>;
+                if constexpr (ActorBase::traits::template is_port_payload_ambiguous_v<typename ActorBase::ports::BodyControlIn, PayloadType>) {
+                    static_assert(!sizeof(Tag*), "reaktar: emit<Port>(payload) is ambiguous on port 'BodyControlIn'! Multiple items accept this payload type. Use emit<ports::BodyControlIn::ItemTag>(...) instead.");
+                }
+                else if constexpr (!ActorBase::traits::template can_port_emit_v<typename ActorBase::ports::BodyControlIn, PayloadType>) {
+                    static_assert(!sizeof(Tag*),
+                        "reaktar: emit<Port>(payload) failed! The payload type does not match any outbound event, notifier, or single-arg method on port 'BodyControlIn'.\n"
+                        "Available single-argument items on port 'BodyControlIn' are:\n"
+                        "  - LockDoors (type: bool, RPC method)\n"
+                        "  - TargetCabinTemperature (type: float, field setter)\n"
+                        "  - WindowPosition (type: uint32_t, field setter)\n"
+                    );
+                }
+                else {
+                    if constexpr (std::is_same_v<PayloadType, bool>) {
+                        auto proxy_lease = this->bodycontrolin_slot_.acquire("BodyControlIn");
+                        using AsyncResType = decltype(make_async_result(proxy_lease->LockDoors(std::forward<Args>(args)...)));
+                        if (proxy_lease) {
+                            return make_async_result(proxy_lease->LockDoors(std::forward<Args>(args)...));
+                        }
+                        return AsyncResType::Failed();
+                    }
+                    else if constexpr (std::is_same_v<PayloadType, float>) {
+                        auto proxy_lease = this->bodycontrolin_slot_.acquire("BodyControlIn");
+                        using AsyncResType = decltype(make_async_result(proxy_lease->TargetCabinTemperature.Set(std::forward<Args>(args)...)));
+                        if (proxy_lease) {
+                            return make_async_result(proxy_lease->TargetCabinTemperature.Set(std::forward<Args>(args)...));
+                        }
+                        return AsyncResType::Failed();
+                    }
+                    else if constexpr (std::is_same_v<PayloadType, uint32_t>) {
+                        auto proxy_lease = this->bodycontrolin_slot_.acquire("BodyControlIn");
+                        using AsyncResType = decltype(make_async_result(proxy_lease->WindowPosition.Set(std::forward<Args>(args)...)));
+                        if (proxy_lease) {
+                            return make_async_result(proxy_lease->WindowPosition.Set(std::forward<Args>(args)...));
+                        }
+                        return AsyncResType::Failed();
+                    }
+                }
+            }
+            else {
+                using SigTuple = std::tuple<std::decay_t<Args>...>;
+                if constexpr (std::is_same_v<SigTuple, std::tuple<uint32_t, uint32_t>>) {
+                    auto proxy_lease = this->bodycontrolin_slot_.acquire("BodyControlIn");
+                    if (proxy_lease) {
+                        proxy_lease->FlashLights(std::forward<Args>(args)...);
+                        return ::reaktar::EmitStatus{true};
+                    }
+                    return ::reaktar::EmitStatus{false};
+                }
+                else {
+                    static_assert(!sizeof(Tag*),
+                        "reaktar: emit<Port>(args...) failed! The argument signature does not match any outbound method on port 'BodyControlIn'.\n"
+                        "Available multi-argument method signatures on port 'BodyControlIn' are:\n"
+                        "  - FlashLights(uint32_t, uint32_t)\n"
+                    );
+                }
+            }
+        }
+        // Tier 2: Port-Level Wildcard Broadcast (emit<ports::PowertrainIn::Any>(payload) and emit<ports::PowertrainIn::All>(payload))
+        else if constexpr (std::is_same_v<Tag, typename ActorBase::ports::PowertrainIn::Any>) {
+            if constexpr (sizeof...(Args) == 1) {
+                static_assert(!sizeof(Tag*), "reaktar: emit<ports::P::Any>(payload) failed! Port 'PowertrainIn' has no outbound events or fire-and-forget methods.");
+            } else {
+                static_assert(!sizeof(Tag*), "reaktar: emit<ports::P::Any>(payload) requires exactly one payload argument.");
+            }
+        }
+        // Tier 1: Port-Only Point-to-Point Dispatch
+        else if constexpr (std::is_same_v<Tag, typename ActorBase::ports::PowertrainIn>) {
+            static_assert(!sizeof(Tag*), "reaktar: Port 'PowertrainIn' has no outbound events, notifiers, or RPC methods!");
+        }
+        // Tier 2: Port-Level Wildcard Broadcast (emit<ports::SupervisorPort::Any>(payload) and emit<ports::SupervisorPort::All>(payload))
+        else if constexpr (std::is_same_v<Tag, typename ActorBase::ports::SupervisorPort::Any>) {
+            if constexpr (sizeof...(Args) == 1) {
+                using PayloadType = std::decay_t<typename std::tuple_element<0, std::tuple<Args...>>::type>;
+                if constexpr (std::is_same_v<PayloadType, ara::core::Array<vehicle_data::SystemStatus, 4>>) {
+                    ::reaktar::FanOutResult res{};
+                    res.attempted++;
+                    supervisorport_skeleton_.SystemMatrix.Update(std::forward<Args>(args)...);
+                    res.delivered++;
+                    return res;
+                }
+                else if constexpr (std::is_same_v<PayloadType, ara::core::Map<uint32_t, vehicle_data::EmergencyAlert>>) {
+                    ::reaktar::FanOutResult res{};
+                    res.attempted++;
+                    supervisorport_skeleton_.ActiveDiagnosticMap.Send(std::forward<Args>(args)...);
+                    res.delivered++;
+                    return res;
+                }
+                else if constexpr (std::is_same_v<PayloadType, ara::core::Vector<vehicle_data::DriveMode>>) {
+                    ::reaktar::FanOutResult res{};
+                    res.attempted++;
+                    supervisorport_skeleton_.DriveHistory.Send(std::forward<Args>(args)...);
+                    res.delivered++;
+                    return res;
+                }
+                else if constexpr (std::is_same_v<PayloadType, ara::core::Vector<vehicle_data::EmergencyAlert>>) {
+                    ::reaktar::FanOutResult res{};
+                    res.attempted++;
+                    supervisorport_skeleton_.ActiveAlerts.Update(std::forward<Args>(args)...);
+                    res.delivered++;
+                    return res;
+                }
+                else if constexpr (std::is_same_v<PayloadType, uint16_t>) {
+                    ::reaktar::FanOutResult res{};
+                    res.attempted++;
+                    supervisorport_skeleton_.PrimaryWarning.Send(std::forward<Args>(args)...);
+                    res.delivered++;
+                    res.attempted++;
+                    supervisorport_skeleton_.SecondaryWarning.Send(std::forward<Args>(args)...);
+                    res.delivered++;
+                    return res;
+                }
+                else if constexpr (std::is_same_v<PayloadType, vehicle_data::EmergencyAlert>) {
+                    ::reaktar::FanOutResult res{};
+                    res.attempted++;
+                    supervisorport_skeleton_.EmergencyAlert.Send(std::forward<Args>(args)...);
+                    res.delivered++;
+                    return res;
+                }
+                else if constexpr (std::is_same_v<PayloadType, vehicle_data::VehicleDiagnostics>) {
+                    ::reaktar::FanOutResult res{};
+                    res.attempted++;
+                    supervisorport_skeleton_.DiagnosticsReport.Send(std::forward<Args>(args)...);
+                    res.delivered++;
+                    return res;
+                }
+                else {
+                    static_assert(!sizeof(Tag*), "reaktar: emit<ports::P::Any>(payload) failed! The payload type does not match any outbound event or fire-and-forget method on port 'SupervisorPort'.");
+                }
+            } else {
+                static_assert(!sizeof(Tag*), "reaktar: emit<ports::P::Any>(payload) requires exactly one payload argument.");
+            }
+        }
+        // Tier 1: Port-Only Point-to-Point Dispatch
+        else if constexpr (std::is_same_v<Tag, typename ActorBase::ports::SupervisorPort>) {
+            if constexpr (sizeof...(Args) == 1) {
+                using PayloadType = std::decay_t<typename std::tuple_element<0, std::tuple<Args...>>::type>;
+                if constexpr (ActorBase::traits::template is_port_payload_ambiguous_v<typename ActorBase::ports::SupervisorPort, PayloadType>) {
+                    if constexpr (std::is_same_v<PayloadType, uint16_t>) {
+                        static_assert(!sizeof(Tag*),
+                            "reaktar: emit<Port>(payload) is ambiguous on port 'SupervisorPort'! Multiple items accept this payload type. Use emit<ports::SupervisorPort::ItemTag>(...) instead.\n"
+                            "Payload type 'uint16_t' matches 2 items on port 'SupervisorPort':\n"
+                            "  - PrimaryWarning (event)\n"
+                            "  - SecondaryWarning (event)\n"
+                        );
+                    }
+                    else {
+                        static_assert(!sizeof(Tag*), "reaktar: emit<Port>(payload) is ambiguous on port 'SupervisorPort'! Multiple items accept this payload type. Use emit<ports::SupervisorPort::ItemTag>(...) instead.");
+                    }
+                }
+                else if constexpr (!ActorBase::traits::template can_port_emit_v<typename ActorBase::ports::SupervisorPort, PayloadType>) {
+                    static_assert(!sizeof(Tag*),
+                        "reaktar: emit<Port>(payload) failed! The payload type does not match any outbound event, notifier, or single-arg method on port 'SupervisorPort'.\n"
+                        "Available single-argument items on port 'SupervisorPort' are:\n"
+                        "  - SystemMatrix (type: ara::core::Array<vehicle_data::SystemStatus, 4>, field notifier)\n"
+                        "  - ActiveDiagnosticMap (type: ara::core::Map<uint32_t, vehicle_data::EmergencyAlert>, event)\n"
+                        "  - DriveHistory (type: ara::core::Vector<vehicle_data::DriveMode>, event)\n"
+                        "  - ActiveAlerts (type: ara::core::Vector<vehicle_data::EmergencyAlert>, field notifier)\n"
+                        "  - PrimaryWarning (type: uint16_t, event)\n"
+                        "  - EmergencyAlert (type: vehicle_data::EmergencyAlert, event)\n"
+                        "  - DiagnosticsReport (type: vehicle_data::VehicleDiagnostics, event)\n"
+                    );
+                }
+                else {
+                    if constexpr (std::is_same_v<PayloadType, ara::core::Array<vehicle_data::SystemStatus, 4>>) {
+                        supervisorport_skeleton_.SystemMatrix.Update(std::forward<Args>(args)...);
+                        return ::reaktar::EmitStatus{true};
+                    }
+                    else if constexpr (std::is_same_v<PayloadType, ara::core::Map<uint32_t, vehicle_data::EmergencyAlert>>) {
+                        supervisorport_skeleton_.ActiveDiagnosticMap.Send(std::forward<Args>(args)...);
+                        return ::reaktar::EmitStatus{true};
+                    }
+                    else if constexpr (std::is_same_v<PayloadType, ara::core::Vector<vehicle_data::DriveMode>>) {
+                        supervisorport_skeleton_.DriveHistory.Send(std::forward<Args>(args)...);
+                        return ::reaktar::EmitStatus{true};
+                    }
+                    else if constexpr (std::is_same_v<PayloadType, ara::core::Vector<vehicle_data::EmergencyAlert>>) {
+                        supervisorport_skeleton_.ActiveAlerts.Update(std::forward<Args>(args)...);
+                        return ::reaktar::EmitStatus{true};
+                    }
+                    else if constexpr (std::is_same_v<PayloadType, vehicle_data::EmergencyAlert>) {
+                        supervisorport_skeleton_.EmergencyAlert.Send(std::forward<Args>(args)...);
+                        return ::reaktar::EmitStatus{true};
+                    }
+                    else if constexpr (std::is_same_v<PayloadType, vehicle_data::VehicleDiagnostics>) {
+                        supervisorport_skeleton_.DiagnosticsReport.Send(std::forward<Args>(args)...);
+                        return ::reaktar::EmitStatus{true};
+                    }
+                }
+            }
+            else {
+                static_assert(!sizeof(Tag*), "reaktar: emit<Port>(args...) failed! Port 'SupervisorPort' has no outbound multi-argument methods.");
+            }
+        }
+        // Tier 3: Interface Wildcard Tags (emit<Tag::Any> / emit<Tag::All>)
+        else if constexpr (std::is_same_v<Tag, ::reaktar::tags::body_control::methods::FlashLights::Any>) {
+            if constexpr (!ActorBase::traits::template can_tag_fan_out_with_args_v<Tag, Args...>) {
+                static_assert(!sizeof(Tag*), "reaktar: Arguments passed to emit<Tag::Any>(...) do not match signature of method 'FlashLights'.");
+            } else {
+                ::reaktar::FanOutResult res{};
+                res.attempted++;
+                {
+                    auto proxy_lease = this->bodycontrolin_slot_.acquire("BodyControlIn");
+                    if (proxy_lease) {
+                        proxy_lease->FlashLights(std::forward<Args>(args)...);
+                        res.delivered++;
+                    }
+                }
+                return res;
+            }
+        }
+        // Tier 3: Interface Wildcard Tags (emit<Tag::Any> / emit<Tag::All>)
+        else if constexpr (std::is_same_v<Tag, ::reaktar::tags::body_control::methods::LockDoors::Any>) {
+            static_assert(!sizeof(Tag*), "reaktar: emit<Tag::Any>(...) is only permitted for fire-and-forget methods! Method 'LockDoors' on port 'BodyControlIn' returns non-void ('bool').");
+        }
+        // Tier 3: Interface Wildcard Tags (emit<Tag::Any> / emit<Tag::All>)
+        else if constexpr (std::is_same_v<Tag, ::reaktar::tags::body_control::fields::OutsideAirQuality::Any>) {
+            static_assert(!sizeof(Tag*), "reaktar: emit<Tag::Any>(...) cannot be used on field getters! Field queries must use read<Tag>().");
+        }
+        // Tier 3: Interface Wildcard Tags (emit<Tag::Any> / emit<Tag::All>)
+        else if constexpr (std::is_same_v<Tag, ::reaktar::tags::body_control::fields::RainSensorLevel::Any>) {
+            static_assert(!sizeof(Tag*), "reaktar: emit<Tag::Any>(...) cannot be used on field getters! Field queries must use read<Tag>().");
+        }
+        // Tier 3: Interface Wildcard Tags (emit<Tag::Any> / emit<Tag::All>)
+        else if constexpr (std::is_same_v<Tag, ::reaktar::tags::body_control::fields::TargetCabinTemperature::Any>) {
+            static_assert(!sizeof(Tag*), "reaktar: emit<Tag::Any>(...) cannot be used on field setters! Field setters are two-way transactions returning Future<T>.");
+        }
+        // Tier 3: Interface Wildcard Tags (emit<Tag::Any> / emit<Tag::All>)
+        else if constexpr (std::is_same_v<Tag, ::reaktar::tags::body_control::fields::WindowPosition::Any>) {
+            static_assert(!sizeof(Tag*), "reaktar: emit<Tag::Any>(...) cannot be used on field setters! Field setters are two-way transactions returning Future<T>.");
+        }
+        // Tier 3: Interface Wildcard Tags (emit<Tag::Any> / emit<Tag::All>)
+        else if constexpr (std::is_same_v<Tag, ::reaktar::tags::powertrain::events::BatteryModuleStatus::Any>) {
+            if constexpr (!ActorBase::traits::template can_tag_fan_out_with_args_v<Tag, Args...>) {
+                static_assert(!sizeof(Tag*), "reaktar: Arguments passed to emit<Tag::Any>(...) do not match payload type of event 'BatteryModuleStatus'.");
+            } else {
+                ::reaktar::FanOutResult res{};
+                return res;
+            }
+        }
+        // Tier 3: Interface Wildcard Tags (emit<Tag::Any> / emit<Tag::All>)
+        else if constexpr (std::is_same_v<Tag, ::reaktar::tags::powertrain::events::CabinSensors::Any>) {
+            if constexpr (!ActorBase::traits::template can_tag_fan_out_with_args_v<Tag, Args...>) {
+                static_assert(!sizeof(Tag*), "reaktar: Arguments passed to emit<Tag::Any>(...) do not match payload type of event 'CabinSensors'.");
+            } else {
+                ::reaktar::FanOutResult res{};
+                return res;
+            }
+        }
+        // Tier 3: Interface Wildcard Tags (emit<Tag::Any> / emit<Tag::All>)
+        else if constexpr (std::is_same_v<Tag, ::reaktar::tags::powertrain::events::SpeedHistory::Any>) {
+            if constexpr (!ActorBase::traits::template can_tag_fan_out_with_args_v<Tag, Args...>) {
+                static_assert(!sizeof(Tag*), "reaktar: Arguments passed to emit<Tag::Any>(...) do not match payload type of event 'SpeedHistory'.");
+            } else {
+                ::reaktar::FanOutResult res{};
+                return res;
+            }
+        }
+        // Tier 3: Interface Wildcard Tags (emit<Tag::Any> / emit<Tag::All>)
+        else if constexpr (std::is_same_v<Tag, ::reaktar::tags::powertrain::events::VehicleSpeed::Any>) {
+            if constexpr (!ActorBase::traits::template can_tag_fan_out_with_args_v<Tag, Args...>) {
+                static_assert(!sizeof(Tag*), "reaktar: Arguments passed to emit<Tag::Any>(...) do not match payload type of event 'VehicleSpeed'.");
+            } else {
+                ::reaktar::FanOutResult res{};
+                return res;
+            }
+        }
+        // Tier 3: Interface Wildcard Tags (emit<Tag::Any> / emit<Tag::All>)
+        else if constexpr (std::is_same_v<Tag, ::reaktar::tags::powertrain::events::WheelSpeeds::Any>) {
+            if constexpr (!ActorBase::traits::template can_tag_fan_out_with_args_v<Tag, Args...>) {
+                static_assert(!sizeof(Tag*), "reaktar: Arguments passed to emit<Tag::Any>(...) do not match payload type of event 'WheelSpeeds'.");
+            } else {
+                ::reaktar::FanOutResult res{};
+                return res;
+            }
+        }
+        // Tier 3: Interface Wildcard Tags (emit<Tag::Any> / emit<Tag::All>)
+        else if constexpr (std::is_same_v<Tag, ::reaktar::tags::vehicle_supervisor::events::ActiveDiagnosticMap::Any>) {
+            if constexpr (!ActorBase::traits::template can_tag_fan_out_with_args_v<Tag, Args...>) {
+                static_assert(!sizeof(Tag*), "reaktar: Arguments passed to emit<Tag::Any>(...) do not match payload type of event 'ActiveDiagnosticMap'.");
+            } else {
+                ::reaktar::FanOutResult res{};
+                res.attempted++;
+                supervisorport_skeleton_.ActiveDiagnosticMap.Send(std::forward<Args>(args)...);
+                res.delivered++;
+                return res;
+            }
+        }
+        // Tier 3: Interface Wildcard Tags (emit<Tag::Any> / emit<Tag::All>)
+        else if constexpr (std::is_same_v<Tag, ::reaktar::tags::vehicle_supervisor::events::DiagnosticsReport::Any>) {
+            if constexpr (!ActorBase::traits::template can_tag_fan_out_with_args_v<Tag, Args...>) {
+                static_assert(!sizeof(Tag*), "reaktar: Arguments passed to emit<Tag::Any>(...) do not match payload type of event 'DiagnosticsReport'.");
+            } else {
+                ::reaktar::FanOutResult res{};
+                res.attempted++;
+                supervisorport_skeleton_.DiagnosticsReport.Send(std::forward<Args>(args)...);
+                res.delivered++;
+                return res;
+            }
+        }
+        // Tier 3: Interface Wildcard Tags (emit<Tag::Any> / emit<Tag::All>)
+        else if constexpr (std::is_same_v<Tag, ::reaktar::tags::vehicle_supervisor::events::DriveHistory::Any>) {
+            if constexpr (!ActorBase::traits::template can_tag_fan_out_with_args_v<Tag, Args...>) {
+                static_assert(!sizeof(Tag*), "reaktar: Arguments passed to emit<Tag::Any>(...) do not match payload type of event 'DriveHistory'.");
+            } else {
+                ::reaktar::FanOutResult res{};
+                res.attempted++;
+                supervisorport_skeleton_.DriveHistory.Send(std::forward<Args>(args)...);
+                res.delivered++;
+                return res;
+            }
+        }
+        // Tier 3: Interface Wildcard Tags (emit<Tag::Any> / emit<Tag::All>)
+        else if constexpr (std::is_same_v<Tag, ::reaktar::tags::vehicle_supervisor::events::EmergencyAlert::Any>) {
+            if constexpr (!ActorBase::traits::template can_tag_fan_out_with_args_v<Tag, Args...>) {
+                static_assert(!sizeof(Tag*), "reaktar: Arguments passed to emit<Tag::Any>(...) do not match payload type of event 'EmergencyAlert'.");
+            } else {
+                ::reaktar::FanOutResult res{};
+                res.attempted++;
+                supervisorport_skeleton_.EmergencyAlert.Send(std::forward<Args>(args)...);
+                res.delivered++;
+                return res;
+            }
+        }
+        // Tier 3: Interface Wildcard Tags (emit<Tag::Any> / emit<Tag::All>)
+        else if constexpr (std::is_same_v<Tag, ::reaktar::tags::vehicle_supervisor::events::PrimaryWarning::Any>) {
+            if constexpr (!ActorBase::traits::template can_tag_fan_out_with_args_v<Tag, Args...>) {
+                static_assert(!sizeof(Tag*), "reaktar: Arguments passed to emit<Tag::Any>(...) do not match payload type of event 'PrimaryWarning'.");
+            } else {
+                ::reaktar::FanOutResult res{};
+                res.attempted++;
+                supervisorport_skeleton_.PrimaryWarning.Send(std::forward<Args>(args)...);
+                res.delivered++;
+                return res;
+            }
+        }
+        // Tier 3: Interface Wildcard Tags (emit<Tag::Any> / emit<Tag::All>)
+        else if constexpr (std::is_same_v<Tag, ::reaktar::tags::vehicle_supervisor::events::SecondaryWarning::Any>) {
+            if constexpr (!ActorBase::traits::template can_tag_fan_out_with_args_v<Tag, Args...>) {
+                static_assert(!sizeof(Tag*), "reaktar: Arguments passed to emit<Tag::Any>(...) do not match payload type of event 'SecondaryWarning'.");
+            } else {
+                ::reaktar::FanOutResult res{};
+                res.attempted++;
+                supervisorport_skeleton_.SecondaryWarning.Send(std::forward<Args>(args)...);
+                res.delivered++;
+                return res;
+            }
+        }
+        // Tier 3: Interface Wildcard Tags (emit<Tag::Any> / emit<Tag::All>)
+        else if constexpr (std::is_same_v<Tag, ::reaktar::tags::vehicle_supervisor::methods::CalibrateOdometer::Any>) {
+            static_assert(!sizeof(Tag*), "reaktar: emit<Tag::Any>(...) is only permitted for fire-and-forget methods! Method 'CalibrateOdometer' on port 'UnknownPort' returns non-void ('uint32_t').");
+        }
+        // Tier 3: Interface Wildcard Tags (emit<Tag::Any> / emit<Tag::All>)
+        else if constexpr (std::is_same_v<Tag, ::reaktar::tags::vehicle_supervisor::methods::ResetTripMeter::Any>) {
+            if constexpr (!ActorBase::traits::template can_tag_fan_out_with_args_v<Tag, Args...>) {
+                static_assert(!sizeof(Tag*), "reaktar: Arguments passed to emit<Tag::Any>(...) do not match signature of method 'ResetTripMeter'.");
+            } else {
+                ::reaktar::FanOutResult res{};
+                return res;
+            }
+        }
+        // Tier 3: Interface Wildcard Tags (emit<Tag::Any> / emit<Tag::All>)
+        else if constexpr (std::is_same_v<Tag, ::reaktar::tags::vehicle_supervisor::methods::SetSpeedLimiter::Any>) {
+            static_assert(!sizeof(Tag*), "reaktar: emit<Tag::Any>(...) is only permitted for fire-and-forget methods! Method 'SetSpeedLimiter' on port 'UnknownPort' returns non-void ('bool').");
+        }
+        // Tier 3: Interface Wildcard Tags (emit<Tag::Any> / emit<Tag::All>)
+        else if constexpr (std::is_same_v<Tag, ::reaktar::tags::vehicle_supervisor::methods::TriggerDiagnostic::Any>) {
+            static_assert(!sizeof(Tag*), "reaktar: emit<Tag::Any>(...) is only permitted for fire-and-forget methods! Method 'TriggerDiagnostic' on port 'UnknownPort' returns non-void ('bool').");
+        }
+        // Tier 3: Interface Wildcard Tags (emit<Tag::Any> / emit<Tag::All>)
+        else if constexpr (std::is_same_v<Tag, ::reaktar::tags::vehicle_supervisor::fields::ActiveAlerts::Any>) {
+            static_assert(!sizeof(Tag*), "reaktar: emit<Tag::Any>(...) cannot be used on field setters! Field setters are two-way transactions returning Future<T>.");
+        }
+        // Tier 3: Interface Wildcard Tags (emit<Tag::Any> / emit<Tag::All>)
+        else if constexpr (std::is_same_v<Tag, ::reaktar::tags::vehicle_supervisor::fields::CalibrationKey::Any>) {
+            static_assert(!sizeof(Tag*), "reaktar: emit<Tag::Any>(...) cannot be used on field setters! Field setters are two-way transactions returning Future<T>.");
+        }
+        // Tier 3: Interface Wildcard Tags (emit<Tag::Any> / emit<Tag::All>)
+        else if constexpr (std::is_same_v<Tag, ::reaktar::tags::vehicle_supervisor::fields::CurrentDriveMode::Any>) {
+            static_assert(!sizeof(Tag*), "reaktar: emit<Tag::Any>(...) cannot be used on field setters! Field setters are two-way transactions returning Future<T>.");
+        }
+        // Tier 3: Interface Wildcard Tags (emit<Tag::Any> / emit<Tag::All>)
+        else if constexpr (std::is_same_v<Tag, ::reaktar::tags::vehicle_supervisor::fields::FeatureFlags::Any>) {
+            static_assert(!sizeof(Tag*), "reaktar: emit<Tag::Any>(...) cannot be used on field setters! Field setters are two-way transactions returning Future<T>.");
+        }
+        // Tier 3: Interface Wildcard Tags (emit<Tag::Any> / emit<Tag::All>)
+        else if constexpr (std::is_same_v<Tag, ::reaktar::tags::vehicle_supervisor::fields::HardwareRevision::Any>) {
+            static_assert(!sizeof(Tag*), "reaktar: emit<Tag::Any>(...) cannot be used on field getters! Field queries must use read<Tag>().");
+        }
+        // Tier 3: Interface Wildcard Tags (emit<Tag::Any> / emit<Tag::All>)
+        else if constexpr (std::is_same_v<Tag, ::reaktar::tags::vehicle_supervisor::fields::SystemMatrix::Any>) {
+            if constexpr (!ActorBase::traits::template can_tag_fan_out_with_args_v<Tag, Args...>) {
+                static_assert(!sizeof(Tag*), "reaktar: Arguments passed to emit<Tag::Any>(...) do not match type of field 'SystemMatrix'.");
+            } else {
+                ::reaktar::FanOutResult res{};
+                res.attempted++;
+                supervisorport_skeleton_.SystemMatrix.Update(std::forward<Args>(args)...);
+                res.delivered++;
+                return res;
+            }
+        }
+        // Tier 3: Interface Wildcard Tags (emit<Tag::Any> / emit<Tag::All>)
+        else if constexpr (std::is_same_v<Tag, ::reaktar::tags::vehicle_supervisor::fields::VehicleConfig::Any>) {
+            static_assert(!sizeof(Tag*), "reaktar: emit<Tag::Any>(...) cannot be used on field setters! Field setters are two-way transactions returning Future<T>.");
+        }
+        // Tier 1: Exact Channel Tag Point-to-Point Dispatch
+        else if constexpr (std::is_same_v<Tag, typename ActorBase::ports::SupervisorPort::ActiveDiagnosticMap>) {
+            supervisorport_skeleton_.ActiveDiagnosticMap.Send(std::forward<Args>(args)...);
+            return ::reaktar::EmitStatus{true};
+        }
+        // Tier 1: Exact Channel Tag Point-to-Point Dispatch
+        else if constexpr (std::is_same_v<Tag, ::reaktar::tags::vehicle_supervisor::events::ActiveDiagnosticMap>) {
+            supervisorport_skeleton_.ActiveDiagnosticMap.Send(std::forward<Args>(args)...);
+            return ::reaktar::EmitStatus{true};
+        }
+        // Tier 1: Exact Channel Tag Point-to-Point Dispatch
+        else if constexpr (std::is_same_v<Tag, typename ActorBase::ports::SupervisorPort::DiagnosticsReport>) {
+            supervisorport_skeleton_.DiagnosticsReport.Send(std::forward<Args>(args)...);
+            return ::reaktar::EmitStatus{true};
+        }
+        // Tier 1: Exact Channel Tag Point-to-Point Dispatch
+        else if constexpr (std::is_same_v<Tag, ::reaktar::tags::vehicle_supervisor::events::DiagnosticsReport>) {
+            supervisorport_skeleton_.DiagnosticsReport.Send(std::forward<Args>(args)...);
+            return ::reaktar::EmitStatus{true};
+        }
+        // Tier 1: Exact Channel Tag Point-to-Point Dispatch
+        else if constexpr (std::is_same_v<Tag, typename ActorBase::ports::SupervisorPort::DriveHistory>) {
+            supervisorport_skeleton_.DriveHistory.Send(std::forward<Args>(args)...);
+            return ::reaktar::EmitStatus{true};
+        }
+        // Tier 1: Exact Channel Tag Point-to-Point Dispatch
+        else if constexpr (std::is_same_v<Tag, ::reaktar::tags::vehicle_supervisor::events::DriveHistory>) {
+            supervisorport_skeleton_.DriveHistory.Send(std::forward<Args>(args)...);
+            return ::reaktar::EmitStatus{true};
+        }
+        // Tier 1: Exact Channel Tag Point-to-Point Dispatch
+        else if constexpr (std::is_same_v<Tag, typename ActorBase::ports::SupervisorPort::EmergencyAlert>) {
+            supervisorport_skeleton_.EmergencyAlert.Send(std::forward<Args>(args)...);
+            return ::reaktar::EmitStatus{true};
+        }
+        // Tier 1: Exact Channel Tag Point-to-Point Dispatch
+        else if constexpr (std::is_same_v<Tag, ::reaktar::tags::vehicle_supervisor::events::EmergencyAlert>) {
+            supervisorport_skeleton_.EmergencyAlert.Send(std::forward<Args>(args)...);
+            return ::reaktar::EmitStatus{true};
+        }
+        // Tier 1: Exact Channel Tag Point-to-Point Dispatch
+        else if constexpr (std::is_same_v<Tag, typename ActorBase::ports::SupervisorPort::PrimaryWarning>) {
+            supervisorport_skeleton_.PrimaryWarning.Send(std::forward<Args>(args)...);
+            return ::reaktar::EmitStatus{true};
+        }
+        // Tier 1: Exact Channel Tag Point-to-Point Dispatch
+        else if constexpr (std::is_same_v<Tag, ::reaktar::tags::vehicle_supervisor::events::PrimaryWarning>) {
+            supervisorport_skeleton_.PrimaryWarning.Send(std::forward<Args>(args)...);
+            return ::reaktar::EmitStatus{true};
+        }
+        // Tier 1: Exact Channel Tag Point-to-Point Dispatch
+        else if constexpr (std::is_same_v<Tag, typename ActorBase::ports::SupervisorPort::SecondaryWarning>) {
+            supervisorport_skeleton_.SecondaryWarning.Send(std::forward<Args>(args)...);
+            return ::reaktar::EmitStatus{true};
+        }
+        // Tier 1: Exact Channel Tag Point-to-Point Dispatch
+        else if constexpr (std::is_same_v<Tag, ::reaktar::tags::vehicle_supervisor::events::SecondaryWarning>) {
+            supervisorport_skeleton_.SecondaryWarning.Send(std::forward<Args>(args)...);
+            return ::reaktar::EmitStatus{true};
+        }
+        // Tier 1: Exact Channel Tag Point-to-Point Dispatch
+        else if constexpr (std::is_same_v<Tag, typename ActorBase::ports::SupervisorPort::ActiveAlerts>) {
+            supervisorport_skeleton_.ActiveAlerts.Update(std::forward<Args>(args)...);
+            return ::reaktar::EmitStatus{true};
+        }
+        // Tier 1: Exact Channel Tag Point-to-Point Dispatch
+        else if constexpr (std::is_same_v<Tag, ::reaktar::tags::vehicle_supervisor::fields::ActiveAlerts>) {
+            supervisorport_skeleton_.ActiveAlerts.Update(std::forward<Args>(args)...);
+            return ::reaktar::EmitStatus{true};
+        }
+        // Tier 1: Exact Channel Tag Point-to-Point Dispatch
+        else if constexpr (std::is_same_v<Tag, typename ActorBase::ports::SupervisorPort::SystemMatrix>) {
+            supervisorport_skeleton_.SystemMatrix.Update(std::forward<Args>(args)...);
+            return ::reaktar::EmitStatus{true};
+        }
+        // Tier 1: Exact Channel Tag Point-to-Point Dispatch
+        else if constexpr (std::is_same_v<Tag, ::reaktar::tags::vehicle_supervisor::fields::SystemMatrix>) {
+            supervisorport_skeleton_.SystemMatrix.Update(std::forward<Args>(args)...);
+            return ::reaktar::EmitStatus{true};
+        }
+        // Tier 1: Exact Channel Tag Point-to-Point Dispatch
+        else if constexpr (std::is_same_v<Tag, typename ActorBase::ports::BodyControlIn::FlashLights>) {
+            auto proxy_lease = this->bodycontrolin_slot_.acquire("BodyControlIn");
+            if (proxy_lease) {
+                proxy_lease->FlashLights(std::forward<Args>(args)...);
+                return ::reaktar::EmitStatus{true};
+            }
+            return ::reaktar::EmitStatus{false};
+        }
+        // Tier 1: Exact Channel Tag Point-to-Point Dispatch
+        else if constexpr (std::is_same_v<Tag, ::reaktar::tags::body_control::methods::FlashLights>) {
+            auto proxy_lease = this->bodycontrolin_slot_.acquire("BodyControlIn");
+            if (proxy_lease) {
+                proxy_lease->FlashLights(std::forward<Args>(args)...);
+                return ::reaktar::EmitStatus{true};
+            }
+            return ::reaktar::EmitStatus{false};
+        }
+        // Tier 1: Exact Channel Tag Point-to-Point Dispatch
+        else if constexpr (std::is_same_v<Tag, typename ActorBase::ports::BodyControlIn::LockDoors>) {
+            auto proxy_lease = this->bodycontrolin_slot_.acquire("BodyControlIn");
+            using AsyncResType = decltype(make_async_result(proxy_lease->LockDoors(std::forward<Args>(args)...)));
+            if (proxy_lease) {
+                return make_async_result(proxy_lease->LockDoors(std::forward<Args>(args)...));
+            }
+            return AsyncResType::Failed();
+        }
+        // Tier 1: Exact Channel Tag Point-to-Point Dispatch
+        else if constexpr (std::is_same_v<Tag, ::reaktar::tags::body_control::methods::LockDoors>) {
+            auto proxy_lease = this->bodycontrolin_slot_.acquire("BodyControlIn");
+            using AsyncResType = decltype(make_async_result(proxy_lease->LockDoors(std::forward<Args>(args)...)));
+            if (proxy_lease) {
+                return make_async_result(proxy_lease->LockDoors(std::forward<Args>(args)...));
+            }
+            return AsyncResType::Failed();
+        }
+        // Tier 1: Exact Channel Tag Point-to-Point Dispatch
+        else if constexpr (std::is_same_v<Tag, typename ActorBase::ports::BodyControlIn::TargetCabinTemperature>) {
+            auto proxy_lease = this->bodycontrolin_slot_.acquire("BodyControlIn");
+            using AsyncResType = decltype(make_async_result(proxy_lease->TargetCabinTemperature.Set(std::forward<Args>(args)...)));
+            if (proxy_lease) {
+                return make_async_result(proxy_lease->TargetCabinTemperature.Set(std::forward<Args>(args)...));
+            }
+            return AsyncResType::Failed();
+        }
+        // Tier 1: Exact Channel Tag Point-to-Point Dispatch
+        else if constexpr (std::is_same_v<Tag, ::reaktar::tags::body_control::fields::TargetCabinTemperature>) {
+            auto proxy_lease = this->bodycontrolin_slot_.acquire("BodyControlIn");
+            using AsyncResType = decltype(make_async_result(proxy_lease->TargetCabinTemperature.Set(std::forward<Args>(args)...)));
+            if (proxy_lease) {
+                return make_async_result(proxy_lease->TargetCabinTemperature.Set(std::forward<Args>(args)...));
+            }
+            return AsyncResType::Failed();
+        }
+        // Tier 1: Exact Channel Tag Point-to-Point Dispatch
+        else if constexpr (std::is_same_v<Tag, typename ActorBase::ports::BodyControlIn::WindowPosition>) {
+            auto proxy_lease = this->bodycontrolin_slot_.acquire("BodyControlIn");
+            using AsyncResType = decltype(make_async_result(proxy_lease->WindowPosition.Set(std::forward<Args>(args)...)));
+            if (proxy_lease) {
+                return make_async_result(proxy_lease->WindowPosition.Set(std::forward<Args>(args)...));
+            }
+            return AsyncResType::Failed();
+        }
+        // Tier 1: Exact Channel Tag Point-to-Point Dispatch
+        else if constexpr (std::is_same_v<Tag, ::reaktar::tags::body_control::fields::WindowPosition>) {
+            auto proxy_lease = this->bodycontrolin_slot_.acquire("BodyControlIn");
+            using AsyncResType = decltype(make_async_result(proxy_lease->WindowPosition.Set(std::forward<Args>(args)...)));
+            if (proxy_lease) {
+                return make_async_result(proxy_lease->WindowPosition.Set(std::forward<Args>(args)...));
+            }
+            return AsyncResType::Failed();
+        }
+        else {
+            static_assert(!sizeof(Tag*), "reaktar: emit<Tag::Any>(...) failed! Tag does not match any outbound port or interface.");
+        }
+    }
+
+    template <typename Tag, typename... Args>
+    auto call(Args&&... args) {
+        return emit<Tag>(std::forward<Args>(args)...);
+    }
+
+    template <typename... Args>
+    auto emit(Args&&... args) {
+        if constexpr (sizeof...(Args) == 1) {
+            using PayloadType = std::decay_t<typename std::tuple_element<0, std::tuple<Args...>>::type>;
+            if constexpr (::reaktar::is_tag_type_v<PayloadType>) {
+                static_assert(!sizeof...(Args), "reaktar: tags cannot be passed as runtime arguments to emit(). Use emit<Tag::Any>(...).");
+            }
+            else if constexpr (ActorBase::traits::template is_ambiguous_emit_v<PayloadType>) {
+                if constexpr (std::is_same_v<PayloadType, uint16_t>) {
+                    static_assert(!sizeof...(Args),
+                        "reaktar: emit(payload) is ambiguous across multiple ports! Use emit<ports::P::Tag>(payload) or explicit broadcast emit<reaktar::Any>(payload).\n"
+                        "Payload type 'uint16_t' matches 2 outbound targets:\n"
+                        "  - Port 'SupervisorPort', member 'PrimaryWarning' (event)\n"
+                        "  - Port 'SupervisorPort', member 'SecondaryWarning' (event)\n"
+                    );
+                }
+                else {
+                    static_assert(!sizeof...(Args), "reaktar: emit(payload) is ambiguous across multiple ports! Use emit<ports::P::Tag>(payload) or explicit broadcast emit<reaktar::Any>(payload).");
+                }
+            }
+            else if constexpr (!ActorBase::traits::template can_emit_v<PayloadType>) {
+                static_assert(!sizeof...(Args),
+                    "reaktar: emit(payload) failed! The payload type is not produced by any skeleton event, field, or single-arg RPC method in this Actor.\n"
+                    "Available single-argument payload types that can be emitted directly are:\n"
+                    "  - ara::core::Map<uint32_t, vehicle_data::EmergencyAlert> -> Port 'SupervisorPort', member 'ActiveDiagnosticMap'\n"
+                    "  - vehicle_data::VehicleDiagnostics -> Port 'SupervisorPort', member 'DiagnosticsReport'\n"
+                    "  - ara::core::Vector<vehicle_data::DriveMode> -> Port 'SupervisorPort', member 'DriveHistory'\n"
+                    "  - vehicle_data::EmergencyAlert -> Port 'SupervisorPort', member 'EmergencyAlert'\n"
+                    "  - ara::core::Vector<vehicle_data::EmergencyAlert> -> Port 'SupervisorPort', member 'ActiveAlerts'\n"
+                    "  - ara::core::Array<vehicle_data::SystemStatus, 4> -> Port 'SupervisorPort', member 'SystemMatrix'\n"
+                    "  - bool -> Port 'BodyControlIn', member 'LockDoors'\n"
+                    "  - float -> Port 'BodyControlIn', member 'TargetCabinTemperature'\n"
+                    "  - uint32_t -> Port 'BodyControlIn', member 'WindowPosition'\n"
+                );
+            }
+            else {
+                if constexpr (std::is_same_v<PayloadType, ara::core::Map<uint32_t, vehicle_data::EmergencyAlert>>) {
+                    supervisorport_skeleton_.ActiveDiagnosticMap.Send(std::forward<Args>(args)...);
+                    return ::reaktar::EmitStatus{true};
+                }
+                else if constexpr (std::is_same_v<PayloadType, vehicle_data::VehicleDiagnostics>) {
+                    supervisorport_skeleton_.DiagnosticsReport.Send(std::forward<Args>(args)...);
+                    return ::reaktar::EmitStatus{true};
+                }
+                else if constexpr (std::is_same_v<PayloadType, ara::core::Vector<vehicle_data::DriveMode>>) {
+                    supervisorport_skeleton_.DriveHistory.Send(std::forward<Args>(args)...);
+                    return ::reaktar::EmitStatus{true};
+                }
+                else if constexpr (std::is_same_v<PayloadType, vehicle_data::EmergencyAlert>) {
+                    supervisorport_skeleton_.EmergencyAlert.Send(std::forward<Args>(args)...);
+                    return ::reaktar::EmitStatus{true};
+                }
+                else if constexpr (std::is_same_v<PayloadType, ara::core::Vector<vehicle_data::EmergencyAlert>>) {
+                    supervisorport_skeleton_.ActiveAlerts.Update(std::forward<Args>(args)...);
+                    return ::reaktar::EmitStatus{true};
+                }
+                else if constexpr (std::is_same_v<PayloadType, ara::core::Array<vehicle_data::SystemStatus, 4>>) {
+                    supervisorport_skeleton_.SystemMatrix.Update(std::forward<Args>(args)...);
+                    return ::reaktar::EmitStatus{true};
+                }
+                else if constexpr (std::is_same_v<PayloadType, bool>) {
                     auto proxy_lease = this->bodycontrolin_slot_.acquire("BodyControlIn");
                     using AsyncResType = decltype(make_async_result(proxy_lease->LockDoors(std::forward<Args>(args)...)));
                     if (proxy_lease) {
@@ -1072,258 +2015,6 @@ public:
                     }
                     return AsyncResType::Failed();
                 }
-                else {
-                    static_assert(!sizeof(Tag*), "reaktar: emit<Port>(payload) failed! The payload type does not match any outbound event, notifier, or single-arg method on port 'BodyControlIn'.");
-                }
-            }
-            else {
-                using SigTuple = std::tuple<std::decay_t<Args>...>;
-                if constexpr (std::is_same_v<SigTuple, std::tuple<uint32_t, uint32_t>>) {
-                    auto proxy_lease = this->bodycontrolin_slot_.acquire("BodyControlIn");
-                    if (proxy_lease) {
-                        proxy_lease->FlashLights(std::forward<Args>(args)...);
-                        return ::reaktar::EmitStatus{true};
-                    }
-                    return ::reaktar::EmitStatus{false};
-                }
-                else {
-                    static_assert(!sizeof(Tag*), "reaktar: emit<Port>(args...) failed! The argument signature does not match any outbound method on port 'BodyControlIn'.");
-                }
-            }
-        }
-        else if constexpr (std::is_same_v<Tag, typename Base::ports::PowertrainIn>) {
-            static_assert(!sizeof(Tag*), "reaktar: Port 'PowertrainIn' has no outbound events, notifiers, or RPC methods!");
-        }
-        else if constexpr (std::is_same_v<Tag, typename Base::ports::SupervisorPort>) {
-            if constexpr (sizeof...(Args) == 1) {
-                using PayloadType = std::decay_t<typename std::tuple_element<0, std::tuple<Args...>>::type>;
-                if constexpr (std::is_same_v<PayloadType, ara::core::Array<vehicle_data::SystemStatus, 4>>) {
-                    supervisorport_skeleton_.SystemMatrix.Update(std::forward<Args>(args)...);
-                    return ::reaktar::EmitStatus{true};
-                }
-                else if constexpr (std::is_same_v<PayloadType, ara::core::Map<uint32_t, vehicle_data::EmergencyAlert>>) {
-                    supervisorport_skeleton_.ActiveDiagnosticMap.Send(std::forward<Args>(args)...);
-                    return ::reaktar::EmitStatus{true};
-                }
-                else if constexpr (std::is_same_v<PayloadType, ara::core::Vector<vehicle_data::DriveMode>>) {
-                    supervisorport_skeleton_.DriveHistory.Send(std::forward<Args>(args)...);
-                    return ::reaktar::EmitStatus{true};
-                }
-                else if constexpr (std::is_same_v<PayloadType, ara::core::Vector<vehicle_data::EmergencyAlert>>) {
-                    supervisorport_skeleton_.ActiveAlerts.Update(std::forward<Args>(args)...);
-                    return ::reaktar::EmitStatus{true};
-                }
-                else if constexpr (std::is_same_v<PayloadType, uint16_t>) {
-                    static_assert(!sizeof(Tag*), "reaktar: emit<Port>(payload) is ambiguous on port 'SupervisorPort'! Multiple items accept type 'uint16_t'. Use emit<ports::SupervisorPort::ItemTag>(...) instead.");
-                }
-                else if constexpr (std::is_same_v<PayloadType, vehicle_data::EmergencyAlert>) {
-                    supervisorport_skeleton_.EmergencyAlert.Send(std::forward<Args>(args)...);
-                    return ::reaktar::EmitStatus{true};
-                }
-                else if constexpr (std::is_same_v<PayloadType, vehicle_data::VehicleDiagnostics>) {
-                    supervisorport_skeleton_.DiagnosticsReport.Send(std::forward<Args>(args)...);
-                    return ::reaktar::EmitStatus{true};
-                }
-                else {
-                    static_assert(!sizeof(Tag*), "reaktar: emit<Port>(payload) failed! The payload type does not match any outbound event, notifier, or single-arg method on port 'SupervisorPort'.");
-                }
-            }
-            else {
-                static_assert(!sizeof(Tag*), "reaktar: emit<Port>(args...) failed! Port 'SupervisorPort' has no outbound multi-argument methods.");
-            }
-        }
-        else if constexpr (std::is_same_v<Tag, typename Base::ports::SupervisorPort::ActiveDiagnosticMap>) {
-            supervisorport_skeleton_.ActiveDiagnosticMap.Send(std::forward<Args>(args)...);
-            return ::reaktar::EmitStatus{true};
-        }
-        else if constexpr (std::is_same_v<Tag, ::reaktar::tags::vehicle_supervisor::events::ActiveDiagnosticMap>) {
-            supervisorport_skeleton_.ActiveDiagnosticMap.Send(std::forward<Args>(args)...);
-            return ::reaktar::EmitStatus{true};
-        }
-        else if constexpr (std::is_same_v<Tag, typename Base::ports::SupervisorPort::DiagnosticsReport>) {
-            supervisorport_skeleton_.DiagnosticsReport.Send(std::forward<Args>(args)...);
-            return ::reaktar::EmitStatus{true};
-        }
-        else if constexpr (std::is_same_v<Tag, ::reaktar::tags::vehicle_supervisor::events::DiagnosticsReport>) {
-            supervisorport_skeleton_.DiagnosticsReport.Send(std::forward<Args>(args)...);
-            return ::reaktar::EmitStatus{true};
-        }
-        else if constexpr (std::is_same_v<Tag, typename Base::ports::SupervisorPort::DriveHistory>) {
-            supervisorport_skeleton_.DriveHistory.Send(std::forward<Args>(args)...);
-            return ::reaktar::EmitStatus{true};
-        }
-        else if constexpr (std::is_same_v<Tag, ::reaktar::tags::vehicle_supervisor::events::DriveHistory>) {
-            supervisorport_skeleton_.DriveHistory.Send(std::forward<Args>(args)...);
-            return ::reaktar::EmitStatus{true};
-        }
-        else if constexpr (std::is_same_v<Tag, typename Base::ports::SupervisorPort::EmergencyAlert>) {
-            supervisorport_skeleton_.EmergencyAlert.Send(std::forward<Args>(args)...);
-            return ::reaktar::EmitStatus{true};
-        }
-        else if constexpr (std::is_same_v<Tag, ::reaktar::tags::vehicle_supervisor::events::EmergencyAlert>) {
-            supervisorport_skeleton_.EmergencyAlert.Send(std::forward<Args>(args)...);
-            return ::reaktar::EmitStatus{true};
-        }
-        else if constexpr (std::is_same_v<Tag, typename Base::ports::SupervisorPort::PrimaryWarning>) {
-            supervisorport_skeleton_.PrimaryWarning.Send(std::forward<Args>(args)...);
-            return ::reaktar::EmitStatus{true};
-        }
-        else if constexpr (std::is_same_v<Tag, ::reaktar::tags::vehicle_supervisor::events::PrimaryWarning>) {
-            supervisorport_skeleton_.PrimaryWarning.Send(std::forward<Args>(args)...);
-            return ::reaktar::EmitStatus{true};
-        }
-        else if constexpr (std::is_same_v<Tag, typename Base::ports::SupervisorPort::SecondaryWarning>) {
-            supervisorport_skeleton_.SecondaryWarning.Send(std::forward<Args>(args)...);
-            return ::reaktar::EmitStatus{true};
-        }
-        else if constexpr (std::is_same_v<Tag, ::reaktar::tags::vehicle_supervisor::events::SecondaryWarning>) {
-            supervisorport_skeleton_.SecondaryWarning.Send(std::forward<Args>(args)...);
-            return ::reaktar::EmitStatus{true};
-        }
-        else if constexpr (std::is_same_v<Tag, typename Base::ports::SupervisorPort::ActiveAlerts>) {
-            supervisorport_skeleton_.ActiveAlerts.Update(std::forward<Args>(args)...);
-            return ::reaktar::EmitStatus{true};
-        }
-        else if constexpr (std::is_same_v<Tag, ::reaktar::tags::vehicle_supervisor::fields::ActiveAlerts>) {
-            supervisorport_skeleton_.ActiveAlerts.Update(std::forward<Args>(args)...);
-            return ::reaktar::EmitStatus{true};
-        }
-        else if constexpr (std::is_same_v<Tag, typename Base::ports::SupervisorPort::SystemMatrix>) {
-            supervisorport_skeleton_.SystemMatrix.Update(std::forward<Args>(args)...);
-            return ::reaktar::EmitStatus{true};
-        }
-        else if constexpr (std::is_same_v<Tag, ::reaktar::tags::vehicle_supervisor::fields::SystemMatrix>) {
-            supervisorport_skeleton_.SystemMatrix.Update(std::forward<Args>(args)...);
-            return ::reaktar::EmitStatus{true};
-        }
-        else if constexpr (std::is_same_v<Tag, typename Base::ports::BodyControlIn::FlashLights>) {
-            auto proxy_lease = this->bodycontrolin_slot_.acquire("BodyControlIn");
-            if (proxy_lease) {
-                proxy_lease->FlashLights(std::forward<Args>(args)...);
-                return ::reaktar::EmitStatus{true};
-            }
-            return ::reaktar::EmitStatus{false};
-        }
-        else if constexpr (std::is_same_v<Tag, ::reaktar::tags::body_control::methods::FlashLights>) {
-            auto proxy_lease = this->bodycontrolin_slot_.acquire("BodyControlIn");
-            if (proxy_lease) {
-                proxy_lease->FlashLights(std::forward<Args>(args)...);
-                return ::reaktar::EmitStatus{true};
-            }
-            return ::reaktar::EmitStatus{false};
-        }
-        else if constexpr (std::is_same_v<Tag, typename Base::ports::BodyControlIn::LockDoors>) {
-            auto proxy_lease = this->bodycontrolin_slot_.acquire("BodyControlIn");
-            using AsyncResType = decltype(make_async_result(proxy_lease->LockDoors(std::forward<Args>(args)...)));
-            if (proxy_lease) {
-                return make_async_result(proxy_lease->LockDoors(std::forward<Args>(args)...));
-            }
-            return AsyncResType::Failed();
-        }
-        else if constexpr (std::is_same_v<Tag, ::reaktar::tags::body_control::methods::LockDoors>) {
-            auto proxy_lease = this->bodycontrolin_slot_.acquire("BodyControlIn");
-            using AsyncResType = decltype(make_async_result(proxy_lease->LockDoors(std::forward<Args>(args)...)));
-            if (proxy_lease) {
-                return make_async_result(proxy_lease->LockDoors(std::forward<Args>(args)...));
-            }
-            return AsyncResType::Failed();
-        }
-        else if constexpr (std::is_same_v<Tag, typename Base::ports::BodyControlIn::TargetCabinTemperature>) {
-            auto proxy_lease = this->bodycontrolin_slot_.acquire("BodyControlIn");
-            using AsyncResType = decltype(make_async_result(proxy_lease->TargetCabinTemperature.Set(std::forward<Args>(args)...)));
-            if (proxy_lease) {
-                return make_async_result(proxy_lease->TargetCabinTemperature.Set(std::forward<Args>(args)...));
-            }
-            return AsyncResType::Failed();
-        }
-        else if constexpr (std::is_same_v<Tag, ::reaktar::tags::body_control::fields::TargetCabinTemperature>) {
-            auto proxy_lease = this->bodycontrolin_slot_.acquire("BodyControlIn");
-            using AsyncResType = decltype(make_async_result(proxy_lease->TargetCabinTemperature.Set(std::forward<Args>(args)...)));
-            if (proxy_lease) {
-                return make_async_result(proxy_lease->TargetCabinTemperature.Set(std::forward<Args>(args)...));
-            }
-            return AsyncResType::Failed();
-        }
-        else if constexpr (std::is_same_v<Tag, typename Base::ports::BodyControlIn::WindowPosition>) {
-            auto proxy_lease = this->bodycontrolin_slot_.acquire("BodyControlIn");
-            using AsyncResType = decltype(make_async_result(proxy_lease->WindowPosition.Set(std::forward<Args>(args)...)));
-            if (proxy_lease) {
-                return make_async_result(proxy_lease->WindowPosition.Set(std::forward<Args>(args)...));
-            }
-            return AsyncResType::Failed();
-        }
-        else if constexpr (std::is_same_v<Tag, ::reaktar::tags::body_control::fields::WindowPosition>) {
-            auto proxy_lease = this->bodycontrolin_slot_.acquire("BodyControlIn");
-            using AsyncResType = decltype(make_async_result(proxy_lease->WindowPosition.Set(std::forward<Args>(args)...)));
-            if (proxy_lease) {
-                return make_async_result(proxy_lease->WindowPosition.Set(std::forward<Args>(args)...));
-            }
-            return AsyncResType::Failed();
-        }
-        else {
-            static_assert(!sizeof(Tag*), "reaktar: emit called with unknown tag or port!");
-        }
-    }
-
-    template <typename Tag, typename... Args>
-    auto call(Args&&... args) {
-        return emit<Tag>(std::forward<Args>(args)...);
-    }
-
-    template <typename... Args>
-    auto emit(Args&&... args) {
-        if constexpr (sizeof...(Args) == 1) {
-            using PayloadType = std::decay_t<typename std::tuple_element<0, std::tuple<Args...>>::type>;
-            if constexpr (std::is_same_v<PayloadType, ara::core::Map<uint32_t, vehicle_data::EmergencyAlert>>) {
-                supervisorport_skeleton_.ActiveDiagnosticMap.Send(std::forward<Args>(args)...);
-                return ::reaktar::EmitStatus{true};
-            }
-            else if constexpr (std::is_same_v<PayloadType, vehicle_data::VehicleDiagnostics>) {
-                supervisorport_skeleton_.DiagnosticsReport.Send(std::forward<Args>(args)...);
-                return ::reaktar::EmitStatus{true};
-            }
-            else if constexpr (std::is_same_v<PayloadType, ara::core::Vector<vehicle_data::DriveMode>>) {
-                supervisorport_skeleton_.DriveHistory.Send(std::forward<Args>(args)...);
-                return ::reaktar::EmitStatus{true};
-            }
-            else if constexpr (std::is_same_v<PayloadType, vehicle_data::EmergencyAlert>) {
-                supervisorport_skeleton_.EmergencyAlert.Send(std::forward<Args>(args)...);
-                return ::reaktar::EmitStatus{true};
-            }
-            else if constexpr (std::is_same_v<PayloadType, ara::core::Vector<vehicle_data::EmergencyAlert>>) {
-                supervisorport_skeleton_.ActiveAlerts.Update(std::forward<Args>(args)...);
-                return ::reaktar::EmitStatus{true};
-            }
-            else if constexpr (std::is_same_v<PayloadType, ara::core::Array<vehicle_data::SystemStatus, 4>>) {
-                supervisorport_skeleton_.SystemMatrix.Update(std::forward<Args>(args)...);
-                return ::reaktar::EmitStatus{true};
-            }
-            else if constexpr (std::is_same_v<PayloadType, bool>) {
-                auto proxy_lease = this->bodycontrolin_slot_.acquire("BodyControlIn");
-                using AsyncResType = decltype(make_async_result(proxy_lease->LockDoors(std::forward<Args>(args)...)));
-                if (proxy_lease) {
-                    return make_async_result(proxy_lease->LockDoors(std::forward<Args>(args)...));
-                }
-                return AsyncResType::Failed();
-            }
-            else if constexpr (std::is_same_v<PayloadType, float>) {
-                auto proxy_lease = this->bodycontrolin_slot_.acquire("BodyControlIn");
-                using AsyncResType = decltype(make_async_result(proxy_lease->TargetCabinTemperature.Set(std::forward<Args>(args)...)));
-                if (proxy_lease) {
-                    return make_async_result(proxy_lease->TargetCabinTemperature.Set(std::forward<Args>(args)...));
-                }
-                return AsyncResType::Failed();
-            }
-            else if constexpr (std::is_same_v<PayloadType, uint32_t>) {
-                auto proxy_lease = this->bodycontrolin_slot_.acquire("BodyControlIn");
-                using AsyncResType = decltype(make_async_result(proxy_lease->WindowPosition.Set(std::forward<Args>(args)...)));
-                if (proxy_lease) {
-                    return make_async_result(proxy_lease->WindowPosition.Set(std::forward<Args>(args)...));
-                }
-                return AsyncResType::Failed();
-            }
-            else {
-                static_assert(!sizeof...(Args), "reaktar: emit(payload) failed! The payload type is not produced by any skeleton event, field, or single-arg RPC method in this Actor.");
             }
         }
         else {
@@ -1337,7 +2028,11 @@ public:
                 return ::reaktar::EmitStatus{false};
             }
             else {
-                static_assert(!sizeof...(Args), "reaktar: emit(args...) failed! The argument list does not match any unique proxy RPC method in this Actor. Use emit<Tag>(args...) if ambiguous.");
+                static_assert(!sizeof...(Args),
+                    "reaktar: emit(args...) failed! The argument list does not match any unique proxy RPC method in this Actor. Use emit<Tag>(args...) if ambiguous.\n"
+                    "Available multi-argument method signatures are:\n"
+                    "  - Port 'BodyControlIn', method 'FlashLights'(uint32_t, uint32_t)\n"
+                );
             }
         }
     }
@@ -1346,9 +2041,9 @@ public:
     // ------------------------------------------------------------------------
     template <typename PortTag, typename ItemTag>
     auto read() {
-        if constexpr (std::is_same_v<PortTag, typename Base::ports::BodyControlIn>) {
+        if constexpr (std::is_same_v<PortTag, typename ActorBase::ports::BodyControlIn>) {
             if constexpr (
-                std::is_same_v<ItemTag, typename Base::ports::BodyControlIn::OutsideAirQuality>
+                std::is_same_v<ItemTag, typename ActorBase::ports::BodyControlIn::OutsideAirQuality>
                 || std::is_same_v<ItemTag, ::reaktar::tags::body_control::fields::OutsideAirQuality>
             ) {
                 auto proxy_lease = this->bodycontrolin_slot_.acquire("BodyControlIn");
@@ -1359,13 +2054,13 @@ public:
                 return AsyncResType::Failed();
             }
             else if constexpr (
-                std::is_same_v<ItemTag, typename Base::ports::BodyControlIn::RainSensorLevel>
+                std::is_same_v<ItemTag, typename ActorBase::ports::BodyControlIn::RainSensorLevel>
                 || std::is_same_v<ItemTag, ::reaktar::tags::body_control::fields::RainSensorLevel>
             ) {
                 static_assert(!sizeof(PortTag*), "reaktar: Field 'RainSensorLevel' on port 'BodyControlIn' does not have a getter in ARXML!");
             }
             else if constexpr (
-                std::is_same_v<ItemTag, typename Base::ports::BodyControlIn::TargetCabinTemperature>
+                std::is_same_v<ItemTag, typename ActorBase::ports::BodyControlIn::TargetCabinTemperature>
                 || std::is_same_v<ItemTag, ::reaktar::tags::body_control::fields::TargetCabinTemperature>
             ) {
                 auto proxy_lease = this->bodycontrolin_slot_.acquire("BodyControlIn");
@@ -1376,7 +2071,7 @@ public:
                 return AsyncResType::Failed();
             }
             else if constexpr (
-                std::is_same_v<ItemTag, typename Base::ports::BodyControlIn::WindowPosition>
+                std::is_same_v<ItemTag, typename ActorBase::ports::BodyControlIn::WindowPosition>
                 || std::is_same_v<ItemTag, ::reaktar::tags::body_control::fields::WindowPosition>
             ) {
                 static_assert(!sizeof(PortTag*), "reaktar: Field 'WindowPosition' on port 'BodyControlIn' does not have a getter in ARXML!");
@@ -1385,7 +2080,7 @@ public:
                 static_assert(!sizeof(PortTag*), "reaktar: Port 'BodyControlIn' has no such field tag!");
             }
         }
-        else if constexpr (std::is_same_v<PortTag, typename Base::ports::PowertrainIn>) {
+        else if constexpr (std::is_same_v<PortTag, typename ActorBase::ports::PowertrainIn>) {
             static_assert(!sizeof(PortTag*), "reaktar: Port 'PowertrainIn' has no fields!");
         }
         else {
@@ -1396,15 +2091,15 @@ public:
     template <typename Tag>
     auto read() {
         // 1. Port tags: read<ports::Port>()
-        if constexpr (std::is_same_v<Tag, typename Base::ports::BodyControlIn>) {
+        if constexpr (std::is_same_v<Tag, typename ActorBase::ports::BodyControlIn>) {
             static_assert(!sizeof(Tag*), "reaktar: read<Port>() is ambiguous on port 'BodyControlIn'! Port has multiple readable fields. Specify the field tag via read<Port::FieldTag>() or read<Port, FieldTag>().");
         }
-        else if constexpr (std::is_same_v<Tag, typename Base::ports::PowertrainIn>) {
+        else if constexpr (std::is_same_v<Tag, typename ActorBase::ports::PowertrainIn>) {
             static_assert(!sizeof(Tag*), "reaktar: Port 'PowertrainIn' has no readable fields with getters!");
         }
 
         // 2. Port-scoped field tags: read<ports::Port::FieldTag>()
-        else if constexpr (std::is_same_v<Tag, typename Base::ports::BodyControlIn::OutsideAirQuality>) {
+        else if constexpr (std::is_same_v<Tag, typename ActorBase::ports::BodyControlIn::OutsideAirQuality>) {
             auto proxy_lease = this->bodycontrolin_slot_.acquire("BodyControlIn");
             using AsyncResType = decltype(make_async_result(proxy_lease->OutsideAirQuality.Get()));
             if (proxy_lease) {
@@ -1412,10 +2107,10 @@ public:
             }
             return AsyncResType::Failed();
         }
-        else if constexpr (std::is_same_v<Tag, typename Base::ports::BodyControlIn::RainSensorLevel>) {
+        else if constexpr (std::is_same_v<Tag, typename ActorBase::ports::BodyControlIn::RainSensorLevel>) {
             static_assert(!sizeof(Tag*), "reaktar: Field 'RainSensorLevel' on port 'BodyControlIn' does not have a getter in ARXML!");
         }
-        else if constexpr (std::is_same_v<Tag, typename Base::ports::BodyControlIn::TargetCabinTemperature>) {
+        else if constexpr (std::is_same_v<Tag, typename ActorBase::ports::BodyControlIn::TargetCabinTemperature>) {
             auto proxy_lease = this->bodycontrolin_slot_.acquire("BodyControlIn");
             using AsyncResType = decltype(make_async_result(proxy_lease->TargetCabinTemperature.Get()));
             if (proxy_lease) {
@@ -1423,7 +2118,7 @@ public:
             }
             return AsyncResType::Failed();
         }
-        else if constexpr (std::is_same_v<Tag, typename Base::ports::BodyControlIn::WindowPosition>) {
+        else if constexpr (std::is_same_v<Tag, typename ActorBase::ports::BodyControlIn::WindowPosition>) {
             static_assert(!sizeof(Tag*), "reaktar: Field 'WindowPosition' on port 'BodyControlIn' does not have a getter in ARXML!");
         }
 
@@ -1497,13 +2192,13 @@ public:
     template <typename PortTag>
     void open_port() {
         static_assert(::reaktar::is_port_v<PortTag>, "open_port requires a valid generated Port Tag (e.g. ports::MyPort)!");
-        if constexpr (std::is_same_v<PortTag, typename Base::ports::SupervisorPort>) {
+        if constexpr (std::is_same_v<PortTag, typename ActorBase::ports::SupervisorPort>) {
             open_supervisorport_provided_port();
         }
-        else if constexpr (std::is_same_v<PortTag, typename Base::ports::BodyControlIn>) {
+        else if constexpr (std::is_same_v<PortTag, typename ActorBase::ports::BodyControlIn>) {
             open_bodycontrolin_required_port();
         }
-        else if constexpr (std::is_same_v<PortTag, typename Base::ports::PowertrainIn>) {
+        else if constexpr (std::is_same_v<PortTag, typename ActorBase::ports::PowertrainIn>) {
             open_powertrainin_required_port();
         }
     }
@@ -1516,13 +2211,13 @@ public:
     template <typename PortTag>
     void close_port() {
         static_assert(::reaktar::is_port_v<PortTag>, "close_port requires a valid generated Port Tag (e.g. ports::MyPort)!");
-        if constexpr (std::is_same_v<PortTag, typename Base::ports::SupervisorPort>) {
+        if constexpr (std::is_same_v<PortTag, typename ActorBase::ports::SupervisorPort>) {
             close_supervisorport_provided_port();
         }
-        else if constexpr (std::is_same_v<PortTag, typename Base::ports::BodyControlIn>) {
+        else if constexpr (std::is_same_v<PortTag, typename ActorBase::ports::BodyControlIn>) {
             close_bodycontrolin_required_port();
         }
-        else if constexpr (std::is_same_v<PortTag, typename Base::ports::PowertrainIn>) {
+        else if constexpr (std::is_same_v<PortTag, typename ActorBase::ports::PowertrainIn>) {
             close_powertrainin_required_port();
         }
     }
@@ -1535,13 +2230,13 @@ public:
     template <typename PortTag>
     bool is_ready() const noexcept {
         static_assert(::reaktar::is_port_v<PortTag>, "is_ready requires a valid generated Port Tag (e.g. ports::MyPort)!");
-        if constexpr (std::is_same_v<PortTag, typename Base::ports::SupervisorPort>) {
+        if constexpr (std::is_same_v<PortTag, typename ActorBase::ports::SupervisorPort>) {
             return this->supervisorport_offered_.load(std::memory_order_acquire);
         }
-        else if constexpr (std::is_same_v<PortTag, typename Base::ports::BodyControlIn>) {
+        else if constexpr (std::is_same_v<PortTag, typename ActorBase::ports::BodyControlIn>) {
             return this->bodycontrolin_open_.load(std::memory_order_acquire) && this->bodycontrolin_slot_.is_available();
         }
-        else if constexpr (std::is_same_v<PortTag, typename Base::ports::PowertrainIn>) {
+        else if constexpr (std::is_same_v<PortTag, typename ActorBase::ports::PowertrainIn>) {
             return this->powertrainin_open_.load(std::memory_order_acquire) && this->powertrainin_slot_.is_available();
         }
     }
@@ -1552,13 +2247,13 @@ public:
     template <typename PortTag>
     bool is_port_open() const noexcept {
         static_assert(::reaktar::is_port_v<PortTag>, "is_port_open requires a valid generated Port Tag (e.g. ports::MyPort)!");
-        if constexpr (std::is_same_v<PortTag, typename Base::ports::SupervisorPort>) {
+        if constexpr (std::is_same_v<PortTag, typename ActorBase::ports::SupervisorPort>) {
             return this->supervisorport_offered_.load(std::memory_order_acquire);
         }
-        else if constexpr (std::is_same_v<PortTag, typename Base::ports::BodyControlIn>) {
+        else if constexpr (std::is_same_v<PortTag, typename ActorBase::ports::BodyControlIn>) {
             return this->bodycontrolin_open_.load(std::memory_order_acquire);
         }
-        else if constexpr (std::is_same_v<PortTag, typename Base::ports::PowertrainIn>) {
+        else if constexpr (std::is_same_v<PortTag, typename ActorBase::ports::PowertrainIn>) {
             return this->powertrainin_open_.load(std::memory_order_acquire);
         }
     }
@@ -1569,11 +2264,11 @@ public:
     template <typename PortTag>
     uint64_t get_port_generation() const noexcept {
         static_assert(::reaktar::is_port_v<PortTag>, "get_port_generation requires a valid generated Port Tag!");
-        if constexpr (std::is_same_v<PortTag, typename Base::ports::BodyControlIn>) {
+        if constexpr (std::is_same_v<PortTag, typename ActorBase::ports::BodyControlIn>) {
             std::lock_guard<std::mutex> lock(this->bodycontrolin_port_mutex_);
             return this->bodycontrolin_generation_;
         }
-        else if constexpr (std::is_same_v<PortTag, typename Base::ports::PowertrainIn>) {
+        else if constexpr (std::is_same_v<PortTag, typename ActorBase::ports::PowertrainIn>) {
             std::lock_guard<std::mutex> lock(this->powertrainin_port_mutex_);
             return this->powertrainin_generation_;
         }
@@ -1583,32 +2278,32 @@ public:
     }
 
     // Bring ActorBase::is_ready() (no-arg readiness check across all ports) into scope
-    using Base::is_ready;
-    using Base::wait_until_ready;
+    using ActorBase::is_ready;
+    using ActorBase::wait_until_ready;
 
     // ------------------------------------------------------------------------
     // Process-Wide Lifecycle Controls (Granular Defaults)
     // ------------------------------------------------------------------------
 
     void start() {
-        this->template open_port<typename Base::ports::SupervisorPort>();
-        this->template open_port<typename Base::ports::BodyControlIn>();
-        this->template open_port<typename Base::ports::PowertrainIn>();
+        this->template open_port<typename ActorBase::ports::SupervisorPort>();
+        this->template open_port<typename ActorBase::ports::BodyControlIn>();
+        this->template open_port<typename ActorBase::ports::PowertrainIn>();
     }
 
     void stop() {
-        this->template close_port<typename Base::ports::SupervisorPort>();
-        this->template close_port<typename Base::ports::BodyControlIn>();
-        this->template close_port<typename Base::ports::PowertrainIn>();
+        this->template close_port<typename ActorBase::ports::SupervisorPort>();
+        this->template close_port<typename ActorBase::ports::BodyControlIn>();
+        this->template close_port<typename ActorBase::ports::PowertrainIn>();
     }
 
     static constexpr bool has_any_lifecycle_handlers_v = (
-        ::reaktar::has_on_direct_event_v<Derived, ::reaktar::Connected<typename Base::ports::SupervisorPort>> ||
-        ::reaktar::has_on_direct_event_v<Derived, ::reaktar::Disconnected<typename Base::ports::SupervisorPort>> ||
-        ::reaktar::has_on_direct_event_v<Derived, ::reaktar::Connected<typename Base::ports::BodyControlIn>> ||
-        ::reaktar::has_on_direct_event_v<Derived, ::reaktar::Disconnected<typename Base::ports::BodyControlIn>> ||
-        ::reaktar::has_on_direct_event_v<Derived, ::reaktar::Connected<typename Base::ports::PowertrainIn>> ||
-        ::reaktar::has_on_direct_event_v<Derived, ::reaktar::Disconnected<typename Base::ports::PowertrainIn>>
+        ::reaktar::has_on_direct_event_v<Derived, ::reaktar::Connected<typename ActorBase::ports::SupervisorPort>> ||
+        ::reaktar::has_on_direct_event_v<Derived, ::reaktar::Disconnected<typename ActorBase::ports::SupervisorPort>> ||
+        ::reaktar::has_on_direct_event_v<Derived, ::reaktar::Connected<typename ActorBase::ports::BodyControlIn>> ||
+        ::reaktar::has_on_direct_event_v<Derived, ::reaktar::Disconnected<typename ActorBase::ports::BodyControlIn>> ||
+        ::reaktar::has_on_direct_event_v<Derived, ::reaktar::Connected<typename ActorBase::ports::PowertrainIn>> ||
+        ::reaktar::has_on_direct_event_v<Derived, ::reaktar::Disconnected<typename ActorBase::ports::PowertrainIn>>
     );
 
     /**
@@ -1620,73 +2315,73 @@ public:
         if constexpr (!has_any_lifecycle_handlers_v) {
             return 0;
         } else {
-            typename Base::port_mask_t dirty = this->dirty_ports_.load(std::memory_order_relaxed);
+            typename ActorBase::port_mask_t dirty = this->dirty_ports_.load(std::memory_order_relaxed);
             if (!dirty) return 0;
             dirty = this->dirty_ports_.exchange(0, std::memory_order_acq_rel);
             if (!dirty) return 0;
 
             size_t count = 0;
             auto reconcile = [this, dirty, &count]() {
-                if constexpr (::reaktar::has_on_direct_event_v<Derived, ::reaktar::Connected<typename Base::ports::SupervisorPort>> ||
-                              ::reaktar::has_on_direct_event_v<Derived, ::reaktar::Disconnected<typename Base::ports::SupervisorPort>>) {
-                    if (dirty & (static_cast<typename Base::port_mask_t>(1) << 0)) {
-                        bool is_now_ready = this->template is_ready<typename Base::ports::SupervisorPort>();
-                        bool was_ready = (this->last_known_ready_ & (static_cast<typename Base::port_mask_t>(1) << 0)) != 0;
+                if constexpr (::reaktar::has_on_direct_event_v<Derived, ::reaktar::Connected<typename ActorBase::ports::SupervisorPort>> ||
+                              ::reaktar::has_on_direct_event_v<Derived, ::reaktar::Disconnected<typename ActorBase::ports::SupervisorPort>>) {
+                    if (dirty & (static_cast<typename ActorBase::port_mask_t>(1) << 0)) {
+                        bool is_now_ready = this->template is_ready<typename ActorBase::ports::SupervisorPort>();
+                        bool was_ready = (this->last_known_ready_ & (static_cast<typename ActorBase::port_mask_t>(1) << 0)) != 0;
                         if (is_now_ready != was_ready) {
                             if (is_now_ready) {
-                                this->last_known_ready_ |= (static_cast<typename Base::port_mask_t>(1) << 0);
-                                if constexpr (::reaktar::has_on_direct_event_v<Derived, ::reaktar::Connected<typename Base::ports::SupervisorPort>>) {
-                                    self().on(::reaktar::Connected<typename Base::ports::SupervisorPort>{});
+                                this->last_known_ready_ |= (static_cast<typename ActorBase::port_mask_t>(1) << 0);
+                                if constexpr (::reaktar::has_on_direct_event_v<Derived, ::reaktar::Connected<typename ActorBase::ports::SupervisorPort>>) {
+                                    self().on(::reaktar::Connected<typename ActorBase::ports::SupervisorPort>{});
                                     ++count;
                                 }
                             } else {
-                                this->last_known_ready_ &= ~(static_cast<typename Base::port_mask_t>(1) << 0);
-                                if constexpr (::reaktar::has_on_direct_event_v<Derived, ::reaktar::Disconnected<typename Base::ports::SupervisorPort>>) {
-                                    self().on(::reaktar::Disconnected<typename Base::ports::SupervisorPort>{});
+                                this->last_known_ready_ &= ~(static_cast<typename ActorBase::port_mask_t>(1) << 0);
+                                if constexpr (::reaktar::has_on_direct_event_v<Derived, ::reaktar::Disconnected<typename ActorBase::ports::SupervisorPort>>) {
+                                    self().on(::reaktar::Disconnected<typename ActorBase::ports::SupervisorPort>{});
                                     ++count;
                                 }
                             }
                         }
                     }
                 }
-                if constexpr (::reaktar::has_on_direct_event_v<Derived, ::reaktar::Connected<typename Base::ports::BodyControlIn>> ||
-                              ::reaktar::has_on_direct_event_v<Derived, ::reaktar::Disconnected<typename Base::ports::BodyControlIn>>) {
-                    if (dirty & (static_cast<typename Base::port_mask_t>(1) << 1)) {
-                        bool is_now_ready = this->template is_ready<typename Base::ports::BodyControlIn>();
-                        bool was_ready = (this->last_known_ready_ & (static_cast<typename Base::port_mask_t>(1) << 1)) != 0;
+                if constexpr (::reaktar::has_on_direct_event_v<Derived, ::reaktar::Connected<typename ActorBase::ports::BodyControlIn>> ||
+                              ::reaktar::has_on_direct_event_v<Derived, ::reaktar::Disconnected<typename ActorBase::ports::BodyControlIn>>) {
+                    if (dirty & (static_cast<typename ActorBase::port_mask_t>(1) << 1)) {
+                        bool is_now_ready = this->template is_ready<typename ActorBase::ports::BodyControlIn>();
+                        bool was_ready = (this->last_known_ready_ & (static_cast<typename ActorBase::port_mask_t>(1) << 1)) != 0;
                         if (is_now_ready != was_ready) {
                             if (is_now_ready) {
-                                this->last_known_ready_ |= (static_cast<typename Base::port_mask_t>(1) << 1);
-                                if constexpr (::reaktar::has_on_direct_event_v<Derived, ::reaktar::Connected<typename Base::ports::BodyControlIn>>) {
-                                    self().on(::reaktar::Connected<typename Base::ports::BodyControlIn>{});
+                                this->last_known_ready_ |= (static_cast<typename ActorBase::port_mask_t>(1) << 1);
+                                if constexpr (::reaktar::has_on_direct_event_v<Derived, ::reaktar::Connected<typename ActorBase::ports::BodyControlIn>>) {
+                                    self().on(::reaktar::Connected<typename ActorBase::ports::BodyControlIn>{});
                                     ++count;
                                 }
                             } else {
-                                this->last_known_ready_ &= ~(static_cast<typename Base::port_mask_t>(1) << 1);
-                                if constexpr (::reaktar::has_on_direct_event_v<Derived, ::reaktar::Disconnected<typename Base::ports::BodyControlIn>>) {
-                                    self().on(::reaktar::Disconnected<typename Base::ports::BodyControlIn>{});
+                                this->last_known_ready_ &= ~(static_cast<typename ActorBase::port_mask_t>(1) << 1);
+                                if constexpr (::reaktar::has_on_direct_event_v<Derived, ::reaktar::Disconnected<typename ActorBase::ports::BodyControlIn>>) {
+                                    self().on(::reaktar::Disconnected<typename ActorBase::ports::BodyControlIn>{});
                                     ++count;
                                 }
                             }
                         }
                     }
                 }
-                if constexpr (::reaktar::has_on_direct_event_v<Derived, ::reaktar::Connected<typename Base::ports::PowertrainIn>> ||
-                              ::reaktar::has_on_direct_event_v<Derived, ::reaktar::Disconnected<typename Base::ports::PowertrainIn>>) {
-                    if (dirty & (static_cast<typename Base::port_mask_t>(1) << 2)) {
-                        bool is_now_ready = this->template is_ready<typename Base::ports::PowertrainIn>();
-                        bool was_ready = (this->last_known_ready_ & (static_cast<typename Base::port_mask_t>(1) << 2)) != 0;
+                if constexpr (::reaktar::has_on_direct_event_v<Derived, ::reaktar::Connected<typename ActorBase::ports::PowertrainIn>> ||
+                              ::reaktar::has_on_direct_event_v<Derived, ::reaktar::Disconnected<typename ActorBase::ports::PowertrainIn>>) {
+                    if (dirty & (static_cast<typename ActorBase::port_mask_t>(1) << 2)) {
+                        bool is_now_ready = this->template is_ready<typename ActorBase::ports::PowertrainIn>();
+                        bool was_ready = (this->last_known_ready_ & (static_cast<typename ActorBase::port_mask_t>(1) << 2)) != 0;
                         if (is_now_ready != was_ready) {
                             if (is_now_ready) {
-                                this->last_known_ready_ |= (static_cast<typename Base::port_mask_t>(1) << 2);
-                                if constexpr (::reaktar::has_on_direct_event_v<Derived, ::reaktar::Connected<typename Base::ports::PowertrainIn>>) {
-                                    self().on(::reaktar::Connected<typename Base::ports::PowertrainIn>{});
+                                this->last_known_ready_ |= (static_cast<typename ActorBase::port_mask_t>(1) << 2);
+                                if constexpr (::reaktar::has_on_direct_event_v<Derived, ::reaktar::Connected<typename ActorBase::ports::PowertrainIn>>) {
+                                    self().on(::reaktar::Connected<typename ActorBase::ports::PowertrainIn>{});
                                     ++count;
                                 }
                             } else {
-                                this->last_known_ready_ &= ~(static_cast<typename Base::port_mask_t>(1) << 2);
-                                if constexpr (::reaktar::has_on_direct_event_v<Derived, ::reaktar::Disconnected<typename Base::ports::PowertrainIn>>) {
-                                    self().on(::reaktar::Disconnected<typename Base::ports::PowertrainIn>{});
+                                this->last_known_ready_ &= ~(static_cast<typename ActorBase::port_mask_t>(1) << 2);
+                                if constexpr (::reaktar::has_on_direct_event_v<Derived, ::reaktar::Disconnected<typename ActorBase::ports::PowertrainIn>>) {
+                                    self().on(::reaktar::Disconnected<typename ActorBase::ports::PowertrainIn>{});
                                     ++count;
                                 }
                             }
@@ -1714,9 +2409,9 @@ private:
             bind_skeleton_fields();
             this->supervisorport_skeleton_.OfferService();
             this->supervisorport_offered_.store(true, std::memory_order_release);
-            if constexpr (::reaktar::has_on_direct_event_v<Derived, ::reaktar::Connected<typename Base::ports::SupervisorPort>> ||
-                          ::reaktar::has_on_direct_event_v<Derived, ::reaktar::Disconnected<typename Base::ports::SupervisorPort>>) {
-                this->dirty_ports_.fetch_or(static_cast<typename Base::port_mask_t>(1) << 0, std::memory_order_release);
+            if constexpr (::reaktar::has_on_direct_event_v<Derived, ::reaktar::Connected<typename ActorBase::ports::SupervisorPort>> ||
+                          ::reaktar::has_on_direct_event_v<Derived, ::reaktar::Disconnected<typename ActorBase::ports::SupervisorPort>>) {
+                this->dirty_ports_.fetch_or(static_cast<typename ActorBase::port_mask_t>(1) << 0, std::memory_order_release);
             }
         }
     }
@@ -1761,9 +2456,9 @@ private:
                         return; // Closed or generation shifted concurrently
                     }
                     this->bodycontrolin_slot_.reset();
-                    if constexpr (::reaktar::has_on_direct_event_v<Derived, ::reaktar::Connected<typename Base::ports::BodyControlIn>> ||
-                                  ::reaktar::has_on_direct_event_v<Derived, ::reaktar::Disconnected<typename Base::ports::BodyControlIn>>) {
-                        this->dirty_ports_.fetch_or(static_cast<typename Base::port_mask_t>(1) << 1, std::memory_order_release);
+                    if constexpr (::reaktar::has_on_direct_event_v<Derived, ::reaktar::Connected<typename ActorBase::ports::BodyControlIn>> ||
+                                  ::reaktar::has_on_direct_event_v<Derived, ::reaktar::Disconnected<typename ActorBase::ports::BodyControlIn>>) {
+                        this->dirty_ports_.fetch_or(static_cast<typename ActorBase::port_mask_t>(1) << 1, std::memory_order_release);
                     }
                 } else {
                     if (auto cur_h = this->bodycontrolin_slot_.get_handle(); cur_h.has_value() && *cur_h == handles[0]) {
@@ -1788,9 +2483,9 @@ private:
                             return; // Closed or generation shifted concurrently
                         }
                         this->bodycontrolin_slot_.publish(std::move(new_proxy), handles[0], teardown_hook);
-                        if constexpr (::reaktar::has_on_direct_event_v<Derived, ::reaktar::Connected<typename Base::ports::BodyControlIn>> ||
-                                      ::reaktar::has_on_direct_event_v<Derived, ::reaktar::Disconnected<typename Base::ports::BodyControlIn>>) {
-                            this->dirty_ports_.fetch_or(static_cast<typename Base::port_mask_t>(1) << 1, std::memory_order_release);
+                        if constexpr (::reaktar::has_on_direct_event_v<Derived, ::reaktar::Connected<typename ActorBase::ports::BodyControlIn>> ||
+                                      ::reaktar::has_on_direct_event_v<Derived, ::reaktar::Disconnected<typename ActorBase::ports::BodyControlIn>>) {
+                            this->dirty_ports_.fetch_or(static_cast<typename ActorBase::port_mask_t>(1) << 1, std::memory_order_release);
                         }
                     }
                     // Safe publication complete: now activate signal subscriptions with zero locks held!
@@ -1878,9 +2573,9 @@ private:
                         return; // Closed or generation shifted concurrently
                     }
                     this->powertrainin_slot_.reset();
-                    if constexpr (::reaktar::has_on_direct_event_v<Derived, ::reaktar::Connected<typename Base::ports::PowertrainIn>> ||
-                                  ::reaktar::has_on_direct_event_v<Derived, ::reaktar::Disconnected<typename Base::ports::PowertrainIn>>) {
-                        this->dirty_ports_.fetch_or(static_cast<typename Base::port_mask_t>(1) << 2, std::memory_order_release);
+                    if constexpr (::reaktar::has_on_direct_event_v<Derived, ::reaktar::Connected<typename ActorBase::ports::PowertrainIn>> ||
+                                  ::reaktar::has_on_direct_event_v<Derived, ::reaktar::Disconnected<typename ActorBase::ports::PowertrainIn>>) {
+                        this->dirty_ports_.fetch_or(static_cast<typename ActorBase::port_mask_t>(1) << 2, std::memory_order_release);
                     }
                 } else {
                     if (auto cur_h = this->powertrainin_slot_.get_handle(); cur_h.has_value() && *cur_h == handles[0]) {
@@ -1906,9 +2601,9 @@ private:
                             return; // Closed or generation shifted concurrently
                         }
                         this->powertrainin_slot_.publish(std::move(new_proxy), handles[0], teardown_hook);
-                        if constexpr (::reaktar::has_on_direct_event_v<Derived, ::reaktar::Connected<typename Base::ports::PowertrainIn>> ||
-                                      ::reaktar::has_on_direct_event_v<Derived, ::reaktar::Disconnected<typename Base::ports::PowertrainIn>>) {
-                            this->dirty_ports_.fetch_or(static_cast<typename Base::port_mask_t>(1) << 2, std::memory_order_release);
+                        if constexpr (::reaktar::has_on_direct_event_v<Derived, ::reaktar::Connected<typename ActorBase::ports::PowertrainIn>> ||
+                                      ::reaktar::has_on_direct_event_v<Derived, ::reaktar::Disconnected<typename ActorBase::ports::PowertrainIn>>) {
+                            this->dirty_ports_.fetch_or(static_cast<typename ActorBase::port_mask_t>(1) << 2, std::memory_order_release);
                         }
                     }
                     // Safe publication complete: now activate signal subscriptions with zero locks held!
@@ -1961,9 +2656,9 @@ private:
         if (this->supervisorport_offered_.load(std::memory_order_relaxed)) {
             this->supervisorport_skeleton_.StopOfferService();
             this->supervisorport_offered_.store(false, std::memory_order_release);
-            if constexpr (::reaktar::has_on_direct_event_v<Derived, ::reaktar::Connected<typename Base::ports::SupervisorPort>> ||
-                          ::reaktar::has_on_direct_event_v<Derived, ::reaktar::Disconnected<typename Base::ports::SupervisorPort>>) {
-                this->dirty_ports_.fetch_or(static_cast<typename Base::port_mask_t>(1) << 0, std::memory_order_release);
+            if constexpr (::reaktar::has_on_direct_event_v<Derived, ::reaktar::Connected<typename ActorBase::ports::SupervisorPort>> ||
+                          ::reaktar::has_on_direct_event_v<Derived, ::reaktar::Disconnected<typename ActorBase::ports::SupervisorPort>>) {
+                this->dirty_ports_.fetch_or(static_cast<typename ActorBase::port_mask_t>(1) << 0, std::memory_order_release);
             }
         }
     }
@@ -1979,9 +2674,9 @@ private:
             handle_to_stop = this->bodycontrolin_find_handle_;
             this->bodycontrolin_find_handle_.reset();
             this->bodycontrolin_slot_.reset();
-            if constexpr (::reaktar::has_on_direct_event_v<Derived, ::reaktar::Connected<typename Base::ports::BodyControlIn>> ||
-                          ::reaktar::has_on_direct_event_v<Derived, ::reaktar::Disconnected<typename Base::ports::BodyControlIn>>) {
-                this->dirty_ports_.fetch_or(static_cast<typename Base::port_mask_t>(1) << 1, std::memory_order_release);
+            if constexpr (::reaktar::has_on_direct_event_v<Derived, ::reaktar::Connected<typename ActorBase::ports::BodyControlIn>> ||
+                          ::reaktar::has_on_direct_event_v<Derived, ::reaktar::Disconnected<typename ActorBase::ports::BodyControlIn>>) {
+                this->dirty_ports_.fetch_or(static_cast<typename ActorBase::port_mask_t>(1) << 1, std::memory_order_release);
             }
         }
 
@@ -2001,9 +2696,9 @@ private:
             handle_to_stop = this->powertrainin_find_handle_;
             this->powertrainin_find_handle_.reset();
             this->powertrainin_slot_.reset();
-            if constexpr (::reaktar::has_on_direct_event_v<Derived, ::reaktar::Connected<typename Base::ports::PowertrainIn>> ||
-                          ::reaktar::has_on_direct_event_v<Derived, ::reaktar::Disconnected<typename Base::ports::PowertrainIn>>) {
-                this->dirty_ports_.fetch_or(static_cast<typename Base::port_mask_t>(1) << 2, std::memory_order_release);
+            if constexpr (::reaktar::has_on_direct_event_v<Derived, ::reaktar::Connected<typename ActorBase::ports::PowertrainIn>> ||
+                          ::reaktar::has_on_direct_event_v<Derived, ::reaktar::Disconnected<typename ActorBase::ports::PowertrainIn>>) {
+                this->dirty_ports_.fetch_or(static_cast<typename ActorBase::port_mask_t>(1) << 2, std::memory_order_release);
             }
         }
 
@@ -2027,7 +2722,7 @@ private:
         supervisorport_skeleton_.SystemMatrix.Update({});
         // Initialise field value before OfferService (required by AUTOSAR Adaptive caching/notifier semantics)
         supervisorport_skeleton_.VehicleConfig.Update({});
-        using supervisorport_ActiveAlerts_Port_ = typename Base::ports::SupervisorPort;
+        using supervisorport_ActiveAlerts_Port_ = typename ActorBase::ports::SupervisorPort;
         using supervisorport_ActiveAlerts_PortTag_ = typename supervisorport_ActiveAlerts_Port_::ActiveAlerts;
 
         static constexpr bool kHas_on_supervisorport_ActiveAlerts_port_tag  = ::reaktar::has_on_setter_v<Derived, supervisorport_ActiveAlerts_PortTag_, ara::core::Vector<vehicle_data::EmergencyAlert>>;
@@ -2074,7 +2769,7 @@ private:
                 return self().on(val);
             });
         }
-        using supervisorport_CalibrationKey_Port_ = typename Base::ports::SupervisorPort;
+        using supervisorport_CalibrationKey_Port_ = typename ActorBase::ports::SupervisorPort;
         using supervisorport_CalibrationKey_PortTag_ = typename supervisorport_CalibrationKey_Port_::CalibrationKey;
 
         static constexpr bool kHas_on_supervisorport_CalibrationKey_port_tag  = ::reaktar::has_on_setter_v<Derived, supervisorport_CalibrationKey_PortTag_, uint32_t>;
@@ -2117,9 +2812,9 @@ private:
             });
         }
         else if constexpr (kHas_on_supervisorport_CalibrationKey_direct) {
-            static_assert(!sizeof(Derived*), "reaktar::on() collision: field type 'uint32_t' is shared across multiple field setters. You must specify the tag: on(vehicle_supervisor::fields::CalibrationKey, const uint32_t& val) or port tag: on(typename Base::ports::SupervisorPort::CalibrationKey, const uint32_t& val).");
+            static_assert(!sizeof(Derived*), "reaktar::on() collision: field type 'uint32_t' is shared across multiple field setters. You must specify the tag: on(vehicle_supervisor::fields::CalibrationKey, const uint32_t& val) or port tag: on(typename ActorBase::ports::SupervisorPort::CalibrationKey, const uint32_t& val).");
         }
-        using supervisorport_CurrentDriveMode_Port_ = typename Base::ports::SupervisorPort;
+        using supervisorport_CurrentDriveMode_Port_ = typename ActorBase::ports::SupervisorPort;
         using supervisorport_CurrentDriveMode_PortTag_ = typename supervisorport_CurrentDriveMode_Port_::CurrentDriveMode;
 
         static constexpr bool kHas_on_supervisorport_CurrentDriveMode_port_tag  = ::reaktar::has_on_setter_v<Derived, supervisorport_CurrentDriveMode_PortTag_, vehicle_data::DriveMode>;
@@ -2166,7 +2861,7 @@ private:
                 return self().on(val);
             });
         }
-        using supervisorport_FeatureFlags_Port_ = typename Base::ports::SupervisorPort;
+        using supervisorport_FeatureFlags_Port_ = typename ActorBase::ports::SupervisorPort;
         using supervisorport_FeatureFlags_PortTag_ = typename supervisorport_FeatureFlags_Port_::FeatureFlags;
 
         static constexpr bool kHas_on_supervisorport_FeatureFlags_port_tag  = ::reaktar::has_on_setter_v<Derived, supervisorport_FeatureFlags_PortTag_, ara::core::Map<ara::core::String, bool>>;
@@ -2213,7 +2908,7 @@ private:
                 return self().on(val);
             });
         }
-        using supervisorport_VehicleConfig_Port_ = typename Base::ports::SupervisorPort;
+        using supervisorport_VehicleConfig_Port_ = typename ActorBase::ports::SupervisorPort;
         using supervisorport_VehicleConfig_PortTag_ = typename supervisorport_VehicleConfig_Port_::VehicleConfig;
 
         static constexpr bool kHas_on_supervisorport_VehicleConfig_port_tag  = ::reaktar::has_on_setter_v<Derived, supervisorport_VehicleConfig_PortTag_, ara::core::Map<ara::core::String, ara::core::String>>;
@@ -2264,7 +2959,7 @@ private:
 
     void check_handler_collisions() {
         {
-            using Port_ = typename Base::ports::BodyControlIn;
+            using Port_ = typename ActorBase::ports::BodyControlIn;
             using PortTag_ = typename Port_::OutsideAirQuality;
             using PortAny_ = typename Port_::Any;
             using SignalAny_ = typename body_control::fields::OutsideAirQuality::Any;
@@ -2281,7 +2976,7 @@ private:
                 "You must define only one: on(ports::BodyControlIn::OutsideAirQuality, ...), on(body_control::fields::OutsideAirQuality, ...), on(ports::BodyControlIn::Any, ...), on(body_control::fields::OutsideAirQuality::Any, ...), on(reaktar::Any, ...), on(ports::BodyControlIn, ...), or on(...)."
             );
             static_assert(!kHas_port_bare, "reaktar::on() collision: field notifier type 'uint32_t' is shared across multiple events/notifiers on port 'BodyControlIn'. You must specify the port field tag: on(ports::BodyControlIn::OutsideAirQuality, const uint32_t& val) instead of on(ports::BodyControlIn, ...).");
-            static_assert(!kHas_direct, "reaktar::on() collision: type 'uint32_t' is shared across multiple incoming channels (events/fields). You must specify the tag: void on(body_control::fields::OutsideAirQuality, const uint32_t& val) or port tag: void on(typename Base::ports::BodyControlIn::OutsideAirQuality, const uint32_t& val).");
+            static_assert(!kHas_direct, "reaktar::on() collision: type 'uint32_t' is shared across multiple incoming channels (events/fields). You must specify the tag: void on(body_control::fields::OutsideAirQuality, const uint32_t& val) or port tag: void on(typename ActorBase::ports::BodyControlIn::OutsideAirQuality, const uint32_t& val).");
             if constexpr (kHas_port_tag) {
                 static_assert(std::is_void_v<decltype(std::declval<Derived&>().on(std::declval<PortTag_>(), std::declval<const uint32_t&>()))>,
                     "reaktar::on() error: Field notifier handler for 'OutsideAirQuality' on port 'BodyControlIn' must return void!");
@@ -2308,7 +3003,7 @@ private:
             }
         }
         {
-            using Port_ = typename Base::ports::BodyControlIn;
+            using Port_ = typename ActorBase::ports::BodyControlIn;
             using PortTag_ = typename Port_::RainSensorLevel;
             using PortAny_ = typename Port_::Any;
             using SignalAny_ = typename body_control::fields::RainSensorLevel::Any;
@@ -2325,7 +3020,7 @@ private:
                 "You must define only one: on(ports::BodyControlIn::RainSensorLevel, ...), on(body_control::fields::RainSensorLevel, ...), on(ports::BodyControlIn::Any, ...), on(body_control::fields::RainSensorLevel::Any, ...), on(reaktar::Any, ...), on(ports::BodyControlIn, ...), or on(...)."
             );
             static_assert(!kHas_port_bare, "reaktar::on() collision: field notifier type 'uint32_t' is shared across multiple events/notifiers on port 'BodyControlIn'. You must specify the port field tag: on(ports::BodyControlIn::RainSensorLevel, const uint32_t& val) instead of on(ports::BodyControlIn, ...).");
-            static_assert(!kHas_direct, "reaktar::on() collision: type 'uint32_t' is shared across multiple incoming channels (events/fields). You must specify the tag: void on(body_control::fields::RainSensorLevel, const uint32_t& val) or port tag: void on(typename Base::ports::BodyControlIn::RainSensorLevel, const uint32_t& val).");
+            static_assert(!kHas_direct, "reaktar::on() collision: type 'uint32_t' is shared across multiple incoming channels (events/fields). You must specify the tag: void on(body_control::fields::RainSensorLevel, const uint32_t& val) or port tag: void on(typename ActorBase::ports::BodyControlIn::RainSensorLevel, const uint32_t& val).");
             if constexpr (kHas_port_tag) {
                 static_assert(std::is_void_v<decltype(std::declval<Derived&>().on(std::declval<PortTag_>(), std::declval<const uint32_t&>()))>,
                     "reaktar::on() error: Field notifier handler for 'RainSensorLevel' on port 'BodyControlIn' must return void!");
@@ -2352,7 +3047,7 @@ private:
             }
         }
         {
-            using Port_ = typename Base::ports::BodyControlIn;
+            using Port_ = typename ActorBase::ports::BodyControlIn;
             using PortTag_ = typename Port_::TargetCabinTemperature;
             using PortAny_ = typename Port_::Any;
             using SignalAny_ = typename body_control::fields::TargetCabinTemperature::Any;
@@ -2394,7 +3089,7 @@ private:
             }
         }
         {
-            using Port_ = typename Base::ports::BodyControlIn;
+            using Port_ = typename ActorBase::ports::BodyControlIn;
             using PortTag_ = typename Port_::WindowPosition;
             using PortAny_ = typename Port_::Any;
             using SignalAny_ = typename body_control::fields::WindowPosition::Any;
@@ -2411,7 +3106,7 @@ private:
                 "You must define only one: on(ports::BodyControlIn::WindowPosition, ...), on(body_control::fields::WindowPosition, ...), on(ports::BodyControlIn::Any, ...), on(body_control::fields::WindowPosition::Any, ...), on(reaktar::Any, ...), on(ports::BodyControlIn, ...), or on(...)."
             );
             static_assert(!kHas_port_bare, "reaktar::on() collision: field notifier type 'uint32_t' is shared across multiple events/notifiers on port 'BodyControlIn'. You must specify the port field tag: on(ports::BodyControlIn::WindowPosition, const uint32_t& val) instead of on(ports::BodyControlIn, ...).");
-            static_assert(!kHas_direct, "reaktar::on() collision: type 'uint32_t' is shared across multiple incoming channels (events/fields). You must specify the tag: void on(body_control::fields::WindowPosition, const uint32_t& val) or port tag: void on(typename Base::ports::BodyControlIn::WindowPosition, const uint32_t& val).");
+            static_assert(!kHas_direct, "reaktar::on() collision: type 'uint32_t' is shared across multiple incoming channels (events/fields). You must specify the tag: void on(body_control::fields::WindowPosition, const uint32_t& val) or port tag: void on(typename ActorBase::ports::BodyControlIn::WindowPosition, const uint32_t& val).");
             if constexpr (kHas_port_tag) {
                 static_assert(std::is_void_v<decltype(std::declval<Derived&>().on(std::declval<PortTag_>(), std::declval<const uint32_t&>()))>,
                     "reaktar::on() error: Field notifier handler for 'WindowPosition' on port 'BodyControlIn' must return void!");
@@ -2438,7 +3133,7 @@ private:
             }
         }
         {
-            using Port_ = typename Base::ports::PowertrainIn;
+            using Port_ = typename ActorBase::ports::PowertrainIn;
             using PortTag_ = typename Port_::BatteryModuleStatus;
             using PortAny_ = typename Port_::Any;
             using SignalAny_ = typename powertrain::events::BatteryModuleStatus::Any;
@@ -2480,7 +3175,7 @@ private:
             }
         }
         {
-            using Port_ = typename Base::ports::PowertrainIn;
+            using Port_ = typename ActorBase::ports::PowertrainIn;
             using PortTag_ = typename Port_::CabinSensors;
             using PortAny_ = typename Port_::Any;
             using SignalAny_ = typename powertrain::events::CabinSensors::Any;
@@ -2522,7 +3217,7 @@ private:
             }
         }
         {
-            using Port_ = typename Base::ports::PowertrainIn;
+            using Port_ = typename ActorBase::ports::PowertrainIn;
             using PortTag_ = typename Port_::SpeedHistory;
             using PortAny_ = typename Port_::Any;
             using SignalAny_ = typename powertrain::events::SpeedHistory::Any;
@@ -2564,7 +3259,7 @@ private:
             }
         }
         {
-            using Port_ = typename Base::ports::PowertrainIn;
+            using Port_ = typename ActorBase::ports::PowertrainIn;
             using PortTag_ = typename Port_::VehicleSpeed;
             using PortAny_ = typename Port_::Any;
             using SignalAny_ = typename powertrain::events::VehicleSpeed::Any;
@@ -2606,7 +3301,7 @@ private:
             }
         }
         {
-            using Port_ = typename Base::ports::PowertrainIn;
+            using Port_ = typename ActorBase::ports::PowertrainIn;
             using PortTag_ = typename Port_::WheelSpeeds;
             using PortAny_ = typename Port_::Any;
             using SignalAny_ = typename powertrain::events::WheelSpeeds::Any;
@@ -2648,7 +3343,7 @@ private:
             }
         }
         {
-            using Port_ = typename Base::ports::SupervisorPort;
+            using Port_ = typename ActorBase::ports::SupervisorPort;
             using PortTag_ = typename Port_::ActiveAlerts;
 
             constexpr bool kHas_on_port_tag  = ::reaktar::has_on_setter_v<Derived, PortTag_, ara::core::Vector<vehicle_data::EmergencyAlert>>;
@@ -2691,7 +3386,7 @@ private:
 
         }
         {
-            using Port_ = typename Base::ports::SupervisorPort;
+            using Port_ = typename ActorBase::ports::SupervisorPort;
             using PortTag_ = typename Port_::CalibrationKey;
 
             constexpr bool kHas_on_port_tag  = ::reaktar::has_on_setter_v<Derived, PortTag_, uint32_t>;
@@ -2732,10 +3427,10 @@ private:
                 static_assert(!std::is_void_v<Ret>, "reaktar::on() error: Field setter handler for 'CalibrationKey' must return 'uint32_t' (or Future<...>), but returns void!");
             }
 
-            static_assert(!kHas_on_direct, "reaktar::on() collision: field type 'uint32_t' is shared across multiple field setters or channels. You must specify the tag: on(vehicle_supervisor::fields::CalibrationKey, const uint32_t& val) or port tag: on(typename Base::ports::SupervisorPort::CalibrationKey, const uint32_t& val).");
+            static_assert(!kHas_on_direct, "reaktar::on() collision: field type 'uint32_t' is shared across multiple field setters or channels. You must specify the tag: on(vehicle_supervisor::fields::CalibrationKey, const uint32_t& val) or port tag: on(typename ActorBase::ports::SupervisorPort::CalibrationKey, const uint32_t& val).");
         }
         {
-            using Port_ = typename Base::ports::SupervisorPort;
+            using Port_ = typename ActorBase::ports::SupervisorPort;
             using PortTag_ = typename Port_::CurrentDriveMode;
 
             constexpr bool kHas_on_port_tag  = ::reaktar::has_on_setter_v<Derived, PortTag_, vehicle_data::DriveMode>;
@@ -2778,7 +3473,7 @@ private:
 
         }
         {
-            using Port_ = typename Base::ports::SupervisorPort;
+            using Port_ = typename ActorBase::ports::SupervisorPort;
             using PortTag_ = typename Port_::FeatureFlags;
 
             constexpr bool kHas_on_port_tag  = ::reaktar::has_on_setter_v<Derived, PortTag_, ara::core::Map<ara::core::String, bool>>;
@@ -2821,7 +3516,7 @@ private:
 
         }
         {
-            using Port_ = typename Base::ports::SupervisorPort;
+            using Port_ = typename ActorBase::ports::SupervisorPort;
             using PortTag_ = typename Port_::VehicleConfig;
 
             constexpr bool kHas_on_port_tag  = ::reaktar::has_on_setter_v<Derived, PortTag_, ara::core::Map<ara::core::String, ara::core::String>>;
@@ -2867,7 +3562,7 @@ private:
 
     void bind_bodycontrolin_signals([[maybe_unused]] body_control::proxy::BodyControlProxy& proxy) {
         // Field notifier: OutsideAirQuality (uint32_t)
-        using bodycontrolin_OutsideAirQuality_Port_ = typename Base::ports::BodyControlIn;
+        using bodycontrolin_OutsideAirQuality_Port_ = typename ActorBase::ports::BodyControlIn;
         using bodycontrolin_OutsideAirQuality_PortTag_ = typename bodycontrolin_OutsideAirQuality_Port_::OutsideAirQuality;
         using bodycontrolin_OutsideAirQuality_PortAny_ = typename bodycontrolin_OutsideAirQuality_Port_::Any;
         using bodycontrolin_OutsideAirQuality_SignalAny_ = typename body_control::fields::OutsideAirQuality::Any;
@@ -2929,10 +3624,10 @@ private:
             });
         }
         else if constexpr (kHas_bodycontrolin_OutsideAirQuality_direct) {
-            static_assert(!sizeof(Derived*), "reaktar::on() collision: type 'uint32_t' is shared across multiple incoming channels (events/fields). You must specify the tag: void on(body_control::fields::OutsideAirQuality, const uint32_t& val) or port tag: void on(typename Base::ports::BodyControlIn::OutsideAirQuality, const uint32_t& val).");
+            static_assert(!sizeof(Derived*), "reaktar::on() collision: type 'uint32_t' is shared across multiple incoming channels (events/fields). You must specify the tag: void on(body_control::fields::OutsideAirQuality, const uint32_t& val) or port tag: void on(typename ActorBase::ports::BodyControlIn::OutsideAirQuality, const uint32_t& val).");
         }
         // Field notifier: RainSensorLevel (uint32_t)
-        using bodycontrolin_RainSensorLevel_Port_ = typename Base::ports::BodyControlIn;
+        using bodycontrolin_RainSensorLevel_Port_ = typename ActorBase::ports::BodyControlIn;
         using bodycontrolin_RainSensorLevel_PortTag_ = typename bodycontrolin_RainSensorLevel_Port_::RainSensorLevel;
         using bodycontrolin_RainSensorLevel_PortAny_ = typename bodycontrolin_RainSensorLevel_Port_::Any;
         using bodycontrolin_RainSensorLevel_SignalAny_ = typename body_control::fields::RainSensorLevel::Any;
@@ -2994,10 +3689,10 @@ private:
             });
         }
         else if constexpr (kHas_bodycontrolin_RainSensorLevel_direct) {
-            static_assert(!sizeof(Derived*), "reaktar::on() collision: type 'uint32_t' is shared across multiple incoming channels (events/fields). You must specify the tag: void on(body_control::fields::RainSensorLevel, const uint32_t& val) or port tag: void on(typename Base::ports::BodyControlIn::RainSensorLevel, const uint32_t& val).");
+            static_assert(!sizeof(Derived*), "reaktar::on() collision: type 'uint32_t' is shared across multiple incoming channels (events/fields). You must specify the tag: void on(body_control::fields::RainSensorLevel, const uint32_t& val) or port tag: void on(typename ActorBase::ports::BodyControlIn::RainSensorLevel, const uint32_t& val).");
         }
         // Field notifier: TargetCabinTemperature (float)
-        using bodycontrolin_TargetCabinTemperature_Port_ = typename Base::ports::BodyControlIn;
+        using bodycontrolin_TargetCabinTemperature_Port_ = typename ActorBase::ports::BodyControlIn;
         using bodycontrolin_TargetCabinTemperature_PortTag_ = typename bodycontrolin_TargetCabinTemperature_Port_::TargetCabinTemperature;
         using bodycontrolin_TargetCabinTemperature_PortAny_ = typename bodycontrolin_TargetCabinTemperature_Port_::Any;
         using bodycontrolin_TargetCabinTemperature_SignalAny_ = typename body_control::fields::TargetCabinTemperature::Any;
@@ -3066,7 +3761,7 @@ private:
             });
         }
         // Field notifier: WindowPosition (uint32_t)
-        using bodycontrolin_WindowPosition_Port_ = typename Base::ports::BodyControlIn;
+        using bodycontrolin_WindowPosition_Port_ = typename ActorBase::ports::BodyControlIn;
         using bodycontrolin_WindowPosition_PortTag_ = typename bodycontrolin_WindowPosition_Port_::WindowPosition;
         using bodycontrolin_WindowPosition_PortAny_ = typename bodycontrolin_WindowPosition_Port_::Any;
         using bodycontrolin_WindowPosition_SignalAny_ = typename body_control::fields::WindowPosition::Any;
@@ -3128,12 +3823,12 @@ private:
             });
         }
         else if constexpr (kHas_bodycontrolin_WindowPosition_direct) {
-            static_assert(!sizeof(Derived*), "reaktar::on() collision: type 'uint32_t' is shared across multiple incoming channels (events/fields). You must specify the tag: void on(body_control::fields::WindowPosition, const uint32_t& val) or port tag: void on(typename Base::ports::BodyControlIn::WindowPosition, const uint32_t& val).");
+            static_assert(!sizeof(Derived*), "reaktar::on() collision: type 'uint32_t' is shared across multiple incoming channels (events/fields). You must specify the tag: void on(body_control::fields::WindowPosition, const uint32_t& val) or port tag: void on(typename ActorBase::ports::BodyControlIn::WindowPosition, const uint32_t& val).");
         }
     }
 
     void subscribe_bodycontrolin_signals([[maybe_unused]] body_control::proxy::BodyControlProxy& proxy) {
-        using bodycontrolin_OutsideAirQuality_Port_ = typename Base::ports::BodyControlIn;
+        using bodycontrolin_OutsideAirQuality_Port_ = typename ActorBase::ports::BodyControlIn;
         using bodycontrolin_OutsideAirQuality_PortTag_ = typename bodycontrolin_OutsideAirQuality_Port_::OutsideAirQuality;
         using bodycontrolin_OutsideAirQuality_PortAny_ = typename bodycontrolin_OutsideAirQuality_Port_::Any;
         using bodycontrolin_OutsideAirQuality_SignalAny_ = typename body_control::fields::OutsideAirQuality::Any;
@@ -3150,7 +3845,7 @@ private:
         if constexpr (kSub_bodycontrolin_OutsideAirQuality) {
             proxy.OutsideAirQuality.Subscribe(10);
         }
-        using bodycontrolin_RainSensorLevel_Port_ = typename Base::ports::BodyControlIn;
+        using bodycontrolin_RainSensorLevel_Port_ = typename ActorBase::ports::BodyControlIn;
         using bodycontrolin_RainSensorLevel_PortTag_ = typename bodycontrolin_RainSensorLevel_Port_::RainSensorLevel;
         using bodycontrolin_RainSensorLevel_PortAny_ = typename bodycontrolin_RainSensorLevel_Port_::Any;
         using bodycontrolin_RainSensorLevel_SignalAny_ = typename body_control::fields::RainSensorLevel::Any;
@@ -3167,7 +3862,7 @@ private:
         if constexpr (kSub_bodycontrolin_RainSensorLevel) {
             proxy.RainSensorLevel.Subscribe(10);
         }
-        using bodycontrolin_TargetCabinTemperature_Port_ = typename Base::ports::BodyControlIn;
+        using bodycontrolin_TargetCabinTemperature_Port_ = typename ActorBase::ports::BodyControlIn;
         using bodycontrolin_TargetCabinTemperature_PortTag_ = typename bodycontrolin_TargetCabinTemperature_Port_::TargetCabinTemperature;
         using bodycontrolin_TargetCabinTemperature_PortAny_ = typename bodycontrolin_TargetCabinTemperature_Port_::Any;
         using bodycontrolin_TargetCabinTemperature_SignalAny_ = typename body_control::fields::TargetCabinTemperature::Any;
@@ -3184,7 +3879,7 @@ private:
         if constexpr (kSub_bodycontrolin_TargetCabinTemperature) {
             proxy.TargetCabinTemperature.Subscribe(10);
         }
-        using bodycontrolin_WindowPosition_Port_ = typename Base::ports::BodyControlIn;
+        using bodycontrolin_WindowPosition_Port_ = typename ActorBase::ports::BodyControlIn;
         using bodycontrolin_WindowPosition_PortTag_ = typename bodycontrolin_WindowPosition_Port_::WindowPosition;
         using bodycontrolin_WindowPosition_PortAny_ = typename bodycontrolin_WindowPosition_Port_::Any;
         using bodycontrolin_WindowPosition_SignalAny_ = typename body_control::fields::WindowPosition::Any;
@@ -3220,7 +3915,7 @@ private:
     }
     void bind_powertrainin_signals([[maybe_unused]] powertrain::proxy::PowertrainProxy& proxy) {
         // Event: BatteryModuleStatus (ara::core::Array<vehicle_data::BatteryCell, 4>)
-        using powertrainin_BatteryModuleStatus_Port_ = typename Base::ports::PowertrainIn;
+        using powertrainin_BatteryModuleStatus_Port_ = typename ActorBase::ports::PowertrainIn;
         using powertrainin_BatteryModuleStatus_PortTag_ = typename powertrainin_BatteryModuleStatus_Port_::BatteryModuleStatus;
         using powertrainin_BatteryModuleStatus_PortAny_ = typename powertrainin_BatteryModuleStatus_Port_::Any;
         using powertrainin_BatteryModuleStatus_SignalAny_ = typename powertrain::events::BatteryModuleStatus::Any;
@@ -3289,7 +3984,7 @@ private:
             });
         }
         // Event: CabinSensors (vehicle_data::CabinSensorData)
-        using powertrainin_CabinSensors_Port_ = typename Base::ports::PowertrainIn;
+        using powertrainin_CabinSensors_Port_ = typename ActorBase::ports::PowertrainIn;
         using powertrainin_CabinSensors_PortTag_ = typename powertrainin_CabinSensors_Port_::CabinSensors;
         using powertrainin_CabinSensors_PortAny_ = typename powertrainin_CabinSensors_Port_::Any;
         using powertrainin_CabinSensors_SignalAny_ = typename powertrain::events::CabinSensors::Any;
@@ -3358,7 +4053,7 @@ private:
             });
         }
         // Event: SpeedHistory (ara::core::Vector<float>)
-        using powertrainin_SpeedHistory_Port_ = typename Base::ports::PowertrainIn;
+        using powertrainin_SpeedHistory_Port_ = typename ActorBase::ports::PowertrainIn;
         using powertrainin_SpeedHistory_PortTag_ = typename powertrainin_SpeedHistory_Port_::SpeedHistory;
         using powertrainin_SpeedHistory_PortAny_ = typename powertrainin_SpeedHistory_Port_::Any;
         using powertrainin_SpeedHistory_SignalAny_ = typename powertrain::events::SpeedHistory::Any;
@@ -3427,7 +4122,7 @@ private:
             });
         }
         // Event: VehicleSpeed (vehicle_data::SpeedData)
-        using powertrainin_VehicleSpeed_Port_ = typename Base::ports::PowertrainIn;
+        using powertrainin_VehicleSpeed_Port_ = typename ActorBase::ports::PowertrainIn;
         using powertrainin_VehicleSpeed_PortTag_ = typename powertrainin_VehicleSpeed_Port_::VehicleSpeed;
         using powertrainin_VehicleSpeed_PortAny_ = typename powertrainin_VehicleSpeed_Port_::Any;
         using powertrainin_VehicleSpeed_SignalAny_ = typename powertrain::events::VehicleSpeed::Any;
@@ -3496,7 +4191,7 @@ private:
             });
         }
         // Event: WheelSpeeds (ara::core::Array<float, 4>)
-        using powertrainin_WheelSpeeds_Port_ = typename Base::ports::PowertrainIn;
+        using powertrainin_WheelSpeeds_Port_ = typename ActorBase::ports::PowertrainIn;
         using powertrainin_WheelSpeeds_PortTag_ = typename powertrainin_WheelSpeeds_Port_::WheelSpeeds;
         using powertrainin_WheelSpeeds_PortAny_ = typename powertrainin_WheelSpeeds_Port_::Any;
         using powertrainin_WheelSpeeds_SignalAny_ = typename powertrain::events::WheelSpeeds::Any;
@@ -3567,7 +4262,7 @@ private:
     }
 
     void subscribe_powertrainin_signals([[maybe_unused]] powertrain::proxy::PowertrainProxy& proxy) {
-        using powertrainin_BatteryModuleStatus_Port_ = typename Base::ports::PowertrainIn;
+        using powertrainin_BatteryModuleStatus_Port_ = typename ActorBase::ports::PowertrainIn;
         using powertrainin_BatteryModuleStatus_PortTag_ = typename powertrainin_BatteryModuleStatus_Port_::BatteryModuleStatus;
         using powertrainin_BatteryModuleStatus_PortAny_ = typename powertrainin_BatteryModuleStatus_Port_::Any;
         using powertrainin_BatteryModuleStatus_SignalAny_ = typename powertrain::events::BatteryModuleStatus::Any;
@@ -3584,7 +4279,7 @@ private:
         if constexpr (kSub_powertrainin_BatteryModuleStatus) {
             proxy.BatteryModuleStatus.Subscribe(10);
         }
-        using powertrainin_CabinSensors_Port_ = typename Base::ports::PowertrainIn;
+        using powertrainin_CabinSensors_Port_ = typename ActorBase::ports::PowertrainIn;
         using powertrainin_CabinSensors_PortTag_ = typename powertrainin_CabinSensors_Port_::CabinSensors;
         using powertrainin_CabinSensors_PortAny_ = typename powertrainin_CabinSensors_Port_::Any;
         using powertrainin_CabinSensors_SignalAny_ = typename powertrain::events::CabinSensors::Any;
@@ -3601,7 +4296,7 @@ private:
         if constexpr (kSub_powertrainin_CabinSensors) {
             proxy.CabinSensors.Subscribe(10);
         }
-        using powertrainin_SpeedHistory_Port_ = typename Base::ports::PowertrainIn;
+        using powertrainin_SpeedHistory_Port_ = typename ActorBase::ports::PowertrainIn;
         using powertrainin_SpeedHistory_PortTag_ = typename powertrainin_SpeedHistory_Port_::SpeedHistory;
         using powertrainin_SpeedHistory_PortAny_ = typename powertrainin_SpeedHistory_Port_::Any;
         using powertrainin_SpeedHistory_SignalAny_ = typename powertrain::events::SpeedHistory::Any;
@@ -3618,7 +4313,7 @@ private:
         if constexpr (kSub_powertrainin_SpeedHistory) {
             proxy.SpeedHistory.Subscribe(10);
         }
-        using powertrainin_VehicleSpeed_Port_ = typename Base::ports::PowertrainIn;
+        using powertrainin_VehicleSpeed_Port_ = typename ActorBase::ports::PowertrainIn;
         using powertrainin_VehicleSpeed_PortTag_ = typename powertrainin_VehicleSpeed_Port_::VehicleSpeed;
         using powertrainin_VehicleSpeed_PortAny_ = typename powertrainin_VehicleSpeed_Port_::Any;
         using powertrainin_VehicleSpeed_SignalAny_ = typename powertrain::events::VehicleSpeed::Any;
@@ -3635,7 +4330,7 @@ private:
         if constexpr (kSub_powertrainin_VehicleSpeed) {
             proxy.VehicleSpeed.Subscribe(10);
         }
-        using powertrainin_WheelSpeeds_Port_ = typename Base::ports::PowertrainIn;
+        using powertrainin_WheelSpeeds_Port_ = typename ActorBase::ports::PowertrainIn;
         using powertrainin_WheelSpeeds_PortTag_ = typename powertrainin_WheelSpeeds_Port_::WheelSpeeds;
         using powertrainin_WheelSpeeds_PortAny_ = typename powertrainin_WheelSpeeds_Port_::Any;
         using powertrainin_WheelSpeeds_SignalAny_ = typename powertrain::events::WheelSpeeds::Any;

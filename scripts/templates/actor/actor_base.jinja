@@ -19,12 +19,14 @@ public:
 {% endfor %}
 
     using Any = ::reaktar::Any;
+    using All = Any;
 
     // ------------------------------------------------------------------------
     // Generated AUTOSAR Port Tags
     // ------------------------------------------------------------------------
     struct ports {
         using Any = ::reaktar::Any;
+        using All = Any;
 {% for port in model.ports %}
         struct {{ port.port_name }} : public {{ port.kind_tag }} {
             static constexpr std::string_view name = "{{ port.port_name }}";
@@ -36,11 +38,14 @@ public:
                 using port_type = {{ port.port_name }};
                 static constexpr std::string_view port_name = "{{ port.port_name }}";
             };
+            using All = Any;
 {% for ev in port.events %}
             struct {{ ev.name }} {
                 using port_type = {{ port.port_name }};
                 static constexpr std::string_view port_name = "{{ port.port_name }}";
                 static constexpr std::string_view event_name = "{{ ev.name }}";
+                using Any = ::reaktar::tags::{{ port.service_ns }}::events::{{ ev.name }}::Any;
+                using All = Any;
             };
 {% endfor %}
 {% for f in port.fields %}
@@ -48,6 +53,8 @@ public:
                 using port_type = {{ port.port_name }};
                 static constexpr std::string_view port_name = "{{ port.port_name }}";
                 static constexpr std::string_view field_name = "{{ f.name }}";
+                using Any = ::reaktar::tags::{{ port.service_ns }}::fields::{{ f.name }}::Any;
+                using All = Any;
             };
 {% endfor %}
 {% for m in port.methods %}
@@ -55,6 +62,8 @@ public:
                 using port_type = {{ port.port_name }};
                 static constexpr std::string_view port_name = "{{ port.port_name }}";
                 static constexpr std::string_view method_name = "{{ m.name }}";
+                using Any = ::reaktar::tags::{{ port.service_ns }}::methods::{{ m.name }}::Any;
+                using All = Any;
             };
 {% endfor %}
         };
@@ -92,6 +101,132 @@ public:
 {% endif %}
 {% endfor %}
 {% endif %}
+    };
+
+    // ------------------------------------------------------------------------
+    // Type Traits for Low-Level Static & Unit-Level Invocability Testing
+    // ------------------------------------------------------------------------
+    struct traits {
+        // --- 1. Bare Untagged emit(payload) Traits ---
+        template <typename Payload>
+        static constexpr bool is_ambiguous_emit_v =
+{% for ambig_t in model.outbound_ambiguous_types %}
+            std::is_same_v<std::decay_t<Payload>, {{ ambig_t }}> ||
+{% endfor %}
+            false;
+
+        template <typename Payload>
+        static constexpr bool can_emit_v =
+{% for item in model.outbound_by_type %}
+            std::is_same_v<std::decay_t<Payload>, {{ item.type }}> ||
+{% endfor %}
+            false;
+
+        // --- 2. Port Validity & Capability Traits ---
+        template <typename Port>
+        static constexpr bool is_valid_port_v =
+{% for port in model.ports %}
+            std::is_same_v<Port, ports::{{ port.port_name }}> ||
+{% endfor %}
+            false;
+
+        template <typename Port>
+        static constexpr bool has_port_outbound_v =
+{% for port in model.ports_outbound %}
+{% if port.total_outbound_count > 0 %}
+            std::is_same_v<Port, ports::{{ port.name }}> ||
+{% endif %}
+{% endfor %}
+            false;
+
+        // --- 3. Port-Targeted emit<Port>(payload) Traits ---
+        template <typename Port, typename Payload>
+        static constexpr bool is_port_payload_ambiguous_v =
+{% for port in model.ports_outbound %}
+{% for item in port.single_arg_items %}
+{% if item.is_ambiguous %}
+            (std::is_same_v<Port, ports::{{ port.name }}> && std::is_same_v<std::decay_t<Payload>, {{ item.type }}>) ||
+{% endif %}
+{% endfor %}
+{% endfor %}
+            false;
+
+        template <typename Port, typename Payload>
+        static constexpr bool can_port_emit_v =
+{% for port in model.ports_outbound %}
+{% for item in port.single_arg_items %}
+{% if not item.is_ambiguous %}
+            (std::is_same_v<Port, ports::{{ port.name }}> && std::is_same_v<std::decay_t<Payload>, {{ item.type }}>) ||
+{% endif %}
+{% endfor %}
+{% endfor %}
+            false;
+
+        // --- 4. Tag Invocability & Ambiguity Traits ---
+        template <typename Tag>
+        static constexpr bool is_ambiguous_tag_v =
+{% for ambig in model.outbound_ambiguous_tags %}
+            std::is_same_v<Tag, {{ ambig.tag }}> ||
+{% endfor %}
+            false;
+
+        template <typename Tag>
+        static constexpr bool can_tag_emit_v =
+{% for item in model.outbound_tagged %}
+            std::is_same_v<Tag, {{ item.tag | replace('typename ActorBase::', '') }}> ||
+{% endfor %}
+            false;
+
+        // --- 5. Global Wildcard Fan-Out (emit<reaktar::Any>(payload)) ---
+        template <typename Payload>
+        static constexpr bool can_fan_out_v =
+{% for group in model.global_outbound_by_type %}
+            std::is_same_v<std::decay_t<Payload>, {{ group.type }}> ||
+{% endfor %}
+            false;
+
+        template <typename Payload>
+        static constexpr size_t fan_out_target_count_v =
+{% for group in model.global_outbound_by_type %}
+            std::is_same_v<std::decay_t<Payload>, {{ group.type }}> ? {{ group.targets | length }} :
+{% endfor %}
+            0;
+
+        // --- 6. Tagged Wildcard Fan-Out (emit<Tag::Any>(args...)) ---
+        template <typename Tag>
+        static constexpr bool can_tag_fan_out_v =
+{% for item in model.outbound_fan_out_tags %}
+{% if (item.kind == "method" and item.is_faf and item.ret_type == "void") or
+      (item.kind == "event") or
+      (item.kind == "field" and item.has_notifier and item.matching_ports | length > 0) %}
+            std::is_same_v<Tag, {{ item.tag }}> ||
+{% endif %}
+{% endfor %}
+            false;
+
+        template <typename Tag>
+        static constexpr bool is_rejected_fan_out_tag_v =
+{% for item in model.outbound_fan_out_tags %}
+{% if (item.kind == "method" and (item.ret_type != "void" or not item.is_faf)) or
+      (item.kind == "field" and (item.has_setter or (item.has_getter and not item.has_notifier) or (item.matching_ports | length == 0))) %}
+            std::is_same_v<Tag, {{ item.tag }}> ||
+{% endif %}
+{% endfor %}
+            false;
+
+        // --- 7. Tagged Wildcard Fan-Out Arguments Matching ---
+        template <typename Tag, typename... Args>
+        static constexpr bool can_tag_fan_out_with_args_v =
+{% for item in model.outbound_fan_out_tags %}
+{% if (item.kind == "method" and item.is_faf and item.ret_type == "void") %}
+            (std::is_same_v<Tag, {{ item.tag }}> && std::is_same_v<std::tuple<std::decay_t<Args>...>, std::tuple<{% for t in item.sig_types %}{{ t }}{% if not loop.last %}, {% endif %}{% endfor %}>>) ||
+{% elif item.kind == "event" %}
+            (std::is_same_v<Tag, {{ item.tag }}> && std::is_same_v<std::tuple<std::decay_t<Args>...>, std::tuple<{{ item.payload_type }}>>) ||
+{% elif item.kind == "field" and item.has_notifier and item.matching_ports | length > 0 %}
+            (std::is_same_v<Tag, {{ item.tag }}> && std::is_same_v<std::tuple<std::decay_t<Args>...>, std::tuple<{{ item.type }}>>) ||
+{% endif %}
+{% endfor %}
+            false;
     };
 
     {{ model.exe_name }}ActorBase() = default;

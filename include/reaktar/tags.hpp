@@ -10,6 +10,8 @@
 // ==============================================================================
 
 #pragma once
+#ifndef REAKTAR_TAGS_HPP_
+#define REAKTAR_TAGS_HPP_
 
 namespace reaktar {
 namespace tags {
@@ -18,36 +20,126 @@ namespace body_control {
 namespace methods {
     struct FlashLights {
         struct Any {};
+        using All = Any;
     };
     struct LockDoors {
         struct Any {};
+        using All = Any;
     };
 } // namespace methods
 namespace fields {
     struct OutsideAirQuality {
         struct Any {};
+        using All = Any;
     };
     struct RainSensorLevel {
         struct Any {};
+        using All = Any;
     };
     struct TargetCabinTemperature {
         struct Any {};
+        using All = Any;
     };
     struct WindowPosition {
         struct Any {};
+        using All = Any;
     };
 } // namespace fields
 } // namespace body_control
+
+namespace fan_out_alert3 {
+namespace events {
+    struct EmergencyAlertCustom {
+        struct Any {};
+        using All = Any;
+    };
+} // namespace events
+} // namespace fan_out_alert3
+
+namespace fan_out_alert {
+namespace events {
+    struct EmergencyAlert {
+        struct Any {};
+        using All = Any;
+    };
+} // namespace events
+} // namespace fan_out_alert
+
+namespace fan_out_body {
+namespace methods {
+    struct ResetTripMeter {
+        struct Any {};
+        using All = Any;
+    };
+} // namespace methods
+namespace fields {
+    struct OutsideAirQuality {
+        struct Any {};
+        using All = Any;
+    };
+    struct WindowPosition {
+        struct Any {};
+        using All = Any;
+    };
+} // namespace fields
+} // namespace fan_out_body
+
+namespace fan_out_sensor {
+namespace methods {
+    struct UniqueSensorFlush {
+        struct Any {};
+        using All = Any;
+    };
+} // namespace methods
+} // namespace fan_out_sensor
+
+namespace fan_out_sup_broadcast {
+namespace events {
+    struct AuditTrail {
+        struct Any {};
+        using All = Any;
+    };
+    struct WarningNotice {
+        struct Any {};
+        using All = Any;
+    };
+} // namespace events
+} // namespace fan_out_sup_broadcast
+
+namespace fan_out_supervisor {
+namespace methods {
+    struct CalibrateOdometer {
+        struct Any {};
+        using All = Any;
+    };
+    struct PerformSelfTest {
+        struct Any {};
+        using All = Any;
+    };
+    struct TriggerDiagnostic {
+        struct Any {};
+        using All = Any;
+    };
+} // namespace methods
+namespace fields {
+    struct CurrentDriveMode {
+        struct Any {};
+        using All = Any;
+    };
+} // namespace fields
+} // namespace fan_out_supervisor
 
 namespace hmi {
 namespace events {
     struct StatusNotification {
         struct Any {};
+        using All = Any;
     };
 } // namespace events
 namespace methods {
     struct ShowPopup {
         struct Any {};
+        using All = Any;
     };
 } // namespace methods
 } // namespace hmi
@@ -56,14 +148,17 @@ namespace infotainment::geo::navigation {
 namespace events {
     struct ActiveRoute {
         struct Any {};
+        using All = Any;
     };
     struct CurrentLocation {
         struct Any {};
+        using All = Any;
     };
 } // namespace events
 namespace methods {
     struct SetDestination {
         struct Any {};
+        using All = Any;
     };
 } // namespace methods
 } // namespace infotainment::geo::navigation
@@ -72,18 +167,23 @@ namespace powertrain {
 namespace events {
     struct BatteryModuleStatus {
         struct Any {};
+        using All = Any;
     };
     struct CabinSensors {
         struct Any {};
+        using All = Any;
     };
     struct SpeedHistory {
         struct Any {};
+        using All = Any;
     };
     struct VehicleSpeed {
         struct Any {};
+        using All = Any;
     };
     struct WheelSpeeds {
         struct Any {};
+        using All = Any;
     };
 } // namespace events
 } // namespace powertrain
@@ -92,58 +192,75 @@ namespace vehicle_supervisor {
 namespace events {
     struct ActiveDiagnosticMap {
         struct Any {};
+        using All = Any;
     };
     struct DiagnosticsReport {
         struct Any {};
+        using All = Any;
     };
     struct DriveHistory {
         struct Any {};
+        using All = Any;
     };
     struct EmergencyAlert {
         struct Any {};
+        using All = Any;
     };
     struct PrimaryWarning {
         struct Any {};
+        using All = Any;
     };
     struct SecondaryWarning {
         struct Any {};
+        using All = Any;
     };
 } // namespace events
 namespace methods {
     struct CalibrateOdometer {
         struct Any {};
+        using All = Any;
     };
     struct ResetTripMeter {
         struct Any {};
+        using All = Any;
     };
     struct SetSpeedLimiter {
         struct Any {};
+        using All = Any;
     };
     struct TriggerDiagnostic {
         struct Any {};
+        using All = Any;
     };
 } // namespace methods
 namespace fields {
     struct ActiveAlerts {
         struct Any {};
+        using All = Any;
     };
     struct CalibrationKey {
         struct Any {};
+        using All = Any;
     };
     struct CurrentDriveMode {
         struct Any {};
+        using All = Any;
     };
     struct FeatureFlags {
         struct Any {};
+        using All = Any;
     };
     struct HardwareRevision {
         struct Any {};
+        using All = Any;
     };
     struct SystemMatrix {
         struct Any {};
+        using All = Any;
     };
     struct VehicleConfig {
         struct Any {};
+        using All = Any;
     };
 } // namespace fields
 } // namespace vehicle_supervisor
@@ -155,6 +272,29 @@ namespace fields {
 namespace body_control {
     namespace tags = ::reaktar::tags::body_control;
     namespace fields = ::reaktar::tags::body_control::fields;
+}
+namespace fan_out_alert3 {
+    namespace tags = ::reaktar::tags::fan_out_alert3;
+    namespace events = ::reaktar::tags::fan_out_alert3::events;
+}
+namespace fan_out_alert {
+    namespace tags = ::reaktar::tags::fan_out_alert;
+    namespace events = ::reaktar::tags::fan_out_alert::events;
+}
+namespace fan_out_body {
+    namespace tags = ::reaktar::tags::fan_out_body;
+    namespace fields = ::reaktar::tags::fan_out_body::fields;
+}
+namespace fan_out_sensor {
+    namespace tags = ::reaktar::tags::fan_out_sensor;
+}
+namespace fan_out_sup_broadcast {
+    namespace tags = ::reaktar::tags::fan_out_sup_broadcast;
+    namespace events = ::reaktar::tags::fan_out_sup_broadcast::events;
+}
+namespace fan_out_supervisor {
+    namespace tags = ::reaktar::tags::fan_out_supervisor;
+    namespace fields = ::reaktar::tags::fan_out_supervisor::fields;
 }
 namespace hmi {
     namespace tags = ::reaktar::tags::hmi;
@@ -173,3 +313,5 @@ namespace vehicle_supervisor {
     namespace events = ::reaktar::tags::vehicle_supervisor::events;
     namespace fields = ::reaktar::tags::vehicle_supervisor::fields;
 }
+
+#endif // REAKTAR_TAGS_HPP_

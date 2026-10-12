@@ -65,6 +65,11 @@ struct EmergencyAlert {
     ara::core::String reason{};
 };
 
+struct AlertPayload {
+    uint32_t code{};
+    ara::core::String message{};
+};
+
 struct LocationPoint {
     float latitude{};
     float longitude{};

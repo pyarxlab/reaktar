@@ -25,13 +25,13 @@
     template <typename PortTag, typename ItemTag>
     auto read() {
 {% for port in model.read_ports %}
-        {{ "if" if loop.first else "else if" }} constexpr (std::is_same_v<PortTag, typename Base::ports::{{ port.name }}>) {
+        {{ "if" if loop.first else "else if" }} constexpr (std::is_same_v<PortTag, typename ActorBase::ports::{{ port.name }}>) {
 {% if port.all_fields | length == 0 %}
             static_assert(!sizeof(PortTag*), "reaktar: Port '{{ port.name }}' has no fields!");
 {% else %}
 {% for field in port.all_fields %}
             {{ "if" if loop.first else "else if" }} constexpr (
-                std::is_same_v<ItemTag, typename Base::ports::{{ port.name }}::{{ field.name }}>
+                std::is_same_v<ItemTag, typename ActorBase::ports::{{ port.name }}::{{ field.name }}>
                 || std::is_same_v<ItemTag, {{ field.tag }}>
             ) {
 {% if field.has_getter %}
@@ -61,7 +61,7 @@
     auto read() {
         // 1. Port tags: read<ports::Port>()
 {% for port in model.read_ports %}
-        {{ "if" if loop.first else "else if" }} constexpr (std::is_same_v<Tag, typename Base::ports::{{ port.name }}>) {
+        {{ "if" if loop.first else "else if" }} constexpr (std::is_same_v<Tag, typename ActorBase::ports::{{ port.name }}>) {
 {% if port.readable_field_count == 0 %}
             static_assert(!sizeof(Tag*), "reaktar: Port '{{ port.name }}' has no readable fields with getters!");
 {% elif port.readable_field_count > 1 %}
@@ -79,7 +79,7 @@
 
         // 2. Port-scoped field tags: read<ports::Port::FieldTag>()
 {% for field in model.read_fields_by_port_tag %}
-        else if constexpr (std::is_same_v<Tag, typename Base::ports::{{ field.port_name }}::{{ field.name }}>) {
+        else if constexpr (std::is_same_v<Tag, typename ActorBase::ports::{{ field.port_name }}::{{ field.name }}>) {
 {% if field.has_getter %}
             auto proxy_lease = this->{{ field.slot_name }}.acquire("{{ field.port_name }}");
             using AsyncResType = decltype(make_async_result(proxy_lease->{{ field.name }}.Get()));

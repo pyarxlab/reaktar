@@ -11,19 +11,20 @@
 #include "reaktar/config.hpp"
 
 /**
- * @file types.hpp
- * @brief Vendor-configurable type mappings for Reaktar.
+ * @file vendor.hpp
+ * @brief Platform and toolchain vendor type mappings for Reaktar.
  *
  * Explicit configuration always trumps automatic discovery:
  * - REAKTAR_CUSTOM_TYPES: Custom future/result/promise provided by user/project configuration
- * - REAKTAR_USE_AMSR: Vector AMSR / MICROSAR Adaptive (amsr::core::Future, amsr::core::Result, amsr::core::Promise)
- * - REAKTAR_USE_VES: Explicit Vector Embedded Software wrapper (ves::Future, ves::Result, ves::Promise)
- * - REAKTAR_USE_ARA: Explicit standard AUTOSAR (ara::core::Future, ara::core::Result, ara::core::Promise)
+ * - REAKTAR_USE_VES: Target ves:: namespace toolchain (ves::Future, ves::Result, ves::Promise)
+ * - REAKTAR_USE_AMSR: Target amsr::core:: namespace toolchain (amsr::core::Future, amsr::core::Result, amsr::core::Promise)
+ * - REAKTAR_USE_ARA: Standard AUTOSAR Adaptive (ara::core::Future, ara::core::Result, ara::core::Promise)
  *
  * Automatic discovery (when enabled by REAKTAR_AUTO_DISCOVER):
- * Uses standard C++17 __has_include to probe real vendor headers:
- *   1. Vector AMSR (<amsr/core/future.h> or <amsr/core/result.h>) -> defines REAKTAR_USE_AMSR
- *   2. Standard AUTOSAR fallback (<ara/core/future.h> or mock_ara) -> defines REAKTAR_USE_ARA
+ * Uses standard C++17 __has_include to probe platform toolchain headers:
+ *   1. VES  (<ves/abort.h>) -> defines REAKTAR_USE_VES
+ *   2. AMSR (<amsr/core/future.h> or <amsr/core/result.h>) -> defines REAKTAR_USE_AMSR
+ *   3. Standard AUTOSAR fallback (<ara/core/future.h> or mock_ara) -> defines REAKTAR_USE_ARA
  *
  * Direct type aliasing is preserved so template deduction and partial
  * specializations remain non-dependent and fully deducible.
@@ -38,7 +39,9 @@
     !defined(REAKTAR_USE_ARA)
 
     #if (defined(REAKTAR_AUTO_DISCOVER) || defined(REAKTAR_AUTO_DISCOVER_TYPES)) && defined(__has_include)
-        #if __has_include(<amsr/core/future.h>) || __has_include(<amsr/core/result.h>)
+        #if __has_include(<ves/abort.h>)
+            #define REAKTAR_USE_VES 1
+        #elif __has_include(<amsr/core/future.h>) || __has_include(<amsr/core/result.h>)
             #define REAKTAR_USE_AMSR 1
         #else
             #define REAKTAR_USE_ARA 1
@@ -51,7 +54,22 @@
 // ----------------------------------------------------------------------------
 // 2. Vendor Header Inclusions (when available via __has_include)
 // ----------------------------------------------------------------------------
-#if defined(REAKTAR_USE_AMSR)
+#if defined(REAKTAR_USE_VES)
+    #if defined(__has_include)
+        #if __has_include(<ves/abort.h>)
+            #include <ves/abort.h>
+        #endif
+        #if __has_include(<ves/future.h>)
+            #include <ves/future.h>
+        #endif
+        #if __has_include(<ves/result.h>)
+            #include <ves/result.h>
+        #endif
+        #if __has_include(<ves/promise.h>)
+            #include <ves/promise.h>
+        #endif
+    #endif
+#elif defined(REAKTAR_USE_AMSR)
     #if defined(__has_include)
         #if __has_include(<amsr/core/future.h>)
             #include <amsr/core/future.h>

@@ -10,6 +10,8 @@
 // ==============================================================================
 
 #pragma once
+#ifndef REAKTAR_TAGS_HPP_
+#define REAKTAR_TAGS_HPP_
 
 namespace reaktar {
 namespace tags {
@@ -22,6 +24,7 @@ namespace events {
 {% for ev in sorted_events(intf.events) %}
     struct {{ ev.short_name }} {
         struct Any {};
+        using All = Any;
     };
 {% endfor %}
 } // namespace events
@@ -31,6 +34,7 @@ namespace methods {
 {% for m in sorted_methods(intf.methods) %}
     struct {{ m.short_name }} {
         struct Any {};
+        using All = Any;
     };
 {% endfor %}
 } // namespace methods
@@ -40,6 +44,7 @@ namespace fields {
 {% for f in sorted_fields(intf.fields) %}
     struct {{ f.short_name }} {
         struct Any {};
+        using All = Any;
     };
 {% endfor %}
 } // namespace fields
@@ -63,3 +68,5 @@ namespace {{ ns }} {
 {% endif %}
 }
 {% endfor %}
+
+#endif // REAKTAR_TAGS_HPP_

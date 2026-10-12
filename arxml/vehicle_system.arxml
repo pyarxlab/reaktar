@@ -226,6 +226,33 @@
                   </SUB-ELEMENTS>
                 </STD-CPP-IMPLEMENTATION-DATA-TYPE>
                 <STD-CPP-IMPLEMENTATION-DATA-TYPE>
+                  <SHORT-NAME>AlertPayload</SHORT-NAME>
+                  <CATEGORY>STRUCTURE</CATEGORY>
+                  <HEADER-FILE>vehicle_data/types.hpp</HEADER-FILE>
+                  <NAMESPACES>
+                    <SYMBOL-PROPS>
+                      <SHORT-NAME>vehicle_data</SHORT-NAME>
+                      <SYMBOL>vehicle_data</SYMBOL>
+                    </SYMBOL-PROPS>
+                  </NAMESPACES>
+                  <SUB-ELEMENTS>
+                    <CPP-IMPLEMENTATION-DATA-TYPE-ELEMENT>
+                      <SHORT-NAME>code</SHORT-NAME>
+                      <CATEGORY>TYPE_REFERENCE</CATEGORY>
+                      <TYPE-REFERENCE>
+                        <TYPE-REFERENCE-REF DEST="STD-CPP-IMPLEMENTATION-DATA-TYPE">/DataType/Implementation/CPP/uint32_t</TYPE-REFERENCE-REF>
+                      </TYPE-REFERENCE>
+                    </CPP-IMPLEMENTATION-DATA-TYPE-ELEMENT>
+                    <CPP-IMPLEMENTATION-DATA-TYPE-ELEMENT>
+                      <SHORT-NAME>message</SHORT-NAME>
+                      <CATEGORY>TYPE_REFERENCE</CATEGORY>
+                      <TYPE-REFERENCE>
+                        <TYPE-REFERENCE-REF DEST="STD-CPP-IMPLEMENTATION-DATA-TYPE">/DataType/Implementation/CPP/String</TYPE-REFERENCE-REF>
+                      </TYPE-REFERENCE>
+                    </CPP-IMPLEMENTATION-DATA-TYPE-ELEMENT>
+                  </SUB-ELEMENTS>
+                </STD-CPP-IMPLEMENTATION-DATA-TYPE>
+                <STD-CPP-IMPLEMENTATION-DATA-TYPE>
                   <SHORT-NAME>LocationPoint</SHORT-NAME>
                   <CATEGORY>STRUCTURE</CATEGORY>
                   <HEADER-FILE>vehicle_data/types.hpp</HEADER-FILE>
@@ -1133,6 +1160,150 @@
                 </CLIENT-SERVER-OPERATION>
               </METHODS>
             </SERVICE-INTERFACE>
+            <SERVICE-INTERFACE>
+              <SHORT-NAME>FanOutBodyControlInterface</SHORT-NAME>
+              <NAMESPACES>
+                <SYMBOL-PROPS>
+                  <SHORT-NAME>fan_out_body</SHORT-NAME>
+                  <SYMBOL>fan_out_body</SYMBOL>
+                </SYMBOL-PROPS>
+              </NAMESPACES>
+              <FIELDS>
+                <FIELD>
+                  <SHORT-NAME>OutsideAirQuality</SHORT-NAME>
+                  <TYPE-TREF DEST="STD-CPP-IMPLEMENTATION-DATA-TYPE">/DataType/Implementation/CPP/uint32_t</TYPE-TREF>
+                  <HAS-GETTER>true</HAS-GETTER>
+                  <HAS-NOTIFIER>true</HAS-NOTIFIER>
+                  <HAS-SETTER>false</HAS-SETTER>
+                </FIELD>
+                <FIELD>
+                  <SHORT-NAME>WindowPosition</SHORT-NAME>
+                  <TYPE-TREF DEST="STD-CPP-IMPLEMENTATION-DATA-TYPE">/DataType/Implementation/CPP/uint32_t</TYPE-TREF>
+                  <HAS-GETTER>false</HAS-GETTER>
+                  <HAS-NOTIFIER>true</HAS-NOTIFIER>
+                  <HAS-SETTER>true</HAS-SETTER>
+                </FIELD>
+              </FIELDS>
+              <METHODS>
+                <CLIENT-SERVER-OPERATION>
+                  <SHORT-NAME>ResetTripMeter</SHORT-NAME>
+                  <FIRE-AND-FORGET>true</FIRE-AND-FORGET>
+                </CLIENT-SERVER-OPERATION>
+              </METHODS>
+            </SERVICE-INTERFACE>
+            <SERVICE-INTERFACE>
+              <SHORT-NAME>FanOutSupervisorInterface</SHORT-NAME>
+              <NAMESPACES>
+                <SYMBOL-PROPS>
+                  <SHORT-NAME>fan_out_supervisor</SHORT-NAME>
+                  <SYMBOL>fan_out_supervisor</SYMBOL>
+                </SYMBOL-PROPS>
+              </NAMESPACES>
+              <FIELDS>
+                <FIELD>
+                  <SHORT-NAME>CurrentDriveMode</SHORT-NAME>
+                  <TYPE-TREF DEST="STD-CPP-IMPLEMENTATION-DATA-TYPE">/DataType/Implementation/CPP/DriveMode</TYPE-TREF>
+                  <HAS-GETTER>true</HAS-GETTER>
+                  <HAS-NOTIFIER>false</HAS-NOTIFIER>
+                  <HAS-SETTER>true</HAS-SETTER>
+                </FIELD>
+              </FIELDS>
+              <METHODS>
+                <CLIENT-SERVER-OPERATION>
+                  <SHORT-NAME>TriggerDiagnostic</SHORT-NAME>
+                  <ARGUMENTS>
+                    <ARGUMENT-DATA-PROTOTYPE>
+                      <SHORT-NAME>code</SHORT-NAME>
+                      <TYPE-TREF DEST="STD-CPP-IMPLEMENTATION-DATA-TYPE">/DataType/Implementation/CPP/uint32_t</TYPE-TREF>
+                      <DIRECTION>IN</DIRECTION>
+                    </ARGUMENT-DATA-PROTOTYPE>
+                  </ARGUMENTS>
+                  <FIRE-AND-FORGET>true</FIRE-AND-FORGET>
+                </CLIENT-SERVER-OPERATION>
+                <CLIENT-SERVER-OPERATION>
+                  <SHORT-NAME>CalibrateOdometer</SHORT-NAME>
+                  <ARGUMENTS>
+                    <ARGUMENT-DATA-PROTOTYPE>
+                      <SHORT-NAME>current_km</SHORT-NAME>
+                      <TYPE-TREF DEST="STD-CPP-IMPLEMENTATION-DATA-TYPE">/DataType/Implementation/CPP/uint32_t</TYPE-TREF>
+                      <DIRECTION>IN</DIRECTION>
+                    </ARGUMENT-DATA-PROTOTYPE>
+                    <ARGUMENT-DATA-PROTOTYPE>
+                      <SHORT-NAME>Result</SHORT-NAME>
+                      <TYPE-TREF DEST="STD-CPP-IMPLEMENTATION-DATA-TYPE">/DataType/Implementation/CPP/uint32_t</TYPE-TREF>
+                      <DIRECTION>OUT</DIRECTION>
+                    </ARGUMENT-DATA-PROTOTYPE>
+                  </ARGUMENTS>
+                </CLIENT-SERVER-OPERATION>
+                <CLIENT-SERVER-OPERATION>
+                  <SHORT-NAME>PerformSelfTest</SHORT-NAME>
+                </CLIENT-SERVER-OPERATION>
+              </METHODS>
+            </SERVICE-INTERFACE>
+            <SERVICE-INTERFACE>
+              <SHORT-NAME>FanOutSupervisorBroadcastInterface</SHORT-NAME>
+              <NAMESPACES>
+                <SYMBOL-PROPS>
+                  <SHORT-NAME>fan_out_sup_broadcast</SHORT-NAME>
+                  <SYMBOL>fan_out_sup_broadcast</SYMBOL>
+                </SYMBOL-PROPS>
+              </NAMESPACES>
+              <EVENTS>
+                <VARIABLE-DATA-PROTOTYPE>
+                  <SHORT-NAME>WarningNotice</SHORT-NAME>
+                  <TYPE-TREF DEST="STD-CPP-IMPLEMENTATION-DATA-TYPE">/DataType/Implementation/CPP/AlertPayload</TYPE-TREF>
+                </VARIABLE-DATA-PROTOTYPE>
+                <VARIABLE-DATA-PROTOTYPE>
+                  <SHORT-NAME>AuditTrail</SHORT-NAME>
+                  <TYPE-TREF DEST="STD-CPP-IMPLEMENTATION-DATA-TYPE">/DataType/Implementation/CPP/AlertPayload</TYPE-TREF>
+                </VARIABLE-DATA-PROTOTYPE>
+              </EVENTS>
+            </SERVICE-INTERFACE>
+            <SERVICE-INTERFACE>
+              <SHORT-NAME>FanOutAlertBroadcastInterface</SHORT-NAME>
+              <NAMESPACES>
+                <SYMBOL-PROPS>
+                  <SHORT-NAME>fan_out_alert</SHORT-NAME>
+                  <SYMBOL>fan_out_alert</SYMBOL>
+                </SYMBOL-PROPS>
+              </NAMESPACES>
+              <EVENTS>
+                <VARIABLE-DATA-PROTOTYPE>
+                  <SHORT-NAME>EmergencyAlert</SHORT-NAME>
+                  <TYPE-TREF DEST="STD-CPP-IMPLEMENTATION-DATA-TYPE">/DataType/Implementation/CPP/EmergencyAlert</TYPE-TREF>
+                </VARIABLE-DATA-PROTOTYPE>
+              </EVENTS>
+            </SERVICE-INTERFACE>
+            <SERVICE-INTERFACE>
+              <SHORT-NAME>FanOutAlert3Interface</SHORT-NAME>
+              <NAMESPACES>
+                <SYMBOL-PROPS>
+                  <SHORT-NAME>fan_out_alert3</SHORT-NAME>
+                  <SYMBOL>fan_out_alert3</SYMBOL>
+                </SYMBOL-PROPS>
+              </NAMESPACES>
+              <EVENTS>
+                <VARIABLE-DATA-PROTOTYPE>
+                  <SHORT-NAME>EmergencyAlertCustom</SHORT-NAME>
+                  <TYPE-TREF DEST="STD-CPP-IMPLEMENTATION-DATA-TYPE">/DataType/Implementation/CPP/EmergencyAlert</TYPE-TREF>
+                </VARIABLE-DATA-PROTOTYPE>
+              </EVENTS>
+            </SERVICE-INTERFACE>
+            <SERVICE-INTERFACE>
+              <SHORT-NAME>FanOutSensorFlushInterface</SHORT-NAME>
+              <NAMESPACES>
+                <SYMBOL-PROPS>
+                  <SHORT-NAME>fan_out_sensor</SHORT-NAME>
+                  <SYMBOL>fan_out_sensor</SYMBOL>
+                </SYMBOL-PROPS>
+              </NAMESPACES>
+              <METHODS>
+                <CLIENT-SERVER-OPERATION>
+                  <SHORT-NAME>UniqueSensorFlush</SHORT-NAME>
+                  <FIRE-AND-FORGET>true</FIRE-AND-FORGET>
+                </CLIENT-SERVER-OPERATION>
+              </METHODS>
+            </SERVICE-INTERFACE>
           </ELEMENTS>
         </AR-PACKAGE>
         <AR-PACKAGE>
@@ -1252,6 +1423,68 @@
                 </R-PORT-PROTOTYPE>
               </PORTS>
             </ADAPTIVE-APPLICATION-SW-COMPONENT-TYPE>
+            <ADAPTIVE-APPLICATION-SW-COMPONENT-TYPE>
+              <SHORT-NAME>FanOutTestApp</SHORT-NAME>
+              <PORTS>
+                <P-PORT-PROTOTYPE>
+                  <SHORT-NAME>AlertSkeleton1</SHORT-NAME>
+                  <PROVIDED-INTERFACE-TREF DEST="SERVICE-INTERFACE">/PortInterface/Service/FanOutAlertBroadcastInterface</PROVIDED-INTERFACE-TREF>
+                </P-PORT-PROTOTYPE>
+                <P-PORT-PROTOTYPE>
+                  <SHORT-NAME>AlertSkeleton2</SHORT-NAME>
+                  <PROVIDED-INTERFACE-TREF DEST="SERVICE-INTERFACE">/PortInterface/Service/FanOutAlertBroadcastInterface</PROVIDED-INTERFACE-TREF>
+                </P-PORT-PROTOTYPE>
+                <P-PORT-PROTOTYPE>
+                  <SHORT-NAME>AlertSkeleton3</SHORT-NAME>
+                  <PROVIDED-INTERFACE-TREF DEST="SERVICE-INTERFACE">/PortInterface/Service/FanOutAlert3Interface</PROVIDED-INTERFACE-TREF>
+                </P-PORT-PROTOTYPE>
+                <P-PORT-PROTOTYPE>
+                  <SHORT-NAME>SupervisorOut</SHORT-NAME>
+                  <PROVIDED-INTERFACE-TREF DEST="SERVICE-INTERFACE">/PortInterface/Service/FanOutSupervisorBroadcastInterface</PROVIDED-INTERFACE-TREF>
+                </P-PORT-PROTOTYPE>
+                <R-PORT-PROTOTYPE>
+                  <SHORT-NAME>PrimaryBody</SHORT-NAME>
+                  <REQUIRED-INTERFACE-TREF DEST="SERVICE-INTERFACE">/PortInterface/Service/FanOutBodyControlInterface</REQUIRED-INTERFACE-TREF>
+                </R-PORT-PROTOTYPE>
+                <R-PORT-PROTOTYPE>
+                  <SHORT-NAME>SecondaryBody</SHORT-NAME>
+                  <REQUIRED-INTERFACE-TREF DEST="SERVICE-INTERFACE">/PortInterface/Service/FanOutBodyControlInterface</REQUIRED-INTERFACE-TREF>
+                </R-PORT-PROTOTYPE>
+                <R-PORT-PROTOTYPE>
+                  <SHORT-NAME>PrimarySupervisor</SHORT-NAME>
+                  <REQUIRED-INTERFACE-TREF DEST="SERVICE-INTERFACE">/PortInterface/Service/FanOutSupervisorInterface</REQUIRED-INTERFACE-TREF>
+                </R-PORT-PROTOTYPE>
+                <R-PORT-PROTOTYPE>
+                  <SHORT-NAME>SecondarySupervisor</SHORT-NAME>
+                  <REQUIRED-INTERFACE-TREF DEST="SERVICE-INTERFACE">/PortInterface/Service/FanOutSupervisorInterface</REQUIRED-INTERFACE-TREF>
+                </R-PORT-PROTOTYPE>
+                <R-PORT-PROTOTYPE>
+                  <SHORT-NAME>SensorFlushPort</SHORT-NAME>
+                  <REQUIRED-INTERFACE-TREF DEST="SERVICE-INTERFACE">/PortInterface/Service/FanOutSensorFlushInterface</REQUIRED-INTERFACE-TREF>
+                </R-PORT-PROTOTYPE>
+              </PORTS>
+            </ADAPTIVE-APPLICATION-SW-COMPONENT-TYPE>
+            <ADAPTIVE-APPLICATION-SW-COMPONENT-TYPE>
+              <SHORT-NAME>DualRoleApp</SHORT-NAME>
+              <PORTS>
+                <P-PORT-PROTOTYPE>
+                  <SHORT-NAME>AlertProvider</SHORT-NAME>
+                  <PROVIDED-INTERFACE-TREF DEST="SERVICE-INTERFACE">/PortInterface/Service/FanOutAlertBroadcastInterface</PROVIDED-INTERFACE-TREF>
+                </P-PORT-PROTOTYPE>
+                <P-PORT-PROTOTYPE>
+                  <SHORT-NAME>SupervisorProvided</SHORT-NAME>
+                  <PROVIDED-INTERFACE-TREF DEST="SERVICE-INTERFACE">/PortInterface/Service/VehicleSupervisorInterface</PROVIDED-INTERFACE-TREF>
+                </P-PORT-PROTOTYPE>
+                <R-PORT-PROTOTYPE>
+                  <SHORT-NAME>AlertConsumer</SHORT-NAME>
+                  <REQUIRED-INTERFACE-TREF DEST="SERVICE-INTERFACE">/PortInterface/Service/FanOutAlertBroadcastInterface</REQUIRED-INTERFACE-TREF>
+                </R-PORT-PROTOTYPE>
+                <R-PORT-PROTOTYPE>
+                  <SHORT-NAME>SupervisorRequired</SHORT-NAME>
+                  <REQUIRED-INTERFACE-TREF DEST="SERVICE-INTERFACE">/PortInterface/Service/VehicleSupervisorInterface</REQUIRED-INTERFACE-TREF>
+                </R-PORT-PROTOTYPE>
+              </PORTS>
+            </ADAPTIVE-APPLICATION-SW-COMPONENT-TYPE>
           </ELEMENTS>
         </AR-PACKAGE>
       </AR-PACKAGES>
@@ -1285,6 +1518,20 @@
           <ROOT-SW-COMPONENT-PROTOTYPE>
             <SHORT-NAME>RootSwComponent</SHORT-NAME>
             <APPLICATION-TYPE-TREF DEST="ADAPTIVE-APPLICATION-SW-COMPONENT-TYPE">/SwComponent/AdaptiveApplication/MultiPortRadarApp</APPLICATION-TYPE-TREF>
+          </ROOT-SW-COMPONENT-PROTOTYPE>
+        </EXECUTABLE>
+        <EXECUTABLE>
+          <SHORT-NAME>FanOutTest</SHORT-NAME>
+          <ROOT-SW-COMPONENT-PROTOTYPE>
+            <SHORT-NAME>RootSwComponent</SHORT-NAME>
+            <APPLICATION-TYPE-TREF DEST="ADAPTIVE-APPLICATION-SW-COMPONENT-TYPE">/SwComponent/AdaptiveApplication/FanOutTestApp</APPLICATION-TYPE-TREF>
+          </ROOT-SW-COMPONENT-PROTOTYPE>
+        </EXECUTABLE>
+        <EXECUTABLE>
+          <SHORT-NAME>DualRole</SHORT-NAME>
+          <ROOT-SW-COMPONENT-PROTOTYPE>
+            <SHORT-NAME>RootSwComponent</SHORT-NAME>
+            <APPLICATION-TYPE-TREF DEST="ADAPTIVE-APPLICATION-SW-COMPONENT-TYPE">/SwComponent/AdaptiveApplication/DualRoleApp</APPLICATION-TYPE-TREF>
           </ROOT-SW-COMPONENT-PROTOTYPE>
         </EXECUTABLE>
       </ELEMENTS>

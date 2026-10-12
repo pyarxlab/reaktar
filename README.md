@@ -191,7 +191,7 @@ include/
     tags.hpp            # Static compile-time method and field identifier tags
     thread_safety.hpp   # Clang -Wthread-safety annotations & locking primitives
     traits.hpp          # SFINAE and C++17 type inspection traits
-    types.hpp           # Return types, EmitStatus, and common primitives
+    vendor.hpp          # Vendor SDK type mappings (Future, Result, Promise, ErrorCode)
   generated_framework/  # Generated Actor bases & Test Benches from ARXML
 scripts/
   generate_actor.py     # Code generator (ARXML -> Actor & TestBench)
@@ -226,3 +226,7 @@ python3 scripts/package_reaktar.py path/to/model.arxml -o dist/
 ## License
 
 MIT License. Copyright (c) 2026 Pyarx Lab. See [LICENSE](LICENSE) for details.
+
+### Trademarks & Disclaimers
+
+All product names, trademarks, and registered trademarks mentioned in this repository are the property of their respective owners. Company, product, and service names are used solely for identification and compatibility purposes, and do not imply any affiliation or endorsement.

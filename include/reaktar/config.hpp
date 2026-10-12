@@ -17,9 +17,9 @@
  * Integrators or projects can override this default by defining any of the
  * following macros prior to including Reaktar headers or via compiler flags (-D):
  *   - REAKTAR_CUSTOM_TYPES     : User provides custom Future, Result, and Promise
- *   - REAKTAR_USE_VES          : Explicitly use Vector Embedded Software (ves::)
- *   - REAKTAR_USE_AMSR         : Explicitly use Vector AMSR (amsr::core::)
- *   - REAKTAR_USE_ARA          : Explicitly use Standard AUTOSAR Adaptive (ara::core::)
+ *   - REAKTAR_USE_VES          : Target ves:: namespace toolchain
+ *   - REAKTAR_USE_AMSR         : Target amsr::core:: namespace toolchain
+ *   - REAKTAR_USE_ARA          : Explicitly use standard AUTOSAR Adaptive (ara::core::)
  *   - REAKTAR_NO_AUTO_DISCOVER : Disable auto-discovery and fall back directly to ara::core::
  */
 

@@ -14,7 +14,8 @@
 #include <optional>
 #include <mutex>
 #include <condition_variable>
-#include "reaktar/types.hpp"
+#include <cstdint>
+#include "reaktar/vendor.hpp"
 
 namespace reaktar {
 
@@ -435,6 +436,31 @@ struct EmitStatus {
         if (!ok_) {
             std::forward<ErrorCallback>(cb)();
         }
+    }
+};
+
+/**
+ * @brief Delivery status accounting for multi-port fan-out dispatches.
+ *
+ * Exactly 2 bytes in size.
+ * Purposely DOES NOT have operator bool() to avoid ambiguity between "any delivered"
+ * and "all delivered". Callers must explicitly check is_all_delivered(), is_any_delivered(),
+ * or is_none_delivered(), or inspect attempted and delivered counts directly.
+ */
+struct FanOutResult {
+    uint8_t attempted{0};
+    uint8_t delivered{0};
+
+    [[nodiscard]] constexpr bool is_all_delivered() const noexcept {
+        return attempted > 0 && delivered == attempted;
+    }
+
+    [[nodiscard]] constexpr bool is_any_delivered() const noexcept {
+        return delivered > 0;
+    }
+
+    [[nodiscard]] constexpr bool is_none_delivered() const noexcept {
+        return delivered == 0;
     }
 };
 
@@ -959,6 +985,49 @@ public:
 
 template <typename App, typename LegalSigsTuple, typename... LegalTypes>
 inline constexpr bool has_rogue_handler_v = rogue_handler_detector<App, LegalSigsTuple, LegalTypes...>::has_rogue;
+
+namespace traits {
+
+template <typename Actor, typename Payload>
+inline constexpr bool can_emit_v = Actor::traits::template can_emit_v<Payload>;
+
+template <typename Actor, typename Payload>
+inline constexpr bool is_ambiguous_emit_v = Actor::traits::template is_ambiguous_emit_v<Payload>;
+
+template <typename Actor, typename Port>
+inline constexpr bool is_valid_port_v = Actor::traits::template is_valid_port_v<Port>;
+
+template <typename Actor, typename Port>
+inline constexpr bool has_port_outbound_v = Actor::traits::template has_port_outbound_v<Port>;
+
+template <typename Actor, typename Port, typename Payload>
+inline constexpr bool can_port_emit_v = Actor::traits::template can_port_emit_v<Port, Payload>;
+
+template <typename Actor, typename Port, typename Payload>
+inline constexpr bool is_port_payload_ambiguous_v = Actor::traits::template is_port_payload_ambiguous_v<Port, Payload>;
+
+template <typename Actor, typename Tag>
+inline constexpr bool is_ambiguous_tag_v = Actor::traits::template is_ambiguous_tag_v<Tag>;
+
+template <typename Actor, typename Tag>
+inline constexpr bool can_tag_emit_v = Actor::traits::template can_tag_emit_v<Tag>;
+
+template <typename Actor, typename Payload>
+inline constexpr bool can_fan_out_v = Actor::traits::template can_fan_out_v<Payload>;
+
+template <typename Actor, typename Payload>
+inline constexpr size_t fan_out_target_count_v = Actor::traits::template fan_out_target_count_v<Payload>;
+
+template <typename Actor, typename Tag>
+inline constexpr bool can_tag_fan_out_v = Actor::traits::template can_tag_fan_out_v<Tag>;
+
+template <typename Actor, typename Tag>
+inline constexpr bool is_rejected_fan_out_tag_v = Actor::traits::template is_rejected_fan_out_tag_v<Tag>;
+
+template <typename Actor, typename Tag, typename... Args>
+inline constexpr bool can_tag_fan_out_with_args_v = Actor::traits::template can_tag_fan_out_with_args_v<Tag, Args...>;
+
+} // namespace traits
 
 } // namespace reaktar
 

@@ -11,7 +11,7 @@
     void open_port() {
         static_assert(::reaktar::is_port_v<PortTag>, "open_port requires a valid generated Port Tag (e.g. ports::MyPort)!");
 {% for port in model.ports %}
-        {{ "if" if loop.first else "else if" }} constexpr (std::is_same_v<PortTag, typename Base::ports::{{ port.port_name }}>) {
+        {{ "if" if loop.first else "else if" }} constexpr (std::is_same_v<PortTag, typename ActorBase::ports::{{ port.port_name }}>) {
 {% if port.kind == "Provided" %}
             open_{{ port.ident }}_provided_port();
 {% else %}
@@ -30,7 +30,7 @@
     void close_port() {
         static_assert(::reaktar::is_port_v<PortTag>, "close_port requires a valid generated Port Tag (e.g. ports::MyPort)!");
 {% for port in model.ports %}
-        {{ "if" if loop.first else "else if" }} constexpr (std::is_same_v<PortTag, typename Base::ports::{{ port.port_name }}>) {
+        {{ "if" if loop.first else "else if" }} constexpr (std::is_same_v<PortTag, typename ActorBase::ports::{{ port.port_name }}>) {
 {% if port.kind == "Provided" %}
             close_{{ port.ident }}_provided_port();
 {% else %}
@@ -49,7 +49,7 @@
     bool is_ready() const noexcept {
         static_assert(::reaktar::is_port_v<PortTag>, "is_ready requires a valid generated Port Tag (e.g. ports::MyPort)!");
 {% for port in model.ports %}
-        {{ "if" if loop.first else "else if" }} constexpr (std::is_same_v<PortTag, typename Base::ports::{{ port.port_name }}>) {
+        {{ "if" if loop.first else "else if" }} constexpr (std::is_same_v<PortTag, typename ActorBase::ports::{{ port.port_name }}>) {
 {% if port.kind == "Provided" %}
             return this->{{ port.ident }}_offered_.load(std::memory_order_acquire);
 {% else %}
@@ -66,7 +66,7 @@
     bool is_port_open() const noexcept {
         static_assert(::reaktar::is_port_v<PortTag>, "is_port_open requires a valid generated Port Tag (e.g. ports::MyPort)!");
 {% for port in model.ports %}
-        {{ "if" if loop.first else "else if" }} constexpr (std::is_same_v<PortTag, typename Base::ports::{{ port.port_name }}>) {
+        {{ "if" if loop.first else "else if" }} constexpr (std::is_same_v<PortTag, typename ActorBase::ports::{{ port.port_name }}>) {
 {% if port.kind == "Provided" %}
             return this->{{ port.ident }}_offered_.load(std::memory_order_acquire);
 {% else %}
@@ -84,7 +84,7 @@
         static_assert(::reaktar::is_port_v<PortTag>, "get_port_generation requires a valid generated Port Tag!");
 {% if model.req_ports | length > 0 %}
 {% for port in model.req_ports %}
-        {{ "if" if loop.first else "else if" }} constexpr (std::is_same_v<PortTag, typename Base::ports::{{ port.port_name }}>) {
+        {{ "if" if loop.first else "else if" }} constexpr (std::is_same_v<PortTag, typename ActorBase::ports::{{ port.port_name }}>) {
             std::lock_guard<std::mutex> lock(this->{{ port.ident }}_port_mutex_);
             return this->{{ port.ident }}_generation_;
         }
@@ -98,8 +98,8 @@
     }
 
     // Bring ActorBase::is_ready() (no-arg readiness check across all ports) into scope
-    using Base::is_ready;
-    using Base::wait_until_ready;
+    using ActorBase::is_ready;
+    using ActorBase::wait_until_ready;
 
     // ------------------------------------------------------------------------
     // Process-Wide Lifecycle Controls (Granular Defaults)
@@ -107,20 +107,20 @@
 
     void start() {
 {% for port in model.ports %}
-        this->template open_port<typename Base::ports::{{ port.port_name }}>();
+        this->template open_port<typename ActorBase::ports::{{ port.port_name }}>();
 {% endfor %}
     }
 
     void stop() {
 {% for port in model.ports %}
-        this->template close_port<typename Base::ports::{{ port.port_name }}>();
+        this->template close_port<typename ActorBase::ports::{{ port.port_name }}>();
 {% endfor %}
     }
 
     static constexpr bool has_any_lifecycle_handlers_v = {% if model.ports | length == 0 %}false{% else %}(
 {% for port in model.ports %}
-        ::reaktar::has_on_direct_event_v<Derived, ::reaktar::Connected<typename Base::ports::{{ port.port_name }}>> ||
-        ::reaktar::has_on_direct_event_v<Derived, ::reaktar::Disconnected<typename Base::ports::{{ port.port_name }}>>{{ " ||" if not loop.last else "" }}
+        ::reaktar::has_on_direct_event_v<Derived, ::reaktar::Connected<typename ActorBase::ports::{{ port.port_name }}>> ||
+        ::reaktar::has_on_direct_event_v<Derived, ::reaktar::Disconnected<typename ActorBase::ports::{{ port.port_name }}>>{{ " ||" if not loop.last else "" }}
 {% endfor %}
     ){% endif %};
 
@@ -133,7 +133,7 @@
         if constexpr (!has_any_lifecycle_handlers_v) {
             return 0;
         } else {
-            typename Base::port_mask_t dirty = this->dirty_ports_.load(std::memory_order_relaxed);
+            typename ActorBase::port_mask_t dirty = this->dirty_ports_.load(std::memory_order_relaxed);
             if (!dirty) return 0;
             dirty = this->dirty_ports_.exchange(0, std::memory_order_acq_rel);
             if (!dirty) return 0;
@@ -141,22 +141,22 @@
             size_t count = 0;
             auto reconcile = [this, dirty, &count]() {
 {% for port in model.ports %}
-                if constexpr (::reaktar::has_on_direct_event_v<Derived, ::reaktar::Connected<typename Base::ports::{{ port.port_name }}>> ||
-                              ::reaktar::has_on_direct_event_v<Derived, ::reaktar::Disconnected<typename Base::ports::{{ port.port_name }}>>) {
-                    if (dirty & (static_cast<typename Base::port_mask_t>(1) << {{ loop.index0 }})) {
-                        bool is_now_ready = this->template is_ready<typename Base::ports::{{ port.port_name }}>();
-                        bool was_ready = (this->last_known_ready_ & (static_cast<typename Base::port_mask_t>(1) << {{ loop.index0 }})) != 0;
+                if constexpr (::reaktar::has_on_direct_event_v<Derived, ::reaktar::Connected<typename ActorBase::ports::{{ port.port_name }}>> ||
+                              ::reaktar::has_on_direct_event_v<Derived, ::reaktar::Disconnected<typename ActorBase::ports::{{ port.port_name }}>>) {
+                    if (dirty & (static_cast<typename ActorBase::port_mask_t>(1) << {{ loop.index0 }})) {
+                        bool is_now_ready = this->template is_ready<typename ActorBase::ports::{{ port.port_name }}>();
+                        bool was_ready = (this->last_known_ready_ & (static_cast<typename ActorBase::port_mask_t>(1) << {{ loop.index0 }})) != 0;
                         if (is_now_ready != was_ready) {
                             if (is_now_ready) {
-                                this->last_known_ready_ |= (static_cast<typename Base::port_mask_t>(1) << {{ loop.index0 }});
-                                if constexpr (::reaktar::has_on_direct_event_v<Derived, ::reaktar::Connected<typename Base::ports::{{ port.port_name }}>>) {
-                                    self().on(::reaktar::Connected<typename Base::ports::{{ port.port_name }}>{});
+                                this->last_known_ready_ |= (static_cast<typename ActorBase::port_mask_t>(1) << {{ loop.index0 }});
+                                if constexpr (::reaktar::has_on_direct_event_v<Derived, ::reaktar::Connected<typename ActorBase::ports::{{ port.port_name }}>>) {
+                                    self().on(::reaktar::Connected<typename ActorBase::ports::{{ port.port_name }}>{});
                                     ++count;
                                 }
                             } else {
-                                this->last_known_ready_ &= ~(static_cast<typename Base::port_mask_t>(1) << {{ loop.index0 }});
-                                if constexpr (::reaktar::has_on_direct_event_v<Derived, ::reaktar::Disconnected<typename Base::ports::{{ port.port_name }}>>) {
-                                    self().on(::reaktar::Disconnected<typename Base::ports::{{ port.port_name }}>{});
+                                this->last_known_ready_ &= ~(static_cast<typename ActorBase::port_mask_t>(1) << {{ loop.index0 }});
+                                if constexpr (::reaktar::has_on_direct_event_v<Derived, ::reaktar::Disconnected<typename ActorBase::ports::{{ port.port_name }}>>) {
+                                    self().on(::reaktar::Disconnected<typename ActorBase::ports::{{ port.port_name }}>{});
                                     ++count;
                                 }
                             }
@@ -187,9 +187,9 @@ private:
             bind_skeleton_fields();
             this->{{ port.var_name }}.OfferService();
             this->{{ port.ident }}_offered_.store(true, std::memory_order_release);
-            if constexpr (::reaktar::has_on_direct_event_v<Derived, ::reaktar::Connected<typename Base::ports::{{ port.port_name }}>> ||
-                          ::reaktar::has_on_direct_event_v<Derived, ::reaktar::Disconnected<typename Base::ports::{{ port.port_name }}>>) {
-                this->dirty_ports_.fetch_or(static_cast<typename Base::port_mask_t>(1) << {{ loop.index0 }}, std::memory_order_release);
+            if constexpr (::reaktar::has_on_direct_event_v<Derived, ::reaktar::Connected<typename ActorBase::ports::{{ port.port_name }}>> ||
+                          ::reaktar::has_on_direct_event_v<Derived, ::reaktar::Disconnected<typename ActorBase::ports::{{ port.port_name }}>>) {
+                this->dirty_ports_.fetch_or(static_cast<typename ActorBase::port_mask_t>(1) << {{ loop.index0 }}, std::memory_order_release);
             }
         }
     }
@@ -235,9 +235,9 @@ private:
                         return; // Closed or generation shifted concurrently
                     }
                     this->{{ port.slot_name }}.reset();
-                    if constexpr (::reaktar::has_on_direct_event_v<Derived, ::reaktar::Connected<typename Base::ports::{{ port.port_name }}>> ||
-                                  ::reaktar::has_on_direct_event_v<Derived, ::reaktar::Disconnected<typename Base::ports::{{ port.port_name }}>>) {
-                        this->dirty_ports_.fetch_or(static_cast<typename Base::port_mask_t>(1) << {{ loop.index0 }}, std::memory_order_release);
+                    if constexpr (::reaktar::has_on_direct_event_v<Derived, ::reaktar::Connected<typename ActorBase::ports::{{ port.port_name }}>> ||
+                                  ::reaktar::has_on_direct_event_v<Derived, ::reaktar::Disconnected<typename ActorBase::ports::{{ port.port_name }}>>) {
+                        this->dirty_ports_.fetch_or(static_cast<typename ActorBase::port_mask_t>(1) << {{ loop.index0 }}, std::memory_order_release);
                     }
                 } else {
                     if (auto cur_h = this->{{ port.slot_name }}.get_handle(); cur_h.has_value() && *cur_h == handles[0]) {
@@ -261,9 +261,9 @@ private:
                             return; // Closed or generation shifted concurrently
                         }
                         this->{{ port.slot_name }}.publish(std::move(new_proxy), handles[0], teardown_hook);
-                        if constexpr (::reaktar::has_on_direct_event_v<Derived, ::reaktar::Connected<typename Base::ports::{{ port.port_name }}>> ||
-                                      ::reaktar::has_on_direct_event_v<Derived, ::reaktar::Disconnected<typename Base::ports::{{ port.port_name }}>>) {
-                            this->dirty_ports_.fetch_or(static_cast<typename Base::port_mask_t>(1) << {{ loop.index0 }}, std::memory_order_release);
+                        if constexpr (::reaktar::has_on_direct_event_v<Derived, ::reaktar::Connected<typename ActorBase::ports::{{ port.port_name }}>> ||
+                                      ::reaktar::has_on_direct_event_v<Derived, ::reaktar::Disconnected<typename ActorBase::ports::{{ port.port_name }}>>) {
+                            this->dirty_ports_.fetch_or(static_cast<typename ActorBase::port_mask_t>(1) << {{ loop.index0 }}, std::memory_order_release);
                         }
                     }
                     // Safe publication complete: now activate signal subscriptions with zero locks held!
@@ -320,9 +320,9 @@ private:
         if (this->{{ port.ident }}_offered_.load(std::memory_order_relaxed)) {
             this->{{ port.var_name }}.StopOfferService();
             this->{{ port.ident }}_offered_.store(false, std::memory_order_release);
-            if constexpr (::reaktar::has_on_direct_event_v<Derived, ::reaktar::Connected<typename Base::ports::{{ port.port_name }}>> ||
-                          ::reaktar::has_on_direct_event_v<Derived, ::reaktar::Disconnected<typename Base::ports::{{ port.port_name }}>>) {
-                this->dirty_ports_.fetch_or(static_cast<typename Base::port_mask_t>(1) << {{ loop.index0 }}, std::memory_order_release);
+            if constexpr (::reaktar::has_on_direct_event_v<Derived, ::reaktar::Connected<typename ActorBase::ports::{{ port.port_name }}>> ||
+                          ::reaktar::has_on_direct_event_v<Derived, ::reaktar::Disconnected<typename ActorBase::ports::{{ port.port_name }}>>) {
+                this->dirty_ports_.fetch_or(static_cast<typename ActorBase::port_mask_t>(1) << {{ loop.index0 }}, std::memory_order_release);
             }
         }
     }
@@ -339,9 +339,9 @@ private:
             handle_to_stop = this->{{ port.find_handle_name }};
             this->{{ port.find_handle_name }}.reset();
             this->{{ port.slot_name }}.reset();
-            if constexpr (::reaktar::has_on_direct_event_v<Derived, ::reaktar::Connected<typename Base::ports::{{ port.port_name }}>> ||
-                          ::reaktar::has_on_direct_event_v<Derived, ::reaktar::Disconnected<typename Base::ports::{{ port.port_name }}>>) {
-                this->dirty_ports_.fetch_or(static_cast<typename Base::port_mask_t>(1) << {{ loop.index0 }}, std::memory_order_release);
+            if constexpr (::reaktar::has_on_direct_event_v<Derived, ::reaktar::Connected<typename ActorBase::ports::{{ port.port_name }}>> ||
+                          ::reaktar::has_on_direct_event_v<Derived, ::reaktar::Disconnected<typename ActorBase::ports::{{ port.port_name }}>>) {
+                this->dirty_ports_.fetch_or(static_cast<typename ActorBase::port_mask_t>(1) << {{ loop.index0 }}, std::memory_order_release);
             }
         }
 
@@ -362,7 +362,7 @@ private:
 {% endif %}
 {% endfor %}
 {% for f in model.skeleton_setters %}
-        using {{ f.port_ident }}_{{ f.name }}_Port_ = typename Base::ports::{{ f.port_name }};
+        using {{ f.port_ident }}_{{ f.name }}_Port_ = typename ActorBase::ports::{{ f.port_name }};
         using {{ f.port_ident }}_{{ f.name }}_PortTag_ = typename {{ f.port_ident }}_{{ f.name }}_Port_::{{ f.name }};
 
         static constexpr bool kHas_on_{{ f.port_ident }}_{{ f.name }}_port_tag  = ::reaktar::has_on_setter_v<Derived, {{ f.port_ident }}_{{ f.name }}_PortTag_, {{ f.type }}>;
@@ -418,7 +418,7 @@ private:
         }
 {% else %}
         else if constexpr (kHas_on_{{ f.port_ident }}_{{ f.name }}_direct) {
-            static_assert(!sizeof(Derived*), "reaktar::on() collision: field type '{{ f.type }}' is shared across multiple field setters. You must specify the tag: on({{ f.tag }}, const {{ f.type }}& val) or port tag: on(typename Base::ports::{{ f.port_name }}::{{ f.name }}, const {{ f.type }}& val).");
+            static_assert(!sizeof(Derived*), "reaktar::on() collision: field type '{{ f.type }}' is shared across multiple field setters. You must specify the tag: on({{ f.tag }}, const {{ f.type }}& val) or port tag: on(typename ActorBase::ports::{{ f.port_name }}::{{ f.name }}, const {{ f.type }}& val).");
         }
 {% endif %}
 {% endfor %}
@@ -427,7 +427,7 @@ private:
     void check_handler_collisions() {
 {% for sig in model.inbound_signals_flat %}
         {
-            using Port_ = typename Base::ports::{{ sig.port_name }};
+            using Port_ = typename ActorBase::ports::{{ sig.port_name }};
             using PortTag_ = typename Port_::{{ sig.name }};
             using PortAny_ = typename Port_::Any;
             using SignalAny_ = typename {{ sig.tag }}::Any;
@@ -450,7 +450,7 @@ private:
             static_assert(!kHas_port_bare, "reaktar::on() collision: {{ sig.shared_type_label }} '{{ sig.type }}' is shared across multiple events/notifiers on port '{{ sig.port_name }}'. You must specify the {{ sig.port_tag_label }}: on(ports::{{ sig.port_name }}::{{ sig.name }}, const {{ sig.type }}& val) instead of on(ports::{{ sig.port_name }}, ...).");
 {% endif %}
 {% if not sig.is_unique %}
-            static_assert(!kHas_direct, "reaktar::on() collision: type '{{ sig.type }}' is shared across multiple incoming channels (events/fields). You must specify the tag: void on({{ sig.tag }}, const {{ sig.type }}& val) or port tag: void on(typename Base::ports::{{ sig.port_name }}::{{ sig.name }}, const {{ sig.type }}& val).");
+            static_assert(!kHas_direct, "reaktar::on() collision: type '{{ sig.type }}' is shared across multiple incoming channels (events/fields). You must specify the tag: void on({{ sig.tag }}, const {{ sig.type }}& val) or port tag: void on(typename ActorBase::ports::{{ sig.port_name }}::{{ sig.name }}, const {{ sig.type }}& val).");
 {% endif %}
             if constexpr (kHas_port_tag) {
                 static_assert(std::is_void_v<decltype(std::declval<Derived&>().on(std::declval<PortTag_>(), std::declval<const {{ sig.type }}&>()))>,
@@ -480,7 +480,7 @@ private:
 {% endfor %}
 {% for f in model.skeleton_setters %}
         {
-            using Port_ = typename Base::ports::{{ f.port_name }};
+            using Port_ = typename ActorBase::ports::{{ f.port_name }};
             using PortTag_ = typename Port_::{{ f.name }};
 
             constexpr bool kHas_on_port_tag  = ::reaktar::has_on_setter_v<Derived, PortTag_, {{ f.type }}>;
@@ -528,7 +528,7 @@ private:
             static_assert(!kHas_on_port_bare, "reaktar::on() collision: field type '{{ f.type }}' is shared across multiple field setters on port '{{ f.port_name }}'. You must specify the port field tag: on(ports::{{ f.port_name }}::{{ f.name }}, const {{ f.type }}& val) instead of on(ports::{{ f.port_name }}, ...).");
 {% endif %}
 {% if not f.is_unique_setter %}
-            static_assert(!kHas_on_direct, "reaktar::on() collision: field type '{{ f.type }}' is shared across multiple field setters or channels. You must specify the tag: on({{ f.tag }}, const {{ f.type }}& val) or port tag: on(typename Base::ports::{{ f.port_name }}::{{ f.name }}, const {{ f.type }}& val).");
+            static_assert(!kHas_on_direct, "reaktar::on() collision: field type '{{ f.type }}' is shared across multiple field setters or channels. You must specify the tag: on({{ f.tag }}, const {{ f.type }}& val) or port tag: on(typename ActorBase::ports::{{ f.port_name }}::{{ f.name }}, const {{ f.type }}& val).");
 {% endif %}
         }
 {% endfor %}
@@ -538,7 +538,7 @@ private:
     void bind_{{ proxy.ident }}_signals([[maybe_unused]] {{ proxy.cls }}& proxy) {
 {% for sig in proxy.inbound_signals %}
         // {{ sig.signal_label_cap }}: {{ sig.name }} ({{ sig.type }})
-        using {{ proxy.ident }}_{{ sig.name }}_Port_ = typename Base::ports::{{ proxy.port_name }};
+        using {{ proxy.ident }}_{{ sig.name }}_Port_ = typename ActorBase::ports::{{ proxy.port_name }};
         using {{ proxy.ident }}_{{ sig.name }}_PortTag_ = typename {{ proxy.ident }}_{{ sig.name }}_Port_::{{ sig.name }};
         using {{ proxy.ident }}_{{ sig.name }}_PortAny_ = typename {{ proxy.ident }}_{{ sig.name }}_Port_::Any;
         using {{ proxy.ident }}_{{ sig.name }}_SignalAny_ = typename {{ sig.tag }}::Any;
@@ -615,7 +615,7 @@ private:
         }
 {% else %}
         else if constexpr (kHas_{{ proxy.ident }}_{{ sig.name }}_direct) {
-            static_assert(!sizeof(Derived*), "reaktar::on() collision: type '{{ sig.type }}' is shared across multiple incoming channels (events/fields). You must specify the tag: void on({{ sig.tag }}, const {{ sig.type }}& val) or port tag: void on(typename Base::ports::{{ proxy.port_name }}::{{ sig.name }}, const {{ sig.type }}& val).");
+            static_assert(!sizeof(Derived*), "reaktar::on() collision: type '{{ sig.type }}' is shared across multiple incoming channels (events/fields). You must specify the tag: void on({{ sig.tag }}, const {{ sig.type }}& val) or port tag: void on(typename ActorBase::ports::{{ proxy.port_name }}::{{ sig.name }}, const {{ sig.type }}& val).");
         }
 {% endif %}
 {% endfor %}
@@ -623,7 +623,7 @@ private:
 
     void subscribe_{{ proxy.ident }}_signals([[maybe_unused]] {{ proxy.cls }}& proxy) {
 {% for sig in proxy.inbound_signals %}
-        using {{ proxy.ident }}_{{ sig.name }}_Port_ = typename Base::ports::{{ proxy.port_name }};
+        using {{ proxy.ident }}_{{ sig.name }}_Port_ = typename ActorBase::ports::{{ proxy.port_name }};
         using {{ proxy.ident }}_{{ sig.name }}_PortTag_ = typename {{ proxy.ident }}_{{ sig.name }}_Port_::{{ sig.name }};
         using {{ proxy.ident }}_{{ sig.name }}_PortAny_ = typename {{ proxy.ident }}_{{ sig.name }}_Port_::Any;
         using {{ proxy.ident }}_{{ sig.name }}_SignalAny_ = typename {{ sig.tag }}::Any;

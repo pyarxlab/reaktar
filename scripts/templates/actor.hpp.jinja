@@ -44,24 +44,25 @@ namespace generated {
 template <typename Derived, typename ExecutionPolicy = ::reaktar::DirectExecution>
 class {{ model.exe_name }}Actor : public {{ model.exe_name }}ActorBase {
 public:
-    using Base = {{ model.exe_name }}ActorBase;
-    using Base::ports;
+    using ActorBase = {{ model.exe_name }}ActorBase;
+    using ActorBase::ports;
+    using ActorBase::traits;
     using execution_policy_type = ExecutionPolicy;
 {% for proxy in model.consumed_proxies %}
-    using Base::get_{{ proxy.ident }}_proxy;
-    using Base::is_{{ proxy.ident }}_ready;
-    using Base::acquire_{{ proxy.ident }}_proxy;
-    using Base::get_{{ proxy.ident }}_handle;
+    using ActorBase::get_{{ proxy.ident }}_proxy;
+    using ActorBase::is_{{ proxy.ident }}_ready;
+    using ActorBase::acquire_{{ proxy.ident }}_proxy;
+    using ActorBase::get_{{ proxy.ident }}_handle;
 {% if proxy.is_unique_service and proxy.service_ident != proxy.ident %}
-    using Base::get_{{ proxy.service_ident }}_proxy;
-    using Base::is_{{ proxy.service_ident }}_ready;
-    using Base::acquire_{{ proxy.service_ident }}_proxy;
-    using Base::get_{{ proxy.service_ident }}_handle;
+    using ActorBase::get_{{ proxy.service_ident }}_proxy;
+    using ActorBase::is_{{ proxy.service_ident }}_ready;
+    using ActorBase::acquire_{{ proxy.service_ident }}_proxy;
+    using ActorBase::get_{{ proxy.service_ident }}_handle;
 {% endif %}
 {% endfor %}
-    using Base::get_proxy;
-    using Base::is_port_ready;
-    using Base::acquire_proxy;
+    using ActorBase::get_proxy;
+    using ActorBase::is_port_ready;
+    using ActorBase::acquire_proxy;
 
     ExecutionPolicy& execution_policy() noexcept { return execution_policy_; }
     const ExecutionPolicy& execution_policy() const noexcept { return execution_policy_; }
