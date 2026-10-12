@@ -155,6 +155,27 @@ public:
 
     // Field Notification Injectors
 
+    // Field value setters for mock skeleton fields (getter/setter/notifier)
+    template <typename PortTag, typename ItemTag, typename Val>
+    void set_field([[maybe_unused]] const Val& val) {
+        static_assert(!sizeof(PortTag*), "reaktar: Unknown port/field tag for set_field (no proxy fields available)");
+    }
+
+    template <typename Tag, typename Val>
+    void set_field([[maybe_unused]] const Val& val) {
+        static_assert(!sizeof(Tag*), "reaktar: Unknown field tag for set_field (no proxy fields available)");
+    }
+
+    template <typename Tag, typename Val>
+    void set_field(Tag, const Val& val) {
+        set_field<Tag>(val);
+    }
+
+    template <typename PortTag, typename ItemTag, typename Val>
+    void set_field(PortTag, ItemTag, const Val& val) {
+        set_field<PortTag, ItemTag>(val);
+    }
+
     // Mock RPC calls on required client proxies
     template <typename Tag, typename Func>
     void mock_rpc([[maybe_unused]] Func&& handler) {

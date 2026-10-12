@@ -16,7 +16,10 @@
         void {{ m.name }}({% for a in m.in_args %}{{ a.pass_type }} {{ a.name }}{{ ", " if not loop.last else "" }}{% endfor %}) override {
             using Port_ = typename Base::ports::{{ skel.port_name }};
             using PortMethodTag_ = typename Port_::{{ m.name }};
+            using PortAny_ = typename Port_::Any;
             using MethodTag = {{ m.tag }};
+            using MethodAny_ = typename {{ m.tag }}::Any;
+            using GlobalAny_ = ::reaktar::Any;
 
             static constexpr bool kHas_port_tag =
                 has_method_handler_v<Derived, PortMethodTag_{% for a in m.in_args %}, {{ a.pass_type }}{% endfor %}> ||
@@ -24,79 +27,78 @@
             static constexpr bool kHas_port_bare =
                 has_method_handler_v<Derived, Port_{% for a in m.in_args %}, {{ a.pass_type }}{% endfor %}> ||
                 has_method_handler_v<Derived, Port_{% for a in m.in_args %}, {{ a.type }}{% endfor %}>;
+            static constexpr bool kHas_port_any =
+                has_method_handler_v<Derived, PortAny_{% for a in m.in_args %}, {{ a.pass_type }}{% endfor %}> ||
+                has_method_handler_v<Derived, PortAny_{% for a in m.in_args %}, {{ a.type }}{% endfor %}>;
+            static constexpr bool kHas_method_any =
+                has_method_handler_v<Derived, MethodAny_{% for a in m.in_args %}, {{ a.pass_type }}{% endfor %}> ||
+                has_method_handler_v<Derived, MethodAny_{% for a in m.in_args %}, {{ a.type }}{% endfor %}>;
             static constexpr bool kHas_tagged =
                 has_method_handler_v<Derived, MethodTag{% for a in m.in_args %}, {{ a.pass_type }}{% endfor %}> ||
                 has_method_handler_v<Derived, MethodTag{% for a in m.in_args %}, {{ a.type }}{% endfor %}>;
             static constexpr bool kHas_direct =
                 has_direct_method_handler_v<Derived{% for a in m.in_args %}, {{ a.pass_type }}{% endfor %}> ||
                 has_direct_method_handler_v<Derived{% for a in m.in_args %}, {{ a.type }}{% endfor %}>;
+            static constexpr bool kHas_global_any =
+                has_method_handler_v<Derived, GlobalAny_{% for a in m.in_args %}, {{ a.pass_type }}{% endfor %}> ||
+                has_method_handler_v<Derived, GlobalAny_{% for a in m.in_args %}, {{ a.type }}{% endfor %}>;
 
             static_assert(
-                (int(kHas_port_tag) + int(kHas_port_bare) + int(kHas_tagged) + int(kHas_direct)) <= 1,
+                (int(kHas_port_tag) + int(kHas_port_bare) + int(kHas_port_any) + int(kHas_method_any) + int(kHas_tagged) + int(kHas_direct) + int(kHas_global_any)) <= 1,
                 "reaktar: Multiple conflicting on(...) RPC handlers declared for method '{{ m.name }}' on port '{{ skel.port_name }}'! "
-                "You must define only one: on(ports::{{ skel.port_name }}::{{ m.name }}, ...), on({{ m.tag }}, ...), on(ports::{{ skel.port_name }}, ...), or on(...)."
+                "You must define only one: on(ports::{{ skel.port_name }}::{{ m.name }}, ...), on({{ m.tag }}, ...), on(ports::{{ skel.port_name }}::Any, ...), on({{ m.tag }}::Any, ...), on(reaktar::Any, ...), on(ports::{{ skel.port_name }}, ...), or on(...)."
             );
+{% if not m.is_unique_across_ports %}
+            static_assert(!kHas_tagged, "reaktar::on() collision: RPC method '{{ m.name }}' is provided by multiple ports ({{ m.port_count }} ports). You cannot use bare on({{ m.tag }}, ...); you must specify the port via on(ports::{{ skel.port_name }}::{{ m.name }}, ...) or use explicit fan-in on({{ m.tag }}::Any, ...).");
+{% endif %}
 
-            if constexpr (kHas_port_tag) {
+            auto dispatch = [&](auto&& fn) {
+                using HandlerRet = decltype(fn());
+                static_assert(std::is_void_v<HandlerRet>,
+                    "reaktar::on() error: Fire-and-forget method handler for '{{ m.name }}' must return void!");
                 if constexpr (std::is_same_v<ExecutionPolicy, ::reaktar::DirectExecution>) {
-                    actor_->self().on(PortMethodTag_{}{% for a in m.in_args %}, {{ a.name }}{% endfor %});
+                    fn();
                 } else if constexpr (std::is_same_v<ExecutionPolicy, ::reaktar::SynchronizedExecution>) {
                     std::lock_guard<std::mutex> lock(actor_->execution_policy_.mutex());
-                    actor_->self().on(PortMethodTag_{}{% for a in m.in_args %}, {{ a.name }}{% endfor %});
+                    fn();
                 } else {
-                    actor_->execution_policy_.execute([&] {
-                        actor_->self().on(PortMethodTag_{}{% for a in m.in_args %}, {{ a.name }}{% endfor %});
-                    });
+                    actor_->execution_policy_.execute(fn);
                 }
+            };
+
+            if constexpr (kHas_port_tag) {
+                dispatch([&] { actor_->self().on(PortMethodTag_{}{% for a in m.in_args %}, {{ a.name }}{% endfor %}); });
             }
 {% if m.is_unique_sig_on_port %}
             else if constexpr (kHas_port_bare) {
-                if constexpr (std::is_same_v<ExecutionPolicy, ::reaktar::DirectExecution>) {
-                    actor_->self().on(Port_{}{% for a in m.in_args %}, {{ a.name }}{% endfor %});
-                } else if constexpr (std::is_same_v<ExecutionPolicy, ::reaktar::SynchronizedExecution>) {
-                    std::lock_guard<std::mutex> lock(actor_->execution_policy_.mutex());
-                    actor_->self().on(Port_{}{% for a in m.in_args %}, {{ a.name }}{% endfor %});
-                } else {
-                    actor_->execution_policy_.execute([&] {
-                        actor_->self().on(Port_{}{% for a in m.in_args %}, {{ a.name }}{% endfor %});
-                    });
-                }
+                dispatch([&] { actor_->self().on(Port_{}{% for a in m.in_args %}, {{ a.name }}{% endfor %}); });
             }
 {% else %}
             else if constexpr (kHas_port_bare) {
                 static_assert(!sizeof(Derived*), "reaktar::on() collision: RPC method argument signature is shared across multiple methods on port '{{ skel.port_name }}'. You must specify the method tag: on(ports::{{ skel.port_name }}::{{ m.name }}, ...) instead of on(ports::{{ skel.port_name }}, ...).");
             }
 {% endif %}
+            else if constexpr (kHas_port_any) {
+                dispatch([&] { actor_->self().on(PortAny_{}{% for a in m.in_args %}, {{ a.name }}{% endfor %}); });
+            }
+            else if constexpr (kHas_method_any) {
+                dispatch([&] { actor_->self().on(MethodAny_{}{% for a in m.in_args %}, {{ a.name }}{% endfor %}); });
+            }
             else if constexpr (kHas_tagged) {
-                if constexpr (std::is_same_v<ExecutionPolicy, ::reaktar::DirectExecution>) {
-                    actor_->self().on(MethodTag{}{% for a in m.in_args %}, {{ a.name }}{% endfor %});
-                } else if constexpr (std::is_same_v<ExecutionPolicy, ::reaktar::SynchronizedExecution>) {
-                    std::lock_guard<std::mutex> lock(actor_->execution_policy_.mutex());
-                    actor_->self().on(MethodTag{}{% for a in m.in_args %}, {{ a.name }}{% endfor %});
-                } else {
-                    actor_->execution_policy_.execute([&] {
-                        actor_->self().on(MethodTag{}{% for a in m.in_args %}, {{ a.name }}{% endfor %});
-                    });
-                }
+                dispatch([&] { actor_->self().on(MethodTag{}{% for a in m.in_args %}, {{ a.name }}{% endfor %}); });
             }
 {% if m.is_unique_sig %}
             else if constexpr (kHas_direct) {
-                if constexpr (std::is_same_v<ExecutionPolicy, ::reaktar::DirectExecution>) {
-                    actor_->self().on({% for a in m.in_args %}{{ a.name }}{{ ", " if not loop.last else "" }}{% endfor %});
-                } else if constexpr (std::is_same_v<ExecutionPolicy, ::reaktar::SynchronizedExecution>) {
-                    std::lock_guard<std::mutex> lock(actor_->execution_policy_.mutex());
-                    actor_->self().on({% for a in m.in_args %}{{ a.name }}{{ ", " if not loop.last else "" }}{% endfor %});
-                } else {
-                    actor_->execution_policy_.execute([&] {
-                        actor_->self().on({% for a in m.in_args %}{{ a.name }}{{ ", " if not loop.last else "" }}{% endfor %});
-                    });
-                }
+                dispatch([&] { actor_->self().on({% for a in m.in_args %}{{ a.name }}{{ ", " if not loop.last else "" }}{% endfor %}); });
             }
 {% else %}
             else if constexpr (kHas_direct) {
                 static_assert(!sizeof(Derived*), "reaktar::on() collision: RPC method argument signature is shared across multiple methods. You must specify the method tag: on(MethodTag, ...) or port tag: on(typename Base::ports::{{ skel.port_name }}::{{ m.name }}, ...).");
             }
 {% endif %}
+            else if constexpr (kHas_global_any) {
+                dispatch([&] { actor_->self().on(GlobalAny_{}{% for a in m.in_args %}, {{ a.name }}{% endfor %}); });
+            }
             else {
                 // Unhandled fire-and-forget method
             }
@@ -107,7 +109,10 @@
         {{ m.name }}RetType {{ m.name }}({% for a in m.in_args %}{{ a.pass_type }} {{ a.name }}{{ ", " if not loop.last else "" }}{% endfor %}) override {
             using Port_ = typename Base::ports::{{ skel.port_name }};
             using PortMethodTag_ = typename Port_::{{ m.name }};
+            using PortAny_ = typename Port_::Any;
             using MethodTag = {{ m.tag }};
+            using MethodAny_ = typename {{ m.tag }}::Any;
+            using GlobalAny_ = ::reaktar::Any;
 
             static constexpr bool kHas_port_tag =
                 has_method_handler_v<Derived, PortMethodTag_{% for a in m.in_args %}, {{ a.pass_type }}{% endfor %}> ||
@@ -115,163 +120,84 @@
             static constexpr bool kHas_port_bare =
                 has_method_handler_v<Derived, Port_{% for a in m.in_args %}, {{ a.pass_type }}{% endfor %}> ||
                 has_method_handler_v<Derived, Port_{% for a in m.in_args %}, {{ a.type }}{% endfor %}>;
+            static constexpr bool kHas_port_any =
+                has_method_handler_v<Derived, PortAny_{% for a in m.in_args %}, {{ a.pass_type }}{% endfor %}> ||
+                has_method_handler_v<Derived, PortAny_{% for a in m.in_args %}, {{ a.type }}{% endfor %}>;
+            static constexpr bool kHas_method_any =
+                has_method_handler_v<Derived, MethodAny_{% for a in m.in_args %}, {{ a.pass_type }}{% endfor %}> ||
+                has_method_handler_v<Derived, MethodAny_{% for a in m.in_args %}, {{ a.type }}{% endfor %}>;
             static constexpr bool kHas_tagged =
                 has_method_handler_v<Derived, MethodTag{% for a in m.in_args %}, {{ a.pass_type }}{% endfor %}> ||
                 has_method_handler_v<Derived, MethodTag{% for a in m.in_args %}, {{ a.type }}{% endfor %}>;
             static constexpr bool kHas_direct =
                 has_direct_method_handler_v<Derived{% for a in m.in_args %}, {{ a.pass_type }}{% endfor %}> ||
                 has_direct_method_handler_v<Derived{% for a in m.in_args %}, {{ a.type }}{% endfor %}>;
+            static constexpr bool kHas_global_any =
+                has_method_handler_v<Derived, GlobalAny_{% for a in m.in_args %}, {{ a.pass_type }}{% endfor %}> ||
+                has_method_handler_v<Derived, GlobalAny_{% for a in m.in_args %}, {{ a.type }}{% endfor %}>;
 
             static_assert(
-                (int(kHas_port_tag) + int(kHas_port_bare) + int(kHas_tagged) + int(kHas_direct)) <= 1,
+                (int(kHas_port_tag) + int(kHas_port_bare) + int(kHas_port_any) + int(kHas_method_any) + int(kHas_tagged) + int(kHas_direct) + int(kHas_global_any)) <= 1,
                 "reaktar: Multiple conflicting on(...) RPC handlers declared for method '{{ m.name }}' on port '{{ skel.port_name }}'! "
-                "You must define only one: on(ports::{{ skel.port_name }}::{{ m.name }}, ...), on({{ m.tag }}, ...), on(ports::{{ skel.port_name }}, ...), or on(...)."
+                "You must define only one: on(ports::{{ skel.port_name }}::{{ m.name }}, ...), on({{ m.tag }}, ...), on(ports::{{ skel.port_name }}::Any, ...), on({{ m.tag }}::Any, ...), on(reaktar::Any, ...), on(ports::{{ skel.port_name }}, ...), or on(...)."
             );
+{% if not m.is_unique_across_ports %}
+            static_assert(!kHas_tagged, "reaktar::on() collision: RPC method '{{ m.name }}' is provided by multiple ports ({{ m.port_count }} ports). You cannot use bare on({{ m.tag }}, ...); you must specify the port via on(ports::{{ skel.port_name }}::{{ m.name }}, ...) or use explicit fan-in on({{ m.tag }}::Any, ...).");
+{% endif %}
 
-            if constexpr (kHas_port_tag) {
-                if constexpr (std::is_same_v<ExecutionPolicy, ::reaktar::DirectExecution>) {
-                    if constexpr (std::is_void_v<decltype(actor_->self().on(PortMethodTag_{}{% for a in m.in_args %}, {{ a.name }}{% endfor %}))>) {
-                        actor_->self().on(PortMethodTag_{}{% for a in m.in_args %}, {{ a.name }}{% endfor %});
-                        return result_adapter<{{ m.name }}RetType, void>::adapt();
+            auto dispatch = [&](auto&& invoke_fn) -> {{ m.name }}RetType {
+                using HandlerRet = decltype(invoke_fn());
+                static_assert(!std::is_void_v<HandlerRet>,
+                    "reaktar::on() error: RPC method handler for '{{ m.name }}' must return a non-void value (or Future/Result), but returns void!");
+                if constexpr (!std::is_void_v<HandlerRet>) {
+                    if constexpr (std::is_same_v<ExecutionPolicy, ::reaktar::DirectExecution>) {
+                        return result_adapter<{{ m.name }}RetType, HandlerRet>::adapt(invoke_fn());
+                    } else if constexpr (std::is_same_v<ExecutionPolicy, ::reaktar::SynchronizedExecution>) {
+                        std::lock_guard<std::mutex> lock(actor_->execution_policy_.mutex());
+                        return result_adapter<{{ m.name }}RetType, HandlerRet>::adapt(invoke_fn());
                     } else {
-                        return result_adapter<{{ m.name }}RetType, decltype(actor_->self().on(PortMethodTag_{}{% for a in m.in_args %}, {{ a.name }}{% endfor %}))>::adapt(
-                            actor_->self().on(PortMethodTag_{}{% for a in m.in_args %}, {{ a.name }}{% endfor %})
-                        );
-                    }
-                } else if constexpr (std::is_same_v<ExecutionPolicy, ::reaktar::SynchronizedExecution>) {
-                    std::lock_guard<std::mutex> lock(actor_->execution_policy_.mutex());
-                    if constexpr (std::is_void_v<decltype(actor_->self().on(PortMethodTag_{}{% for a in m.in_args %}, {{ a.name }}{% endfor %}))>) {
-                        actor_->self().on(PortMethodTag_{}{% for a in m.in_args %}, {{ a.name }}{% endfor %});
-                        return result_adapter<{{ m.name }}RetType, void>::adapt();
-                    } else {
-                        return result_adapter<{{ m.name }}RetType, decltype(actor_->self().on(PortMethodTag_{}{% for a in m.in_args %}, {{ a.name }}{% endfor %}))>::adapt(
-                            actor_->self().on(PortMethodTag_{}{% for a in m.in_args %}, {{ a.name }}{% endfor %})
-                        );
+                        return actor_->execution_policy_.execute([&]() -> {{ m.name }}RetType {
+                            return result_adapter<{{ m.name }}RetType, HandlerRet>::adapt(invoke_fn());
+                        });
                     }
                 } else {
-                    return actor_->execution_policy_.execute([&]() -> {{ m.name }}RetType {
-                        if constexpr (std::is_void_v<decltype(actor_->self().on(PortMethodTag_{}{% for a in m.in_args %}, {{ a.name }}{% endfor %}))>) {
-                            actor_->self().on(PortMethodTag_{}{% for a in m.in_args %}, {{ a.name }}{% endfor %});
-                            return result_adapter<{{ m.name }}RetType, void>::adapt();
-                        } else {
-                            return result_adapter<{{ m.name }}RetType, decltype(actor_->self().on(PortMethodTag_{}{% for a in m.in_args %}, {{ a.name }}{% endfor %}))>::adapt(
-                                actor_->self().on(PortMethodTag_{}{% for a in m.in_args %}, {{ a.name }}{% endfor %})
-                            );
-                        }
-                    });
+                    return result_adapter<{{ m.name }}RetType, void>::adapt();
                 }
+            };
+
+            if constexpr (kHas_port_tag) {
+                return dispatch([&] { return actor_->self().on(PortMethodTag_{}{% for a in m.in_args %}, {{ a.name }}{% endfor %}); });
             }
 {% if m.is_unique_sig_on_port %}
             else if constexpr (kHas_port_bare) {
-                if constexpr (std::is_same_v<ExecutionPolicy, ::reaktar::DirectExecution>) {
-                    if constexpr (std::is_void_v<decltype(actor_->self().on(Port_{}{% for a in m.in_args %}, {{ a.name }}{% endfor %}))>) {
-                        actor_->self().on(Port_{}{% for a in m.in_args %}, {{ a.name }}{% endfor %});
-                        return result_adapter<{{ m.name }}RetType, void>::adapt();
-                    } else {
-                        return result_adapter<{{ m.name }}RetType, decltype(actor_->self().on(Port_{}{% for a in m.in_args %}, {{ a.name }}{% endfor %}))>::adapt(
-                            actor_->self().on(Port_{}{% for a in m.in_args %}, {{ a.name }}{% endfor %})
-                        );
-                    }
-                } else if constexpr (std::is_same_v<ExecutionPolicy, ::reaktar::SynchronizedExecution>) {
-                    std::lock_guard<std::mutex> lock(actor_->execution_policy_.mutex());
-                    if constexpr (std::is_void_v<decltype(actor_->self().on(Port_{}{% for a in m.in_args %}, {{ a.name }}{% endfor %}))>) {
-                        actor_->self().on(Port_{}{% for a in m.in_args %}, {{ a.name }}{% endfor %});
-                        return result_adapter<{{ m.name }}RetType, void>::adapt();
-                    } else {
-                        return result_adapter<{{ m.name }}RetType, decltype(actor_->self().on(Port_{}{% for a in m.in_args %}, {{ a.name }}{% endfor %}))>::adapt(
-                            actor_->self().on(Port_{}{% for a in m.in_args %}, {{ a.name }}{% endfor %})
-                        );
-                    }
-                } else {
-                    return actor_->execution_policy_.execute([&]() -> {{ m.name }}RetType {
-                        if constexpr (std::is_void_v<decltype(actor_->self().on(Port_{}{% for a in m.in_args %}, {{ a.name }}{% endfor %}))>) {
-                            actor_->self().on(Port_{}{% for a in m.in_args %}, {{ a.name }}{% endfor %});
-                            return result_adapter<{{ m.name }}RetType, void>::adapt();
-                        } else {
-                            return result_adapter<{{ m.name }}RetType, decltype(actor_->self().on(Port_{}{% for a in m.in_args %}, {{ a.name }}{% endfor %}))>::adapt(
-                                actor_->self().on(Port_{}{% for a in m.in_args %}, {{ a.name }}{% endfor %})
-                            );
-                        }
-                    });
-                }
+                return dispatch([&] { return actor_->self().on(Port_{}{% for a in m.in_args %}, {{ a.name }}{% endfor %}); });
             }
 {% else %}
             else if constexpr (kHas_port_bare) {
                 static_assert(!sizeof(Derived*), "reaktar::on() collision: RPC method argument signature is shared across multiple methods on port '{{ skel.port_name }}'. You must specify the method tag: on(ports::{{ skel.port_name }}::{{ m.name }}, ...) instead of on(ports::{{ skel.port_name }}, ...).");
             }
 {% endif %}
+            else if constexpr (kHas_port_any) {
+                return dispatch([&] { return actor_->self().on(PortAny_{}{% for a in m.in_args %}, {{ a.name }}{% endfor %}); });
+            }
+            else if constexpr (kHas_method_any) {
+                return dispatch([&] { return actor_->self().on(MethodAny_{}{% for a in m.in_args %}, {{ a.name }}{% endfor %}); });
+            }
             else if constexpr (kHas_tagged) {
-                if constexpr (std::is_same_v<ExecutionPolicy, ::reaktar::DirectExecution>) {
-                    if constexpr (std::is_void_v<decltype(actor_->self().on(MethodTag{}{% for a in m.in_args %}, {{ a.name }}{% endfor %}))>) {
-                        actor_->self().on(MethodTag{}{% for a in m.in_args %}, {{ a.name }}{% endfor %});
-                        return result_adapter<{{ m.name }}RetType, void>::adapt();
-                    } else {
-                        return result_adapter<{{ m.name }}RetType, decltype(actor_->self().on(MethodTag{}{% for a in m.in_args %}, {{ a.name }}{% endfor %}))>::adapt(
-                            actor_->self().on(MethodTag{}{% for a in m.in_args %}, {{ a.name }}{% endfor %})
-                        );
-                    }
-                } else if constexpr (std::is_same_v<ExecutionPolicy, ::reaktar::SynchronizedExecution>) {
-                    std::lock_guard<std::mutex> lock(actor_->execution_policy_.mutex());
-                    if constexpr (std::is_void_v<decltype(actor_->self().on(MethodTag{}{% for a in m.in_args %}, {{ a.name }}{% endfor %}))>) {
-                        actor_->self().on(MethodTag{}{% for a in m.in_args %}, {{ a.name }}{% endfor %});
-                        return result_adapter<{{ m.name }}RetType, void>::adapt();
-                    } else {
-                        return result_adapter<{{ m.name }}RetType, decltype(actor_->self().on(MethodTag{}{% for a in m.in_args %}, {{ a.name }}{% endfor %}))>::adapt(
-                            actor_->self().on(MethodTag{}{% for a in m.in_args %}, {{ a.name }}{% endfor %})
-                        );
-                    }
-                } else {
-                    return actor_->execution_policy_.execute([&]() -> {{ m.name }}RetType {
-                        if constexpr (std::is_void_v<decltype(actor_->self().on(MethodTag{}{% for a in m.in_args %}, {{ a.name }}{% endfor %}))>) {
-                            actor_->self().on(MethodTag{}{% for a in m.in_args %}, {{ a.name }}{% endfor %});
-                            return result_adapter<{{ m.name }}RetType, void>::adapt();
-                        } else {
-                            return result_adapter<{{ m.name }}RetType, decltype(actor_->self().on(MethodTag{}{% for a in m.in_args %}, {{ a.name }}{% endfor %}))>::adapt(
-                                actor_->self().on(MethodTag{}{% for a in m.in_args %}, {{ a.name }}{% endfor %})
-                            );
-                        }
-                    });
-                }
+                return dispatch([&] { return actor_->self().on(MethodTag{}{% for a in m.in_args %}, {{ a.name }}{% endfor %}); });
             }
 {% if m.is_unique_sig %}
             else if constexpr (kHas_direct) {
-                if constexpr (std::is_same_v<ExecutionPolicy, ::reaktar::DirectExecution>) {
-                    if constexpr (std::is_void_v<decltype(actor_->self().on({% for a in m.in_args %}{{ a.name }}{{ ", " if not loop.last else "" }}{% endfor %}))>) {
-                        actor_->self().on({% for a in m.in_args %}{{ a.name }}{{ ", " if not loop.last else "" }}{% endfor %});
-                        return result_adapter<{{ m.name }}RetType, void>::adapt();
-                    } else {
-                        return result_adapter<{{ m.name }}RetType, decltype(actor_->self().on({% for a in m.in_args %}{{ a.name }}{{ ", " if not loop.last else "" }}{% endfor %}))>::adapt(
-                            actor_->self().on({% for a in m.in_args %}{{ a.name }}{{ ", " if not loop.last else "" }}{% endfor %})
-                        );
-                    }
-                } else if constexpr (std::is_same_v<ExecutionPolicy, ::reaktar::SynchronizedExecution>) {
-                    std::lock_guard<std::mutex> lock(actor_->execution_policy_.mutex());
-                    if constexpr (std::is_void_v<decltype(actor_->self().on({% for a in m.in_args %}{{ a.name }}{{ ", " if not loop.last else "" }}{% endfor %}))>) {
-                        actor_->self().on({% for a in m.in_args %}{{ a.name }}{{ ", " if not loop.last else "" }}{% endfor %});
-                        return result_adapter<{{ m.name }}RetType, void>::adapt();
-                    } else {
-                        return result_adapter<{{ m.name }}RetType, decltype(actor_->self().on({% for a in m.in_args %}{{ a.name }}{{ ", " if not loop.last else "" }}{% endfor %}))>::adapt(
-                            actor_->self().on({% for a in m.in_args %}{{ a.name }}{{ ", " if not loop.last else "" }}{% endfor %})
-                        );
-                    }
-                } else {
-                    return actor_->execution_policy_.execute([&]() -> {{ m.name }}RetType {
-                        if constexpr (std::is_void_v<decltype(actor_->self().on({% for a in m.in_args %}{{ a.name }}{{ ", " if not loop.last else "" }}{% endfor %}))>) {
-                            actor_->self().on({% for a in m.in_args %}{{ a.name }}{{ ", " if not loop.last else "" }}{% endfor %});
-                            return result_adapter<{{ m.name }}RetType, void>::adapt();
-                        } else {
-                            return result_adapter<{{ m.name }}RetType, decltype(actor_->self().on({% for a in m.in_args %}{{ a.name }}{{ ", " if not loop.last else "" }}{% endfor %}))>::adapt(
-                                actor_->self().on({% for a in m.in_args %}{{ a.name }}{{ ", " if not loop.last else "" }}{% endfor %})
-                            );
-                        }
-                    });
-                }
+                return dispatch([&] { return actor_->self().on({% for a in m.in_args %}{{ a.name }}{{ ", " if not loop.last else "" }}{% endfor %}); });
             }
 {% else %}
             else if constexpr (kHas_direct) {
                 static_assert(!sizeof(Derived*), "reaktar::on() collision: RPC method argument signature is shared across multiple methods. You must specify the method tag: on(MethodTag, ...) or port tag: on(typename Base::ports::{{ skel.port_name }}::{{ m.name }}, ...).");
             }
 {% endif %}
+            else if constexpr (kHas_global_any) {
+                return dispatch([&] { return actor_->self().on(GlobalAny_{}{% for a in m.in_args %}, {{ a.name }}{% endfor %}); });
+            }
             else {
                 return result_adapter<{{ m.name }}RetType, void>::adapt();
             }

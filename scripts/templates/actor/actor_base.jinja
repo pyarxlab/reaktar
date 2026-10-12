@@ -18,10 +18,13 @@ public:
 {% endif %}
 {% endfor %}
 
+    using Any = ::reaktar::Any;
+
     // ------------------------------------------------------------------------
     // Generated AUTOSAR Port Tags
     // ------------------------------------------------------------------------
     struct ports {
+        using Any = ::reaktar::Any;
 {% for port in model.ports %}
         struct {{ port.port_name }} : public {{ port.kind_tag }} {
             static constexpr std::string_view name = "{{ port.port_name }}";
@@ -29,6 +32,10 @@ public:
             using port_tag = {{ port.port_name }};
             using kind_type = {{ port.kind_tag }};
 
+            struct Any {
+                using port_type = {{ port.port_name }};
+                static constexpr std::string_view port_name = "{{ port.port_name }}";
+            };
 {% for ev in port.events %}
             struct {{ ev.name }} {
                 using port_type = {{ port.port_name }};

@@ -188,6 +188,7 @@ public:
         if constexpr (
             std::is_same_v<Tag, typename App::ports::FrontPowertrain::BatteryModuleStatus>
             || (std::is_same_v<Tag, typename App::ports::FrontPowertrain> && std::is_convertible_v<Val, ara::core::Array<vehicle_data::BatteryCell, 4>>)
+            || (std::is_same_v<Tag, typename App::ports::FrontPowertrain::Any> && std::is_convertible_v<Val, ara::core::Array<vehicle_data::BatteryCell, 4>>)
         ) {
             if (auto lease = app_.acquire_frontpowertrain_proxy()) {
                 lease->BatteryModuleStatus.OnDataArrived(
@@ -198,6 +199,7 @@ public:
         else if constexpr (
             std::is_same_v<Tag, typename App::ports::FrontPowertrain::CabinSensors>
             || (std::is_same_v<Tag, typename App::ports::FrontPowertrain> && std::is_convertible_v<Val, vehicle_data::CabinSensorData>)
+            || (std::is_same_v<Tag, typename App::ports::FrontPowertrain::Any> && std::is_convertible_v<Val, vehicle_data::CabinSensorData>)
         ) {
             if (auto lease = app_.acquire_frontpowertrain_proxy()) {
                 lease->CabinSensors.OnDataArrived(
@@ -208,6 +210,7 @@ public:
         else if constexpr (
             std::is_same_v<Tag, typename App::ports::FrontPowertrain::SpeedHistory>
             || (std::is_same_v<Tag, typename App::ports::FrontPowertrain> && std::is_convertible_v<Val, ara::core::Vector<float>>)
+            || (std::is_same_v<Tag, typename App::ports::FrontPowertrain::Any> && std::is_convertible_v<Val, ara::core::Vector<float>>)
         ) {
             if (auto lease = app_.acquire_frontpowertrain_proxy()) {
                 lease->SpeedHistory.OnDataArrived(
@@ -218,6 +221,7 @@ public:
         else if constexpr (
             std::is_same_v<Tag, typename App::ports::FrontPowertrain::VehicleSpeed>
             || (std::is_same_v<Tag, typename App::ports::FrontPowertrain> && std::is_convertible_v<Val, vehicle_data::SpeedData>)
+            || (std::is_same_v<Tag, typename App::ports::FrontPowertrain::Any> && std::is_convertible_v<Val, vehicle_data::SpeedData>)
         ) {
             if (auto lease = app_.acquire_frontpowertrain_proxy()) {
                 lease->VehicleSpeed.OnDataArrived(
@@ -228,6 +232,7 @@ public:
         else if constexpr (
             std::is_same_v<Tag, typename App::ports::FrontPowertrain::WheelSpeeds>
             || (std::is_same_v<Tag, typename App::ports::FrontPowertrain> && std::is_convertible_v<Val, ara::core::Array<float, 4>>)
+            || (std::is_same_v<Tag, typename App::ports::FrontPowertrain::Any> && std::is_convertible_v<Val, ara::core::Array<float, 4>>)
         ) {
             if (auto lease = app_.acquire_frontpowertrain_proxy()) {
                 lease->WheelSpeeds.OnDataArrived(
@@ -238,30 +243,35 @@ public:
         else if constexpr (
             std::is_same_v<Tag, typename App::ports::PrimaryBody::OutsideAirQuality>
             || (std::is_same_v<Tag, typename App::ports::PrimaryBody> && std::is_convertible_v<Val, uint32_t>)
+            || (std::is_same_v<Tag, typename App::ports::PrimaryBody::Any> && std::is_convertible_v<Val, uint32_t>)
         ) {
             mock_primarybody_OutsideAirQuality_.Update(val);
         }
         else if constexpr (
             std::is_same_v<Tag, typename App::ports::PrimaryBody::RainSensorLevel>
             || (std::is_same_v<Tag, typename App::ports::PrimaryBody> && std::is_convertible_v<Val, uint32_t>)
+            || (std::is_same_v<Tag, typename App::ports::PrimaryBody::Any> && std::is_convertible_v<Val, uint32_t>)
         ) {
             mock_primarybody_RainSensorLevel_.Update(val);
         }
         else if constexpr (
             std::is_same_v<Tag, typename App::ports::PrimaryBody::TargetCabinTemperature>
             || (std::is_same_v<Tag, typename App::ports::PrimaryBody> && std::is_convertible_v<Val, float>)
+            || (std::is_same_v<Tag, typename App::ports::PrimaryBody::Any> && std::is_convertible_v<Val, float>)
         ) {
             mock_primarybody_TargetCabinTemperature_.Update(val);
         }
         else if constexpr (
             std::is_same_v<Tag, typename App::ports::PrimaryBody::WindowPosition>
             || (std::is_same_v<Tag, typename App::ports::PrimaryBody> && std::is_convertible_v<Val, uint32_t>)
+            || (std::is_same_v<Tag, typename App::ports::PrimaryBody::Any> && std::is_convertible_v<Val, uint32_t>)
         ) {
             mock_primarybody_WindowPosition_.Update(val);
         }
         else if constexpr (
             std::is_same_v<Tag, typename App::ports::RearPowertrain::BatteryModuleStatus>
             || (std::is_same_v<Tag, typename App::ports::RearPowertrain> && std::is_convertible_v<Val, ara::core::Array<vehicle_data::BatteryCell, 4>>)
+            || (std::is_same_v<Tag, typename App::ports::RearPowertrain::Any> && std::is_convertible_v<Val, ara::core::Array<vehicle_data::BatteryCell, 4>>)
         ) {
             if (auto lease = app_.acquire_rearpowertrain_proxy()) {
                 lease->BatteryModuleStatus.OnDataArrived(
@@ -272,6 +282,7 @@ public:
         else if constexpr (
             std::is_same_v<Tag, typename App::ports::RearPowertrain::CabinSensors>
             || (std::is_same_v<Tag, typename App::ports::RearPowertrain> && std::is_convertible_v<Val, vehicle_data::CabinSensorData>)
+            || (std::is_same_v<Tag, typename App::ports::RearPowertrain::Any> && std::is_convertible_v<Val, vehicle_data::CabinSensorData>)
         ) {
             if (auto lease = app_.acquire_rearpowertrain_proxy()) {
                 lease->CabinSensors.OnDataArrived(
@@ -282,6 +293,7 @@ public:
         else if constexpr (
             std::is_same_v<Tag, typename App::ports::RearPowertrain::SpeedHistory>
             || (std::is_same_v<Tag, typename App::ports::RearPowertrain> && std::is_convertible_v<Val, ara::core::Vector<float>>)
+            || (std::is_same_v<Tag, typename App::ports::RearPowertrain::Any> && std::is_convertible_v<Val, ara::core::Vector<float>>)
         ) {
             if (auto lease = app_.acquire_rearpowertrain_proxy()) {
                 lease->SpeedHistory.OnDataArrived(
@@ -292,6 +304,7 @@ public:
         else if constexpr (
             std::is_same_v<Tag, typename App::ports::RearPowertrain::VehicleSpeed>
             || (std::is_same_v<Tag, typename App::ports::RearPowertrain> && std::is_convertible_v<Val, vehicle_data::SpeedData>)
+            || (std::is_same_v<Tag, typename App::ports::RearPowertrain::Any> && std::is_convertible_v<Val, vehicle_data::SpeedData>)
         ) {
             if (auto lease = app_.acquire_rearpowertrain_proxy()) {
                 lease->VehicleSpeed.OnDataArrived(
@@ -302,6 +315,7 @@ public:
         else if constexpr (
             std::is_same_v<Tag, typename App::ports::RearPowertrain::WheelSpeeds>
             || (std::is_same_v<Tag, typename App::ports::RearPowertrain> && std::is_convertible_v<Val, ara::core::Array<float, 4>>)
+            || (std::is_same_v<Tag, typename App::ports::RearPowertrain::Any> && std::is_convertible_v<Val, ara::core::Array<float, 4>>)
         ) {
             if (auto lease = app_.acquire_rearpowertrain_proxy()) {
                 lease->WheelSpeeds.OnDataArrived(
@@ -312,24 +326,28 @@ public:
         else if constexpr (
             std::is_same_v<Tag, typename App::ports::SecondaryBody::OutsideAirQuality>
             || (std::is_same_v<Tag, typename App::ports::SecondaryBody> && std::is_convertible_v<Val, uint32_t>)
+            || (std::is_same_v<Tag, typename App::ports::SecondaryBody::Any> && std::is_convertible_v<Val, uint32_t>)
         ) {
             mock_secondarybody_OutsideAirQuality_.Update(val);
         }
         else if constexpr (
             std::is_same_v<Tag, typename App::ports::SecondaryBody::RainSensorLevel>
             || (std::is_same_v<Tag, typename App::ports::SecondaryBody> && std::is_convertible_v<Val, uint32_t>)
+            || (std::is_same_v<Tag, typename App::ports::SecondaryBody::Any> && std::is_convertible_v<Val, uint32_t>)
         ) {
             mock_secondarybody_RainSensorLevel_.Update(val);
         }
         else if constexpr (
             std::is_same_v<Tag, typename App::ports::SecondaryBody::TargetCabinTemperature>
             || (std::is_same_v<Tag, typename App::ports::SecondaryBody> && std::is_convertible_v<Val, float>)
+            || (std::is_same_v<Tag, typename App::ports::SecondaryBody::Any> && std::is_convertible_v<Val, float>)
         ) {
             mock_secondarybody_TargetCabinTemperature_.Update(val);
         }
         else if constexpr (
             std::is_same_v<Tag, typename App::ports::SecondaryBody::WindowPosition>
             || (std::is_same_v<Tag, typename App::ports::SecondaryBody> && std::is_convertible_v<Val, uint32_t>)
+            || (std::is_same_v<Tag, typename App::ports::SecondaryBody::Any> && std::is_convertible_v<Val, uint32_t>)
         ) {
             mock_secondarybody_WindowPosition_.Update(val);
         }
@@ -363,6 +381,151 @@ public:
     }
     void inject_field_notify(typename App::ports::SecondaryBody::WindowPosition, const uint32_t& val) {
         mock_secondarybody_WindowPosition_.Update(val);
+    }
+
+    // Field value setters for mock skeleton fields (getter/setter/notifier)
+    template <typename PortTag, typename ItemTag, typename Val>
+    void set_field([[maybe_unused]] const Val& val) {
+        if constexpr (
+            std::is_same_v<PortTag, typename App::ports::PrimaryBody> && (
+                std::is_same_v<ItemTag, typename App::ports::PrimaryBody::OutsideAirQuality>
+                || std::is_same_v<ItemTag, ::reaktar::tags::body_control::fields::OutsideAirQuality>
+            )
+        ) {
+            mock_primarybody_OutsideAirQuality_.Update(val);
+        }
+        else if constexpr (
+            std::is_same_v<PortTag, typename App::ports::PrimaryBody> && (
+                std::is_same_v<ItemTag, typename App::ports::PrimaryBody::RainSensorLevel>
+                || std::is_same_v<ItemTag, ::reaktar::tags::body_control::fields::RainSensorLevel>
+            )
+        ) {
+            mock_primarybody_RainSensorLevel_.Update(val);
+        }
+        else if constexpr (
+            std::is_same_v<PortTag, typename App::ports::PrimaryBody> && (
+                std::is_same_v<ItemTag, typename App::ports::PrimaryBody::TargetCabinTemperature>
+                || std::is_same_v<ItemTag, ::reaktar::tags::body_control::fields::TargetCabinTemperature>
+            )
+        ) {
+            mock_primarybody_TargetCabinTemperature_.Update(val);
+        }
+        else if constexpr (
+            std::is_same_v<PortTag, typename App::ports::PrimaryBody> && (
+                std::is_same_v<ItemTag, typename App::ports::PrimaryBody::WindowPosition>
+                || std::is_same_v<ItemTag, ::reaktar::tags::body_control::fields::WindowPosition>
+            )
+        ) {
+            mock_primarybody_WindowPosition_.Update(val);
+        }
+        else if constexpr (
+            std::is_same_v<PortTag, typename App::ports::SecondaryBody> && (
+                std::is_same_v<ItemTag, typename App::ports::SecondaryBody::OutsideAirQuality>
+                || std::is_same_v<ItemTag, ::reaktar::tags::body_control::fields::OutsideAirQuality>
+            )
+        ) {
+            mock_secondarybody_OutsideAirQuality_.Update(val);
+        }
+        else if constexpr (
+            std::is_same_v<PortTag, typename App::ports::SecondaryBody> && (
+                std::is_same_v<ItemTag, typename App::ports::SecondaryBody::RainSensorLevel>
+                || std::is_same_v<ItemTag, ::reaktar::tags::body_control::fields::RainSensorLevel>
+            )
+        ) {
+            mock_secondarybody_RainSensorLevel_.Update(val);
+        }
+        else if constexpr (
+            std::is_same_v<PortTag, typename App::ports::SecondaryBody> && (
+                std::is_same_v<ItemTag, typename App::ports::SecondaryBody::TargetCabinTemperature>
+                || std::is_same_v<ItemTag, ::reaktar::tags::body_control::fields::TargetCabinTemperature>
+            )
+        ) {
+            mock_secondarybody_TargetCabinTemperature_.Update(val);
+        }
+        else if constexpr (
+            std::is_same_v<PortTag, typename App::ports::SecondaryBody> && (
+                std::is_same_v<ItemTag, typename App::ports::SecondaryBody::WindowPosition>
+                || std::is_same_v<ItemTag, ::reaktar::tags::body_control::fields::WindowPosition>
+            )
+        ) {
+            mock_secondarybody_WindowPosition_.Update(val);
+        }
+        else {
+            static_assert(!sizeof(PortTag*), "reaktar: Unknown port/field tag for set_field");
+        }
+    }
+
+    template <typename Tag, typename Val>
+    void set_field([[maybe_unused]] const Val& val) {
+        if constexpr (
+            std::is_same_v<Tag, typename App::ports::PrimaryBody::OutsideAirQuality>
+            || (std::is_same_v<Tag, typename App::ports::PrimaryBody> && std::is_convertible_v<Val, uint32_t>)
+            || (std::is_same_v<Tag, typename App::ports::PrimaryBody::Any> && std::is_convertible_v<Val, uint32_t>)
+        ) {
+            mock_primarybody_OutsideAirQuality_.Update(val);
+        }
+        else if constexpr (
+            std::is_same_v<Tag, typename App::ports::PrimaryBody::RainSensorLevel>
+            || (std::is_same_v<Tag, typename App::ports::PrimaryBody> && std::is_convertible_v<Val, uint32_t>)
+            || (std::is_same_v<Tag, typename App::ports::PrimaryBody::Any> && std::is_convertible_v<Val, uint32_t>)
+        ) {
+            mock_primarybody_RainSensorLevel_.Update(val);
+        }
+        else if constexpr (
+            std::is_same_v<Tag, typename App::ports::PrimaryBody::TargetCabinTemperature>
+            || (std::is_same_v<Tag, typename App::ports::PrimaryBody> && std::is_convertible_v<Val, float>)
+            || (std::is_same_v<Tag, typename App::ports::PrimaryBody::Any> && std::is_convertible_v<Val, float>)
+        ) {
+            mock_primarybody_TargetCabinTemperature_.Update(val);
+        }
+        else if constexpr (
+            std::is_same_v<Tag, typename App::ports::PrimaryBody::WindowPosition>
+            || (std::is_same_v<Tag, typename App::ports::PrimaryBody> && std::is_convertible_v<Val, uint32_t>)
+            || (std::is_same_v<Tag, typename App::ports::PrimaryBody::Any> && std::is_convertible_v<Val, uint32_t>)
+        ) {
+            mock_primarybody_WindowPosition_.Update(val);
+        }
+        else if constexpr (
+            std::is_same_v<Tag, typename App::ports::SecondaryBody::OutsideAirQuality>
+            || (std::is_same_v<Tag, typename App::ports::SecondaryBody> && std::is_convertible_v<Val, uint32_t>)
+            || (std::is_same_v<Tag, typename App::ports::SecondaryBody::Any> && std::is_convertible_v<Val, uint32_t>)
+        ) {
+            mock_secondarybody_OutsideAirQuality_.Update(val);
+        }
+        else if constexpr (
+            std::is_same_v<Tag, typename App::ports::SecondaryBody::RainSensorLevel>
+            || (std::is_same_v<Tag, typename App::ports::SecondaryBody> && std::is_convertible_v<Val, uint32_t>)
+            || (std::is_same_v<Tag, typename App::ports::SecondaryBody::Any> && std::is_convertible_v<Val, uint32_t>)
+        ) {
+            mock_secondarybody_RainSensorLevel_.Update(val);
+        }
+        else if constexpr (
+            std::is_same_v<Tag, typename App::ports::SecondaryBody::TargetCabinTemperature>
+            || (std::is_same_v<Tag, typename App::ports::SecondaryBody> && std::is_convertible_v<Val, float>)
+            || (std::is_same_v<Tag, typename App::ports::SecondaryBody::Any> && std::is_convertible_v<Val, float>)
+        ) {
+            mock_secondarybody_TargetCabinTemperature_.Update(val);
+        }
+        else if constexpr (
+            std::is_same_v<Tag, typename App::ports::SecondaryBody::WindowPosition>
+            || (std::is_same_v<Tag, typename App::ports::SecondaryBody> && std::is_convertible_v<Val, uint32_t>)
+            || (std::is_same_v<Tag, typename App::ports::SecondaryBody::Any> && std::is_convertible_v<Val, uint32_t>)
+        ) {
+            mock_secondarybody_WindowPosition_.Update(val);
+        }
+        else {
+            static_assert(!sizeof(Tag*), "reaktar: Unknown field tag for set_field");
+        }
+    }
+
+    template <typename Tag, typename Val>
+    void set_field(Tag, const Val& val) {
+        set_field<Tag>(val);
+    }
+
+    template <typename PortTag, typename ItemTag, typename Val>
+    void set_field(PortTag, ItemTag, const Val& val) {
+        set_field<PortTag, ItemTag>(val);
     }
 
     // Mock RPC calls on required client proxies

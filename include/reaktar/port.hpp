@@ -23,6 +23,15 @@ enum class PortKind : uint8_t {
 };
 
 /**
+ * @brief Universal wildcard tag representing any port / any event for fan-in handlers.
+ */
+struct Any {};
+
+namespace tags {
+    using Any = ::reaktar::Any;
+}
+
+/**
  * @brief Tag type indicating an R-Port (Required / Proxy).
  */
 struct RequiredPortTag {

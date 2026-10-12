@@ -20,21 +20,27 @@ namespace {{ ns }} {
 {% if intf.events %}
 namespace events {
 {% for ev in sorted_events(intf.events) %}
-    struct {{ ev.short_name }} {};
+    struct {{ ev.short_name }} {
+        struct Any {};
+    };
 {% endfor %}
 } // namespace events
 {% endif %}
 {% if intf.methods %}
 namespace methods {
 {% for m in sorted_methods(intf.methods) %}
-    struct {{ m.short_name }} {};
+    struct {{ m.short_name }} {
+        struct Any {};
+    };
 {% endfor %}
 } // namespace methods
 {% endif %}
 {% if intf.fields %}
 namespace fields {
 {% for f in sorted_fields(intf.fields) %}
-    struct {{ f.short_name }} {};
+    struct {{ f.short_name }} {
+        struct Any {};
+    };
 {% endfor %}
 } // namespace fields
 {% endif %}

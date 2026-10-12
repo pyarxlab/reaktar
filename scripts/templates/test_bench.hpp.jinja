@@ -164,6 +164,7 @@ public:
             || std::is_same_v<Tag, ::reaktar::tags::{{ ns }}::events::{{ ev.short_name }}>
 {% endif %}
             || (std::is_same_v<Tag, typename App::ports::{{ r_port.short_name }}> && std::is_convertible_v<Val, {{ type_str }}>)
+            || (std::is_same_v<Tag, typename App::ports::{{ r_port.short_name }}::Any> && std::is_convertible_v<Val, {{ type_str }}>)
         ) {
             if (auto lease = app_.acquire_{{ r_port.short_name.lower() }}_proxy()) {
                 lease->{{ ev.short_name }}.OnDataArrived(
@@ -182,6 +183,7 @@ public:
             || std::is_same_v<Tag, ::reaktar::tags::{{ ns }}::fields::{{ f.short_name }}>
 {% endif %}
             || (std::is_same_v<Tag, typename App::ports::{{ r_port.short_name }}> && std::is_convertible_v<Val, {{ type_str }}>)
+            || (std::is_same_v<Tag, typename App::ports::{{ r_port.short_name }}::Any> && std::is_convertible_v<Val, {{ type_str }}>)
         ) {
             mock_{{ r_port.short_name.lower() }}_{{ f.short_name }}_.Update(val);
         }
@@ -233,6 +235,80 @@ public:
 {% endif %}
 {% endfor %}
 {% endfor %}
+
+    // Field value setters for mock skeleton fields (getter/setter/notifier)
+    template <typename PortTag, typename ItemTag, typename Val>
+    void set_field([[maybe_unused]] const Val& val) {
+{% set first_sf = namespace(value=true) %}
+{% for r_port in sorted_ports(app.r_port_prototypes | service_r_ports) %}
+{% set intf = resolve_intf(r_port, domain) %}
+{% set ns = service_ns(intf) %}
+{% for f in sorted_fields(intf.fields) %}
+{% if f.has_notifier or f.has_getter or f.has_setter %}
+{% set type_str = cpp_type(f.type_tref) %}
+        {{ "if" if first_sf.value else "else if" }} constexpr (
+            std::is_same_v<PortTag, typename App::ports::{{ r_port.short_name }}> && (
+                std::is_same_v<ItemTag, typename App::ports::{{ r_port.short_name }}::{{ f.short_name }}>
+                || std::is_same_v<ItemTag, ::reaktar::tags::{{ ns }}::fields::{{ f.short_name }}>
+            )
+        ) {
+            mock_{{ r_port.short_name.lower() }}_{{ f.short_name }}_.Update(val);
+        }
+{% set first_sf.value = false %}
+{% endif %}
+{% endfor %}
+{% endfor %}
+{% if first_sf.value %}
+        static_assert(!sizeof(PortTag*), "reaktar: Unknown port/field tag for set_field (no proxy fields available)");
+{% else %}
+        else {
+            static_assert(!sizeof(PortTag*), "reaktar: Unknown port/field tag for set_field");
+        }
+{% endif %}
+    }
+
+    template <typename Tag, typename Val>
+    void set_field([[maybe_unused]] const Val& val) {
+{% set first_sfb = namespace(value=true) %}
+{% for r_port in sorted_ports(app.r_port_prototypes | service_r_ports) %}
+{% set intf = resolve_intf(r_port, domain) %}
+{% set ns = service_ns(intf) %}
+{% set is_uniq = is_unique_r_service(r_port, app, domain) %}
+{% for f in sorted_fields(intf.fields) %}
+{% if f.has_notifier or f.has_getter or f.has_setter %}
+{% set type_str = cpp_type(f.type_tref) %}
+        {{ "if" if first_sfb.value else "else if" }} constexpr (
+            std::is_same_v<Tag, typename App::ports::{{ r_port.short_name }}::{{ f.short_name }}>
+{% if is_uniq %}
+            || std::is_same_v<Tag, ::reaktar::tags::{{ ns }}::fields::{{ f.short_name }}>
+{% endif %}
+            || (std::is_same_v<Tag, typename App::ports::{{ r_port.short_name }}> && std::is_convertible_v<Val, {{ type_str }}>)
+            || (std::is_same_v<Tag, typename App::ports::{{ r_port.short_name }}::Any> && std::is_convertible_v<Val, {{ type_str }}>)
+        ) {
+            mock_{{ r_port.short_name.lower() }}_{{ f.short_name }}_.Update(val);
+        }
+{% set first_sfb.value = false %}
+{% endif %}
+{% endfor %}
+{% endfor %}
+{% if first_sfb.value %}
+        static_assert(!sizeof(Tag*), "reaktar: Unknown field tag for set_field (no proxy fields available)");
+{% else %}
+        else {
+            static_assert(!sizeof(Tag*), "reaktar: Unknown field tag for set_field");
+        }
+{% endif %}
+    }
+
+    template <typename Tag, typename Val>
+    void set_field(Tag, const Val& val) {
+        set_field<Tag>(val);
+    }
+
+    template <typename PortTag, typename ItemTag, typename Val>
+    void set_field(PortTag, ItemTag, const Val& val) {
+        set_field<PortTag, ItemTag>(val);
+    }
 
     // Mock RPC calls on required client proxies
     template <typename Tag, typename Func>

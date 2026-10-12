@@ -77,6 +77,46 @@ public:
 
   // Method handler with bare tag TriggerDiagnostic
   bool on(TriggerDiagnostic, uint32_t code) { return (code != 0xDEAD); }
+
+  // =========================================================================
+  // Demonstration: Querying proxy fields asynchronously using read(...)
+  // =========================================================================
+
+  // 1. Query by unique bare field tag: read<TargetCabinTemperature>()
+  float read_target_temp_demo() {
+    auto future = read<TargetCabinTemperature>();
+    if (future.valid()) {
+      return future.get();
+    }
+    return -1.0f;
+  }
+
+  // 2. Query by port-scoped field tag: read<ports::BodyControl::TargetCabinTemperature>()
+  float read_target_temp_port_demo() {
+    auto future = read<ports::BodyControl::TargetCabinTemperature>();
+    if (future.valid()) {
+      return future.get();
+    }
+    return -1.0f;
+  }
+
+  // 3. Query by unique data type across all consumed ports: read<float>()
+  float read_temp_by_type_demo() {
+    auto future = read<float>();
+    if (future.valid()) {
+      return future.get();
+    }
+    return -1.0f;
+  }
+
+  // 4. Query by unique data type across all consumed ports: read<uint32_t>()
+  uint32_t read_air_quality_demo() {
+    auto future = read<uint32_t>();
+    if (future.valid()) {
+      return future.get();
+    }
+    return 0u;
+  }
 };
 
 // -----------------------------------------------------------------------------
@@ -271,6 +311,8 @@ int main() {
     assert(alert.has_value());
     assert(alert->alert_id == 1001);
   }
+  std::cout << "PASSED\n";
+
   // 8. High-level Demonstration: Actor with custom Port lifecycle state machine
   std::cout << "  - Demonstrating Actor-driven Port lifecycle state machine... ";
   {
@@ -311,6 +353,63 @@ int main() {
     assert(!app.is_service_offered());      // Service unoffered from network
     assert(!app.is_powertrain_connected()); // Powertrain telemetry isolated
     assert(app.is_body_connected());        // Body control kept alive for hazard/safety
+  }
+  std::cout << "PASSED\n";
+
+  // 9. Demonstration & quick smoke test for read(...) API
+  std::cout << "  - Demonstrating & verifying read(...) API with mock field values... ";
+  {
+    using OutsideAirQuality = SupervisorSmokeApp::OutsideAirQuality;
+    using TargetCabinTemperature = SupervisorSmokeApp::TargetCabinTemperature;
+
+    reaktar::testing::VehicleSupervisorTestBench<SupervisorSmokeApp> bench;
+
+    // Seed initial field values in mock skeleton via test bench
+    bench.set_field<TargetCabinTemperature>(22.5f);
+    bench.set_field<OutsideAirQuality>(42u);
+
+    // Verify actor application demonstration methods
+    assert(bench.app().read_target_temp_demo() == 22.5f);
+    assert(bench.app().read_target_temp_port_demo() == 22.5f);
+    assert(bench.app().read_temp_by_type_demo() == 22.5f);
+    assert(bench.app().read_air_quality_demo() == 42u);
+
+    // Direct smoke test of all read() syntax variations:
+    // a. Bare field tag: read<TargetCabinTemperature>()
+    auto temp_tag_fut = bench.app().read<TargetCabinTemperature>();
+    assert(temp_tag_fut.valid());
+    assert(temp_tag_fut.get() == 22.5f);
+
+    // b. Port-scoped field tag: read<ports::BodyControl::TargetCabinTemperature>()
+    auto temp_port_fut = bench.app().read<SupervisorSmokeApp::ports::BodyControl::TargetCabinTemperature>();
+    assert(temp_port_fut.valid());
+    assert(temp_port_fut.get() == 22.5f);
+
+    // c. Dual template args: read<Port, Tag>()
+    auto temp_dual_fut = bench.app().read<SupervisorSmokeApp::ports::BodyControl, TargetCabinTemperature>();
+    assert(temp_dual_fut.valid());
+    assert(temp_dual_fut.get() == 22.5f);
+
+    // d. Tag value object: read(TargetCabinTemperature{})
+    auto temp_obj_fut = bench.app().read(TargetCabinTemperature{});
+    assert(temp_obj_fut.valid());
+    assert(temp_obj_fut.get() == 22.5f);
+
+    // e. Unique type read: read<float>() (TargetCabinTemperature)
+    auto float_fut = bench.app().read<float>();
+    assert(float_fut.valid());
+    assert(float_fut.get() == 22.5f);
+
+    // f. Unique type read: read<uint32_t>() (OutsideAirQuality)
+    auto aqi_fut = bench.app().read<uint32_t>();
+    assert(aqi_fut.valid());
+    assert(aqi_fut.get() == 42u);
+
+    // g. Verify test bench set_field updates are observed on subsequent read
+    bench.set_field<TargetCabinTemperature>(19.0f);
+    auto updated_fut = bench.app().read<TargetCabinTemperature>();
+    assert(updated_fut.valid());
+    assert(updated_fut.get() == 19.0f);
   }
   std::cout << "PASSED\n";
 

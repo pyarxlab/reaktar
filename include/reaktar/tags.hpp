@@ -16,69 +16,135 @@ namespace tags {
 
 namespace body_control {
 namespace methods {
-    struct FlashLights {};
-    struct LockDoors {};
+    struct FlashLights {
+        struct Any {};
+    };
+    struct LockDoors {
+        struct Any {};
+    };
 } // namespace methods
 namespace fields {
-    struct OutsideAirQuality {};
-    struct RainSensorLevel {};
-    struct TargetCabinTemperature {};
-    struct WindowPosition {};
+    struct OutsideAirQuality {
+        struct Any {};
+    };
+    struct RainSensorLevel {
+        struct Any {};
+    };
+    struct TargetCabinTemperature {
+        struct Any {};
+    };
+    struct WindowPosition {
+        struct Any {};
+    };
 } // namespace fields
 } // namespace body_control
 
 namespace hmi {
 namespace events {
-    struct StatusNotification {};
+    struct StatusNotification {
+        struct Any {};
+    };
 } // namespace events
 namespace methods {
-    struct ShowPopup {};
+    struct ShowPopup {
+        struct Any {};
+    };
 } // namespace methods
 } // namespace hmi
 
 namespace infotainment::geo::navigation {
 namespace events {
-    struct ActiveRoute {};
-    struct CurrentLocation {};
+    struct ActiveRoute {
+        struct Any {};
+    };
+    struct CurrentLocation {
+        struct Any {};
+    };
 } // namespace events
 namespace methods {
-    struct SetDestination {};
+    struct SetDestination {
+        struct Any {};
+    };
 } // namespace methods
 } // namespace infotainment::geo::navigation
 
 namespace powertrain {
 namespace events {
-    struct BatteryModuleStatus {};
-    struct CabinSensors {};
-    struct SpeedHistory {};
-    struct VehicleSpeed {};
-    struct WheelSpeeds {};
+    struct BatteryModuleStatus {
+        struct Any {};
+    };
+    struct CabinSensors {
+        struct Any {};
+    };
+    struct SpeedHistory {
+        struct Any {};
+    };
+    struct VehicleSpeed {
+        struct Any {};
+    };
+    struct WheelSpeeds {
+        struct Any {};
+    };
 } // namespace events
 } // namespace powertrain
 
 namespace vehicle_supervisor {
 namespace events {
-    struct ActiveDiagnosticMap {};
-    struct DiagnosticsReport {};
-    struct DriveHistory {};
-    struct EmergencyAlert {};
-    struct PrimaryWarning {};
-    struct SecondaryWarning {};
+    struct ActiveDiagnosticMap {
+        struct Any {};
+    };
+    struct DiagnosticsReport {
+        struct Any {};
+    };
+    struct DriveHistory {
+        struct Any {};
+    };
+    struct EmergencyAlert {
+        struct Any {};
+    };
+    struct PrimaryWarning {
+        struct Any {};
+    };
+    struct SecondaryWarning {
+        struct Any {};
+    };
 } // namespace events
 namespace methods {
-    struct CalibrateOdometer {};
-    struct ResetTripMeter {};
-    struct SetSpeedLimiter {};
-    struct TriggerDiagnostic {};
+    struct CalibrateOdometer {
+        struct Any {};
+    };
+    struct ResetTripMeter {
+        struct Any {};
+    };
+    struct SetSpeedLimiter {
+        struct Any {};
+    };
+    struct TriggerDiagnostic {
+        struct Any {};
+    };
 } // namespace methods
 namespace fields {
-    struct ActiveAlerts {};
-    struct CalibrationKey {};
-    struct CurrentDriveMode {};
-    struct FeatureFlags {};
-    struct HardwareRevision {};
-    struct SystemMatrix {};
-    struct VehicleConfig {};
+    struct ActiveAlerts {
+        struct Any {};
+    };
+    struct CalibrationKey {
+        struct Any {};
+    };
+    struct CurrentDriveMode {
+        struct Any {};
+    };
+    struct FeatureFlags {
+        struct Any {};
+    };
+    struct HardwareRevision {
+        struct Any {};
+    };
+    struct SystemMatrix {
+        struct Any {};
+    };
+    struct VehicleConfig {
+        struct Any {};
+    };
 } // namespace fields
 } // namespace vehicle_supervisor
 

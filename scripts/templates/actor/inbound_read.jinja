@@ -1,0 +1,148 @@
+    // ------------------------------------------------------------------------
+    // PULL: read<Tag>() / read<Port, Tag>() / read(Tag) / read(Port, Tag)
+    // ------------------------------------------------------------------------
+{% if model.consumed_proxy_count == 0 %}
+    template <typename Tag>
+    auto read() {
+        static_assert(!sizeof(Tag*), "reaktar: read called on Actor with 0 consumed proxies!");
+    }
+
+    template <typename PortTag, typename ItemTag>
+    auto read() {
+        static_assert(!sizeof(PortTag*), "reaktar: read<Port, Tag>() called on Actor with 0 consumed proxies!");
+    }
+
+    template <typename Tag>
+    auto read([[maybe_unused]] Tag tag) {
+        return read<Tag>();
+    }
+
+    template <typename PortTag, typename ItemTag>
+    auto read([[maybe_unused]] PortTag port, [[maybe_unused]] ItemTag item) {
+        return read<PortTag, ItemTag>();
+    }
+{% else %}
+    template <typename PortTag, typename ItemTag>
+    auto read() {
+{% for port in model.read_ports %}
+        {{ "if" if loop.first else "else if" }} constexpr (std::is_same_v<PortTag, typename Base::ports::{{ port.name }}>) {
+{% if port.all_fields | length == 0 %}
+            static_assert(!sizeof(PortTag*), "reaktar: Port '{{ port.name }}' has no fields!");
+{% else %}
+{% for field in port.all_fields %}
+            {{ "if" if loop.first else "else if" }} constexpr (
+                std::is_same_v<ItemTag, typename Base::ports::{{ port.name }}::{{ field.name }}>
+                || std::is_same_v<ItemTag, {{ field.tag }}>
+            ) {
+{% if field.has_getter %}
+                auto proxy_lease = this->{{ port.slot_name }}.acquire("{{ port.name }}");
+                using AsyncResType = decltype(make_async_result(proxy_lease->{{ field.name }}.Get()));
+                if (proxy_lease) {
+                    return make_async_result(proxy_lease->{{ field.name }}.Get());
+                }
+                return AsyncResType::Failed();
+{% else %}
+                static_assert(!sizeof(PortTag*), "reaktar: Field '{{ field.name }}' on port '{{ port.name }}' does not have a getter in ARXML!");
+{% endif %}
+            }
+{% endfor %}
+            else {
+                static_assert(!sizeof(PortTag*), "reaktar: Port '{{ port.name }}' has no such field tag!");
+            }
+{% endif %}
+        }
+{% endfor %}
+        else {
+            static_assert(!sizeof(PortTag*), "reaktar: read<Port, Tag>() called with unknown port tag!");
+        }
+    }
+
+    template <typename Tag>
+    auto read() {
+        // 1. Port tags: read<ports::Port>()
+{% for port in model.read_ports %}
+        {{ "if" if loop.first else "else if" }} constexpr (std::is_same_v<Tag, typename Base::ports::{{ port.name }}>) {
+{% if port.readable_field_count == 0 %}
+            static_assert(!sizeof(Tag*), "reaktar: Port '{{ port.name }}' has no readable fields with getters!");
+{% elif port.readable_field_count > 1 %}
+            static_assert(!sizeof(Tag*), "reaktar: read<Port>() is ambiguous on port '{{ port.name }}'! Port has multiple readable fields. Specify the field tag via read<Port::FieldTag>() or read<Port, FieldTag>().");
+{% else %}
+            auto proxy_lease = this->{{ port.slot_name }}.acquire("{{ port.name }}");
+            using AsyncResType = decltype(make_async_result(proxy_lease->{{ port.unique_field.name }}.Get()));
+            if (proxy_lease) {
+                return make_async_result(proxy_lease->{{ port.unique_field.name }}.Get());
+            }
+            return AsyncResType::Failed();
+{% endif %}
+        }
+{% endfor %}
+
+        // 2. Port-scoped field tags: read<ports::Port::FieldTag>()
+{% for field in model.read_fields_by_port_tag %}
+        else if constexpr (std::is_same_v<Tag, typename Base::ports::{{ field.port_name }}::{{ field.name }}>) {
+{% if field.has_getter %}
+            auto proxy_lease = this->{{ field.slot_name }}.acquire("{{ field.port_name }}");
+            using AsyncResType = decltype(make_async_result(proxy_lease->{{ field.name }}.Get()));
+            if (proxy_lease) {
+                return make_async_result(proxy_lease->{{ field.name }}.Get());
+            }
+            return AsyncResType::Failed();
+{% else %}
+            static_assert(!sizeof(Tag*), "reaktar: Field '{{ field.name }}' on port '{{ field.port_name }}' does not have a getter in ARXML!");
+{% endif %}
+        }
+{% endfor %}
+
+        // 3. Unique bare field tags: read<FieldTag>()
+{% for field in model.read_unique_bare_fields %}
+        else if constexpr (std::is_same_v<Tag, {{ field.tag }}>) {
+{% if field.has_getter %}
+            auto proxy_lease = this->{{ field.slot_name }}.acquire("{{ field.port_name }}");
+            using AsyncResType = decltype(make_async_result(proxy_lease->{{ field.name }}.Get()));
+            if (proxy_lease) {
+                return make_async_result(proxy_lease->{{ field.name }}.Get());
+            }
+            return AsyncResType::Failed();
+{% else %}
+            static_assert(!sizeof(Tag*), "reaktar: Field '{{ field.name }}' on port '{{ field.port_name }}' does not have a getter in ARXML!");
+{% endif %}
+        }
+{% endfor %}
+
+        // 4. Ambiguous bare field tags: read<AmbiguousTag>()
+{% for ambig in model.read_ambiguous_bare_tags %}
+        else if constexpr (std::is_same_v<Tag, {{ ambig.tag }}>) {
+            static_assert(!sizeof(Tag*), "reaktar: read<Tag>() is ambiguous across multiple ports sharing the '{{ ambig.service }}' interface! Use read<ports::PortName::Tag>() or read<ports::PortName, Tag>() instead.");
+        }
+{% endfor %}
+
+        // 5. Data type reads: read<DataType>()
+{% for item in model.read_by_type %}
+        else if constexpr (std::is_same_v<Tag, {{ item.type }}>) {
+{% if item.is_ambiguous %}
+            static_assert(!sizeof(Tag*), "reaktar: read<DataType>() is ambiguous! Multiple fields across ports return type '{{ item.type }}'. Specify the field tag or port.");
+{% else %}
+            auto proxy_lease = this->{{ item.field.slot_name }}.acquire("{{ item.field.port_name }}");
+            using AsyncResType = decltype(make_async_result(proxy_lease->{{ item.field.name }}.Get()));
+            if (proxy_lease) {
+                return make_async_result(proxy_lease->{{ item.field.name }}.Get());
+            }
+            return AsyncResType::Failed();
+{% endif %}
+        }
+{% endfor %}
+        else {
+            static_assert(!sizeof(Tag*), "reaktar: read called with unknown tag, port, or type!");
+        }
+    }
+
+    template <typename Tag>
+    auto read([[maybe_unused]] Tag tag) {
+        return read<Tag>();
+    }
+
+    template <typename PortTag, typename ItemTag>
+    auto read([[maybe_unused]] PortTag port, [[maybe_unused]] ItemTag item) {
+        return read<PortTag, ItemTag>();
+    }
+{% endif %}

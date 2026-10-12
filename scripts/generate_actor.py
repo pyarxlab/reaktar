@@ -526,7 +526,6 @@ def analyze_application_types(app, domain):
                 outgoing_items.append(('field_set', f.short_name, t, r.short_name, intf, f))
 
     out_type_counts = Counter([item[2] for item in outgoing_items])
-    outgoing_unique_types = {t for t, count in out_type_counts.items() if count == 1}
 
     # Incoming items: R-Port events + R-Port field notifiers
     incoming_items = []
@@ -541,7 +540,6 @@ def analyze_application_types(app, domain):
                 incoming_items.append(('field_notify', f.short_name, t, r.short_name, intf, f))
 
     in_type_counts = Counter([item[2] for item in incoming_items])
-    incoming_unique_types = {t for t, count in in_type_counts.items() if count == 1}
 
     # Skeleton field setters
     fset_items = []
@@ -553,7 +551,6 @@ def analyze_application_types(app, domain):
                 fset_items.append((f.short_name, t))
 
     fset_type_counts = Counter([item[1] for item in fset_items])
-    field_setter_unique_types = {t for t, count in fset_type_counts.items() if count == 1}
 
     # 4. Skeleton methods for direct tagless on(args...)
     skeleton_methods = []
@@ -565,7 +562,6 @@ def analyze_application_types(app, domain):
             skeleton_methods.append((m.short_name, sig_types, in_args, m))
 
     skel_method_sig_counts = Counter([sm[1] for sm in skeleton_methods])
-    skel_method_unique_sigs = {sig for sig, count in skel_method_sig_counts.items() if count == 1}
 
     # 5. Proxy methods for variadic tagless emit(args...)
     proxy_methods = []
@@ -577,6 +573,31 @@ def analyze_application_types(app, domain):
             proxy_methods.append((m.short_name, sig_types, in_args, m, r))
 
     proxy_method_sig_counts = Counter([pm[1] for pm in proxy_methods])
+
+    # Single-argument method signatures that could collide with single-payload direct on(t) / emit(t)
+    skel_single_arg_types = {sig[0] for sig in skel_method_sig_counts.keys() if len(sig) == 1}
+    proxy_single_arg_types = {sig[0] for sig in proxy_method_sig_counts.keys() if len(sig) == 1}
+
+    # Guardrail 3 (Fan-In Boundaries):
+    # One-Way signals (returns void: pub/sub events, field notifiers) cannot fan-in with
+    # Two-Way transactions (returns T/Result: field setters, request-response RPCs).
+    # Ambiguous collisions between incoming channels must be rejected for direct tagless dispatch.
+    incoming_unique_types = {
+        t for t, count in in_type_counts.items()
+        if count == 1 and t not in fset_type_counts and t not in skel_single_arg_types
+    }
+
+    field_setter_unique_types = {
+        t for t, count in fset_type_counts.items()
+        if count == 1 and t not in in_type_counts and t not in skel_single_arg_types
+    }
+
+    skel_method_unique_sigs = {
+        sig for sig, count in skel_method_sig_counts.items()
+        if count == 1 and not (len(sig) == 1 and (sig[0] in in_type_counts or sig[0] in fset_type_counts))
+    }
+
+    outgoing_unique_types = {t for t, count in out_type_counts.items() if count == 1}
     proxy_method_unique_sigs = {sig for sig, count in proxy_method_sig_counts.items() if count == 1}
 
     outgoing_conflicting_types = {t: [f"{item[0]}:{item[1]}" for item in outgoing_items if item[2] == t] for t, count in out_type_counts.items() if count > 1}
@@ -592,42 +613,60 @@ def analyze_application_types(app, domain):
         ns = service_ns(intf)
         port_name = r.short_name
         port_tag = f"typename Base::ports::{port_name}"
+        port_Any_tag = f"typename Base::ports::{port_name}::Any"
         legal_tags.add(port_tag)
+        legal_tags.add(port_Any_tag)
+        legal_tags.add("::reaktar::Any")
         for ev in sorted_events(intf.events):
             t = cpp_type(ev.type_tref, domain)
             legal_types.add(t)
             tag = f"::reaktar::tags::{ns}::events::{ev.short_name}"
+            tag_any = f"{tag}::Any"
             nested_port_tag = f"typename Base::ports::{port_name}::{ev.short_name}"
             legal_tags.add(tag)
+            legal_tags.add(tag_any)
             legal_tags.add(nested_port_tag)
-            # Direct on(t), service-tagged on(tag, t), port-tagged on(nested, t), port-bare on(port, t)
+            # Direct on(t), service-tagged on(tag, t), port-tagged on(nested, t), port-bare on(port, t), port-any on(port::Any, t), tag-any on(tag::Any, t), global-any on(::reaktar::Any, t)
             legal_signatures.add((t,))
             legal_signatures.add((tag, t))
+            legal_signatures.add((tag_any, t))
             legal_signatures.add((nested_port_tag, t))
             legal_signatures.add((port_tag, t))
+            legal_signatures.add((port_Any_tag, t))
+            legal_signatures.add(("::reaktar::Any", t))
         for f in sorted_fields(intf.fields):
             if f.has_notifier:
                 t = cpp_type(f.type_tref, domain)
                 legal_types.add(t)
                 tag = f"::reaktar::tags::{ns}::fields::{f.short_name}"
+                tag_any = f"{tag}::Any"
                 nested_port_tag = f"typename Base::ports::{port_name}::{f.short_name}"
                 legal_tags.add(tag)
+                legal_tags.add(tag_any)
                 legal_tags.add(nested_port_tag)
                 legal_signatures.add((t,))
                 legal_signatures.add((tag, t))
+                legal_signatures.add((tag_any, t))
                 legal_signatures.add((nested_port_tag, t))
                 legal_signatures.add((port_tag, t))
+                legal_signatures.add((port_Any_tag, t))
+                legal_signatures.add(("::reaktar::Any", t))
 
     for p in get_service_p_ports(app, domain):
         intf = resolve_intf(p, domain)
         ns = service_ns(intf)
         port_name = p.short_name
         port_tag = f"typename Base::ports::{port_name}"
+        port_Any_tag = f"typename Base::ports::{port_name}::Any"
         legal_tags.add(port_tag)
+        legal_tags.add(port_Any_tag)
+        legal_tags.add("::reaktar::Any")
         for m in sorted_methods(intf.methods):
             tag = f"::reaktar::tags::{ns}::methods::{m.short_name}"
+            tag_any = f"{tag}::Any"
             nested_port_tag = f"typename Base::ports::{port_name}::{m.short_name}"
             legal_tags.add(tag)
+            legal_tags.add(tag_any)
             legal_tags.add(nested_port_tag)
             in_args = method_in_args(m, domain)
             sig_types = tuple(a[1] for a in in_args)
@@ -637,22 +676,31 @@ def analyze_application_types(app, domain):
             legal_signatures.add(sig_types)
             # Tagged on(Tag, args...)
             legal_signatures.add((tag,) + sig_types)
+            legal_signatures.add((tag_any,) + sig_types)
             # Port-tagged on(Port::Method, args...)
             legal_signatures.add((nested_port_tag,) + sig_types)
             # Port-bare on(Port, args...)
             legal_signatures.add((port_tag,) + sig_types)
+            # Port-any on(Port::Any, args...)
+            legal_signatures.add((port_Any_tag,) + sig_types)
+            # Global-any on(reaktar::Any, args...)
+            legal_signatures.add(("::reaktar::Any",) + sig_types)
         for f in sorted_fields(intf.fields):
             if f.has_setter:
                 t = cpp_type(f.type_tref, domain)
                 legal_types.add(t)
                 tag = f"::reaktar::tags::{ns}::fields::{f.short_name}"
+                tag_any = f"{tag}::Any"
                 nested_port_tag = f"typename Base::ports::{port_name}::{f.short_name}"
                 legal_tags.add(tag)
+                legal_tags.add(tag_any)
                 legal_tags.add(nested_port_tag)
                 legal_signatures.add((t,))
                 legal_signatures.add((tag, t))
+                legal_signatures.add((tag_any, t))
                 legal_signatures.add((nested_port_tag, t))
                 legal_signatures.add((port_tag, t))
+                legal_signatures.add((port_Any_tag, t))
 
     # 7. Collect all app tags and build ergonomic tag aliases
     all_intfs = set()
@@ -1022,6 +1070,28 @@ def build_actor_model(app, domain, analysis, pass_by="const_ref"):
     r_sident_counts = Counter([service_ident(resolve_intf(r, domain)) for r in r_ports])
     p_sident_counts = Counter([service_ident(resolve_intf(p, domain)) for p in p_ports])
 
+    r_event_counts = Counter()
+    r_field_notif_counts = Counter()
+    for r in r_ports:
+        r_intf = resolve_intf(r, domain)
+        r_ns = service_ns(r_intf)
+        for ev in r_intf.events:
+            r_event_counts[f"{r_ns}::events::{ev.short_name}"] += 1
+        for f in r_intf.fields:
+            if getattr(f, "has_notifier", False):
+                r_field_notif_counts[f"{r_ns}::fields::{f.short_name}"] += 1
+
+    p_method_counts = Counter()
+    p_field_setter_counts = Counter()
+    for p in p_ports:
+        p_intf = resolve_intf(p, domain)
+        p_ns = service_ns(p_intf)
+        for m in p_intf.methods:
+            p_method_counts[f"::reaktar::tags::{p_ns}::methods::{m.short_name}"] += 1
+        for f in p_intf.fields:
+            if getattr(f, "has_setter", False):
+                p_field_setter_counts[f"{p_ns}::fields::{f.short_name}"] += 1
+
     consumed_proxies = []
     for r_port in r_ports:
         intf = resolve_intf(r_port, domain)
@@ -1045,6 +1115,8 @@ def build_actor_model(app, domain, analysis, pass_by="const_ref"):
                 "tag": tag,
                 "is_unique": is_unique_incoming(t, analysis),
                 "is_unique_on_port": (port_incoming_types.count(t) == 1),
+                "is_unique_across_ports": (r_event_counts[tag] == 1),
+                "port_count": r_event_counts[tag],
             })
 
         field_list = []
@@ -1063,6 +1135,8 @@ def build_actor_model(app, domain, analysis, pass_by="const_ref"):
                 "has_setter": has_set,
                 "is_unique": is_unique_incoming(t, analysis),
                 "is_unique_on_port": (port_incoming_types.count(t) == 1) if has_notif else True,
+                "is_unique_across_ports": (r_field_notif_counts[tag] == 1) if has_notif else True,
+                "port_count": r_field_notif_counts[tag],
             })
 
         proxy_methods_list = []
@@ -1081,6 +1155,43 @@ def build_actor_model(app, domain, analysis, pass_by="const_ref"):
 
         unsub_targets = [ev["name"] for ev in ev_list] + [f["name"] for f in field_list if f["has_notifier"]]
 
+        inbound_signals = []
+        for ev in ev_list:
+            inbound_signals.append({
+                "name": ev["name"],
+                "type": ev["type"],
+                "tag": ev["tag"],
+                "signal_kind": "event",
+                "signal_label": "event",
+                "signal_label_cap": "Event",
+                "shared_type_label": "event payload type",
+                "port_tag_label": "port event tag",
+                "is_unique": ev["is_unique"],
+                "is_unique_on_port": ev["is_unique_on_port"],
+                "is_unique_across_ports": ev["is_unique_across_ports"],
+                "port_count": ev["port_count"],
+                "port_name": r_port.short_name,
+                "port_ident": port_ident,
+            })
+        for f in field_list:
+            if f["has_notifier"]:
+                inbound_signals.append({
+                    "name": f["name"],
+                    "type": f["type"],
+                    "tag": f["tag"],
+                    "signal_kind": "field_notifier",
+                    "signal_label": "field notifier",
+                    "signal_label_cap": "Field notifier",
+                    "shared_type_label": "field notifier type",
+                    "port_tag_label": "port field tag",
+                    "is_unique": f["is_unique"],
+                    "is_unique_on_port": f["is_unique_on_port"],
+                    "is_unique_across_ports": f["is_unique_across_ports"],
+                    "port_count": f["port_count"],
+                    "port_name": r_port.short_name,
+                    "port_ident": port_ident,
+                })
+
         consumed_proxies.append({
             "port_name": r_port.short_name,
             "ident": port_ident,
@@ -1092,9 +1203,12 @@ def build_actor_model(app, domain, analysis, pass_by="const_ref"):
             "instance_spec": instance_spec,
             "events": ev_list,
             "fields": field_list,
+            "inbound_signals": inbound_signals,
             "methods": proxy_methods_list,
             "all_unsubscribe_targets": unsub_targets,
         })
+
+    inbound_signals_flat = [sig for cp in consumed_proxies for sig in cp["inbound_signals"]]
 
     skeletons = []
     skeleton_fields_flat = []
@@ -1145,6 +1259,8 @@ def build_actor_model(app, domain, analysis, pass_by="const_ref"):
                 ],
                 "is_unique_sig": is_unique_sig,
                 "is_unique_sig_on_port": is_unique_sig_on_port,
+                "is_unique_across_ports": (p_method_counts[tag] == 1),
+                "port_count": p_method_counts[tag],
             })
 
         port_setter_types = [cpp_type(f.type_tref, domain) for f in intf.fields if getattr(f, "has_setter", False)]
@@ -1171,6 +1287,8 @@ def build_actor_model(app, domain, analysis, pass_by="const_ref"):
                 "has_setter": has_set,
                 "is_unique_setter": is_uniq_set,
                 "is_unique_setter_on_port": is_uniq_setter_on_port,
+                "is_unique_across_ports": (p_field_setter_counts[tag] == 1) if has_set else True,
+                "port_count": p_field_setter_counts[tag],
             }
             field_list.append(f_info)
             skeleton_fields_flat.append(f_info)
@@ -1647,7 +1765,7 @@ def build_actor_model(app, domain, analysis, pass_by="const_ref"):
                 if is_shared_service:
                     is_uniq = False
                     tag_expr = f"ports::{port_name}::{f.short_name}"
-                    tag_note = f"MANDATORY TAGGED: on_set(ports::{port_name}::{f.short_name}, ...) (shared service across ports)"
+                    tag_note = f"MANDATORY TAGGED: on(ports::{port_name}::{f.short_name}, ...) (shared service across ports)"
                 elif not is_uniq:
                     tag_note = f"Tagged (resolves collision on {t})"
                 else:
@@ -1968,6 +2086,97 @@ def build_actor_model(app, domain, analysis, pass_by="const_ref"):
     legal_signatures = dedup_list(sorted(legal_signatures, key=lambda s: (len(s), s)))
     legal_types = dedup_list(sorted(legal_types))
 
+    req_ports = [p for p in all_ports if p.get("kind") != "Provided"]
+    skeleton_setters = [f for f in skeleton_fields_flat if f.get("has_setter")]
+
+    # -------------------------------------------------------------------------
+    # Inbound Read (Field Getters) Model Structures
+    # -------------------------------------------------------------------------
+    read_ports = []
+    read_fields_by_port_tag = []
+    r_all_field_counts = Counter()
+    for cp in consumed_proxies:
+        for f in cp["fields"]:
+            r_all_field_counts[f"::reaktar::tags::{f['tag']}"] += 1
+
+    type_to_readable_fields = defaultdict(list)
+
+    for cp in consumed_proxies:
+        p_name = cp["port_name"]
+        p_slot = cp["slot_name"]
+        
+        # Check type counts among readable fields on this port
+        port_field_type_counts = Counter([f["type"] for f in cp["fields"] if f.get("has_getter")])
+
+        all_fields_for_port = []
+        for f in cp["fields"]:
+            field_data = {
+                "name": f["name"],
+                "type": f["type"],
+                "tag": f"::reaktar::tags::{f['tag']}",
+                "has_getter": f.get("has_getter", False),
+                "port_name": p_name,
+                "slot_name": p_slot,
+                "is_unique_type_on_port": (port_field_type_counts[f["type"]] == 1) if f.get("has_getter") else False,
+            }
+            all_fields_for_port.append(field_data)
+            read_fields_by_port_tag.append(field_data)
+            if f.get("has_getter"):
+                type_to_readable_fields[f["type"]].append(field_data)
+
+        readable_fields_on_port = [f for f in all_fields_for_port if f["has_getter"]]
+        unique_readable_field = readable_fields_on_port[0] if len(readable_fields_on_port) == 1 else None
+
+        read_ports.append({
+            "name": p_name,
+            "ident": cp["ident"],
+            "slot_name": p_slot,
+            "readable_field_count": len(readable_fields_on_port),
+            "unique_field": unique_readable_field,
+            "all_fields": all_fields_for_port,
+        })
+
+    read_unique_bare_fields = []
+    read_ambiguous_bare_tags = []
+    seen_ambig_tags = set()
+
+    for cp in consumed_proxies:
+        for f in cp["fields"]:
+            tag_name = f"::reaktar::tags::{f['tag']}"
+            if r_all_field_counts[tag_name] == 1:
+                read_unique_bare_fields.append({
+                    "tag": tag_name,
+                    "name": f["name"],
+                    "port_name": cp["port_name"],
+                    "slot_name": cp["slot_name"],
+                    "type": f["type"],
+                    "has_getter": f.get("has_getter", False),
+                })
+            else:
+                if tag_name not in seen_ambig_tags:
+                    seen_ambig_tags.add(tag_name)
+                    read_ambiguous_bare_tags.append({
+                        "tag": tag_name,
+                        "name": f["name"],
+                        "service": cp["service_ident"],
+                    })
+
+    read_by_type = []
+    for t in sorted(type_to_readable_fields.keys()):
+        fields = type_to_readable_fields[t]
+        if len(fields) == 1:
+            read_by_type.append({
+                "type": t,
+                "is_ambiguous": False,
+                "field": fields[0],
+            })
+        else:
+            read_by_type.append({
+                "type": t,
+                "is_ambiguous": True,
+                "fields": fields,
+            })
+
     return {
         "exe_name": exe_name,
         "app_short_name": app_short_name,
@@ -1979,16 +2188,24 @@ def build_actor_model(app, domain, analysis, pass_by="const_ref"):
         "proxy_headers": proxy_headers,
         "tag_aliases": analysis["tag_aliases"],
         "ports": all_ports,
+        "req_ports": req_ports,
         "ports_outbound": ports_outbound,
         "port_aliases": port_aliases,
         "consumed_proxies": consumed_proxies,
         "consumed_proxy_count": len(consumed_proxies),
         "skeletons": skeletons,
         "skeleton_fields": skeleton_fields_flat,
+        "skeleton_setters": skeleton_setters,
+        "inbound_signals_flat": inbound_signals_flat,
         "outbound_tagged": outbound_tagged,
         "outbound_ambiguous_tags": outbound_ambiguous_tags,
         "outbound_by_type": outbound_by_type,
         "outbound_multi": outbound_multi,
+        "read_ports": read_ports,
+        "read_fields_by_port_tag": read_fields_by_port_tag,
+        "read_unique_bare_fields": read_unique_bare_fields,
+        "read_ambiguous_bare_tags": read_ambiguous_bare_tags,
+        "read_by_type": read_by_type,
         "legal_signatures": legal_signatures,
         "legal_types": legal_types,
         "legal_tags": analysis["legal_tags"],

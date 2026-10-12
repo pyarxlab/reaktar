@@ -37,11 +37,11 @@ struct strict_val {
     operator const Target&() const& noexcept;
     operator Target&&() && noexcept;
 
-    template <typename Other, typename = std::enable_if_t<(std::is_arithmetic_v<Other> || std::is_enum_v<Other>) && !std::is_same_v<std::decay_t<Other>, Target>>>
+    template <typename Other, typename = std::enable_if_t<std::is_arithmetic_v<Target> && std::is_arithmetic_v<Other> && !std::is_same_v<std::decay_t<Other>, Target>>>
     operator Other() const = delete;
-    template <typename Other, typename = std::enable_if_t<(std::is_arithmetic_v<Other> || std::is_enum_v<Other>) && !std::is_same_v<std::decay_t<Other>, Target>>>
+    template <typename Other, typename = std::enable_if_t<std::is_arithmetic_v<Target> && std::is_arithmetic_v<Other> && !std::is_same_v<std::decay_t<Other>, Target>>>
     operator Other&() = delete;
-    template <typename Other, typename = std::enable_if_t<(std::is_arithmetic_v<Other> || std::is_enum_v<Other>) && !std::is_same_v<std::decay_t<Other>, Target>>>
+    template <typename Other, typename = std::enable_if_t<std::is_arithmetic_v<Target> && std::is_arithmetic_v<Other> && !std::is_same_v<std::decay_t<Other>, Target>>>
     operator const Other&() const = delete;
 };
 
@@ -188,7 +188,7 @@ struct result_adapter {
                 if constexpr (std::is_same_v<std::decay_t<ReturnType>, DecayedVal> || std::is_convertible_v<ReturnType, DecayedVal>) {
                     return make_future_adapter<DecayedVal>::make(static_cast<DecayedVal>(std::forward<ReturnType>(val)));
                 } else if constexpr (std::is_constructible_v<DecayedVal, ReturnType>) {
-                    return make_future_adapter<DecayedVal>::make(DecayedVal{std::forward<ReturnType>(val)});
+                    return make_future_adapter<DecayedVal>::make(DecayedVal(std::forward<ReturnType>(val)));
                 } else {
                     return make_future_adapter<DecayedVal>::make(DecayedVal{});
                 }
@@ -196,7 +196,7 @@ struct result_adapter {
         } else if constexpr (is_result_v<ExpectedType>) {
             return ExpectedType::FromValue(std::forward<ReturnType>(val));
         } else {
-            return ExpectedType{std::forward<ReturnType>(val)};
+            return ExpectedType(std::forward<ReturnType>(val));
         }
     }
 };
@@ -291,19 +291,33 @@ public:
 template <typename Derived, typename... Args>
 inline constexpr bool has_direct_method_handler_v = has_direct_method_handler<Derived, Args...>::value;
 
-// SFINAE traits to detect field setter handler: `Result<T> on_set(FieldTag, const T&)`
+// SFINAE traits to detect field setter handler: `T on_set(FieldTag, const T&)`
 template <typename Derived, typename Tag, typename ValueType, typename = void>
 struct has_on_field_set : std::false_type {};
 
 template <typename Derived, typename Tag, typename ValueType>
 struct has_on_field_set<Derived, Tag, ValueType,
-    std::void_t<decltype(std::declval<Derived&>().on_set(std::declval<Tag>(), std::declval<const ValueType&>()))>>
+    std::void_t<decltype(std::declval<Derived&>().on_set(std::declval<Tag>(), std::declval<strict_val<std::decay_t<ValueType>>&>()))>>
     : std::true_type {};
 
 template <typename Derived, typename Tag, typename ValueType>
 inline constexpr bool has_on_field_set_v = has_on_field_set<Derived, Tag, ValueType>::value;
 
-// SFINAE traits to detect direct field setter handler without tag: `Result<T> on_set(const T&)` or `on_set(T)`
+template <typename Derived, typename Tag, typename ValueType, typename = void>
+struct on_field_set_return_type {
+    using type = void;
+};
+
+template <typename Derived, typename Tag, typename ValueType>
+struct on_field_set_return_type<Derived, Tag, ValueType,
+    std::void_t<decltype(std::declval<Derived&>().on_set(std::declval<Tag>(), std::declval<strict_val<std::decay_t<ValueType>>&>()))>> {
+    using type = decltype(std::declval<Derived&>().on_set(std::declval<Tag>(), std::declval<strict_val<std::decay_t<ValueType>>&>()));
+};
+
+template <typename Derived, typename Tag, typename ValueType>
+using on_field_set_return_type_t = typename on_field_set_return_type<Derived, Tag, ValueType>::type;
+
+// SFINAE traits to detect direct field setter handler without tag: `T on_set(const T&)` or `on_set(T)`
 template <typename Derived, typename ValueType>
 class has_on_direct_field_set {
     template <typename D>
@@ -318,6 +332,83 @@ public:
 
 template <typename Derived, typename ValueType>
 inline constexpr bool has_on_direct_field_set_v = has_on_direct_field_set<Derived, ValueType>::value;
+
+template <typename Derived, typename ValueType, typename = void>
+struct on_direct_field_set_return_type {
+    using type = void;
+};
+
+template <typename Derived, typename ValueType>
+struct on_direct_field_set_return_type<Derived, ValueType,
+    std::void_t<decltype(std::declval<Derived&>().on_set(std::declval<strict_val<std::decay_t<ValueType>>&>()))>> {
+    using type = decltype(std::declval<Derived&>().on_set(std::declval<strict_val<std::decay_t<ValueType>>&>()));
+};
+
+template <typename Derived, typename ValueType>
+using on_direct_field_set_return_type_t = typename on_direct_field_set_return_type<Derived, ValueType>::type;
+
+// SFINAE traits to detect canonical tagged field setter handler: `T on(FieldTag, const T&)` or `on(FieldTag, T)`
+template <typename Derived, typename Tag, typename ValueType, typename = void>
+struct has_on_setter : std::false_type {};
+
+template <typename Derived, typename Tag, typename ValueType>
+struct has_on_setter<Derived, Tag, ValueType,
+    std::void_t<decltype(std::declval<Derived&>().on(std::declval<Tag>(), std::declval<strict_val<std::decay_t<ValueType>>&>()))>>
+    : std::true_type {};
+
+template <typename Derived, typename Tag, typename ValueType>
+inline constexpr bool has_on_setter_v = has_on_setter<Derived, Tag, ValueType>::value;
+
+template <typename Derived, typename Tag, typename ValueType, typename = void>
+struct on_setter_return_type {
+    using type = void;
+};
+
+template <typename Derived, typename Tag, typename ValueType>
+struct on_setter_return_type<Derived, Tag, ValueType,
+    std::void_t<decltype(std::declval<Derived&>().on(std::declval<Tag>(), std::declval<strict_val<std::decay_t<ValueType>>&>()))>> {
+    using type = decltype(std::declval<Derived&>().on(std::declval<Tag>(), std::declval<strict_val<std::decay_t<ValueType>>&>()));
+};
+
+template <typename Derived, typename Tag, typename ValueType>
+using on_setter_return_type_t = typename on_setter_return_type<Derived, Tag, ValueType>::type;
+
+// SFINAE traits to detect canonical direct field setter handler without tag: `T on(const T&)` or `on(T)`
+// Distinguishes from regular event/notifier handlers by requiring a non-void return type.
+template <typename Derived, typename ValueType>
+class has_on_direct_setter {
+    using V = std::decay_t<ValueType>;
+
+    template <typename D>
+    static auto test(int) -> std::enable_if_t<
+        !std::is_void_v<decltype(std::declval<D&>().on(std::declval<strict_val<V>&>()))>,
+        std::true_type
+    >;
+
+    template <typename>
+    static auto test(...) -> std::false_type;
+
+public:
+    static constexpr bool value = decltype(test<Derived>(0))::value;
+};
+
+template <typename Derived, typename ValueType>
+inline constexpr bool has_on_direct_setter_v = has_on_direct_setter<Derived, ValueType>::value;
+
+template <typename Derived, typename ValueType, typename = void>
+struct on_direct_setter_return_type {
+    using type = void;
+};
+
+template <typename Derived, typename ValueType>
+struct on_direct_setter_return_type<Derived, ValueType,
+    std::void_t<decltype(std::declval<Derived&>().on(std::declval<strict_val<std::decay_t<ValueType>>&>()))>> {
+    using type = decltype(std::declval<Derived&>().on(std::declval<strict_val<std::decay_t<ValueType>>&>()));
+};
+
+template <typename Derived, typename ValueType>
+using on_direct_setter_return_type_t = typename on_direct_setter_return_type<Derived, ValueType>::type;
+
 
 
 /**
@@ -395,6 +486,7 @@ public:
 
     constexpr explicit operator bool() const noexcept { return is_valid_; }
     constexpr bool ok() const noexcept { return is_valid_; }
+    constexpr bool valid() const noexcept { return is_valid_; }
 
     /**
      * @brief Vanilla AUTOSAR Future pass-through.

@@ -12,22 +12,28 @@
 //
 // QUICK DEVELOPER CHEAT SHEET:
 //
-// 1. INCOMING DATA -> implement on(...) or on_set(...)
+// 1. INCOMING DATA -> implement on(...)
 //    - Events & Notifiers:  void on(const Payload& val)          or on(Tag, const Payload& val)
 //    - Skeleton Methods:    Ret  on(Args...)                     or on(Tag, Args...)
-//    - Skeleton Field Set:  T    on_set(const T& val)            or on_set(Tag, const T& val)
+//    - Skeleton Field Set:  T    on(const T& val)                or on(Tag, const T& val)
 //
 // 2. OUTGOING DATA -> call emit(...)
 //    - Ergonomic Untagged:  emit(val)                           or emit(args...).then(...)
 //    - Port-Only Targeted:  emit<ports::Port>(val)              or emit<ports::Port>(args...).then(...)
 //    - Fully Qualified:     emit<ports::Port::Tag>(val)         or emit<Tag>(val)
 //
-// 3. TAGS & CONFLICT RESOLUTION:
-//    - Unique across Actor: use ergonomic untagged emit(...).
-//    - Unique on Port:      use port-only emit<ports::Port>(...).
+// 3. PULL QUERY (FIELDS) -> call read(...)
+//    - Ergonomic Untagged:  read<FieldType>()                   (if unique across actor)
+//    - Port-Only Targeted:  read<ports::Port>()                 (if port has 1 readable field)
+//    - Tag-Based:           read<FieldTag>()                    or read(FieldTag{})
+//    - Fully Qualified:     read<ports::Port::FieldTag>()       or read<ports::Port, FieldTag>()
+//
+// 4. TAGS & CONFLICT RESOLUTION:
+//    - Unique across Actor: use ergonomic untagged emit(...)/read<Type>().
+//    - Unique on Port:      use port-only emit<ports::Port>(...)/read<ports::Port>().
 //    - Type collision:      pass/specify Tag (tags are in scope directly from Base).
 //
-// 4. PORT LIFECYCLE:
+// 5. PORT LIFECYCLE:
 //    - Full:     start(); wait_until_ready(); ... stop();
 //    - Granular: open_port<ports::PortName>(); close_port<ports::PortName>();
 // ==============================================================================
@@ -85,31 +91,31 @@ public:
     }
 
     // [SupervisorPort::ActiveAlerts] Untagged (unique field type)
-    ara::core::Vector<vehicle_data::EmergencyAlert> on_set(const ara::core::Vector<vehicle_data::EmergencyAlert>& val) {
+    ara::core::Vector<vehicle_data::EmergencyAlert> on(const ara::core::Vector<vehicle_data::EmergencyAlert>& val) {
         std::cout << "[TelemetryExample] ActiveAlerts set: " << val << "\n";
         return val;
     }
 
-    // [SupervisorPort::CalibrationKey] Untagged (unique field type)
-    uint32_t on_set(const uint32_t& val) {
+    // [SupervisorPort::CalibrationKey] Tagged (resolves collision on uint32_t)
+    uint32_t on(CalibrationKey, const uint32_t& val) {
         std::cout << "[TelemetryExample] CalibrationKey set: " << val << "\n";
         return val;
     }
 
     // [SupervisorPort::CurrentDriveMode] Untagged (unique field type)
-    vehicle_data::DriveMode on_set(const vehicle_data::DriveMode& val) {
+    vehicle_data::DriveMode on(const vehicle_data::DriveMode& val) {
         std::cout << "[TelemetryExample] CurrentDriveMode set: " << val << "\n";
         return val;
     }
 
     // [SupervisorPort::FeatureFlags] Untagged (unique field type)
-    ara::core::Map<ara::core::String, bool> on_set(const ara::core::Map<ara::core::String, bool>& val) {
+    ara::core::Map<ara::core::String, bool> on(const ara::core::Map<ara::core::String, bool>& val) {
         std::cout << "[TelemetryExample] FeatureFlags set: " << val << "\n";
         return val;
     }
 
     // [SupervisorPort::VehicleConfig] Untagged (unique field type)
-    ara::core::Map<ara::core::String, ara::core::String> on_set(const ara::core::Map<ara::core::String, ara::core::String>& val) {
+    ara::core::Map<ara::core::String, ara::core::String> on(const ara::core::Map<ara::core::String, ara::core::String>& val) {
         std::cout << "[TelemetryExample] VehicleConfig set: " << val << "\n";
         return val;
     }
