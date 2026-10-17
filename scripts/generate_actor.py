@@ -188,14 +188,19 @@ def get_vector_element_tref(dt):
 
 
 def get_array_element_tref_and_size(dt):
-    size = getattr(dt, "array_size", None)
-    if hasattr(size, "__iter__") and not isinstance(size, (str, bytes)):
-        size = list(size)[0] if len(size) > 0 else 1
-    if size is not None:
+    def _extract_size(val):
+        if val is None:
+            return None
+        if isinstance(val, dict) and "_text" in val:
+            val = val["_text"]
+        elif hasattr(val, "__iter__") and not isinstance(val, (str, bytes, dict)):
+            val = list(val)[0] if len(val) > 0 else 1
         try:
-            size = int(size)
+            return int(val)
         except Exception:
-            size = 1
+            return 1
+
+    size = _extract_size(getattr(dt, "array_size", None))
     elem_ref = None
     args = getattr(dt, "cpp_template_arguments", None) or getattr(dt, "template_arguments", None)
     if args and len(args) > 0:
@@ -205,7 +210,7 @@ def get_array_element_tref_and_size(dt):
         if sub_els:
             for el in sub_els:
                 if size is None:
-                    size = getattr(el, "array_size", None)
+                    size = _extract_size(getattr(el, "array_size", None))
                 ref = getattr(el, "type_reference_ref", None) or getattr(el, "type_tref", None)
                 if ref and not getattr(ref, "is_null", False):
                     elem_ref = ref
@@ -503,13 +508,12 @@ def analyze_application_types(app, domain):
             t = cpp_type(ev.type_tref, domain)
             outgoing_items.append(('event', ev.short_name, t, p.short_name, intf, ev))
 
-    # 2. P-Port field notifiers (Skeleton Field Update)
+    # 2. P-Port fields (Skeleton Field Update - Law 0: actor manages field signals)
     for p in get_service_p_ports(app, domain):
         intf = resolve_intf(p, domain)
         for f in sorted_fields(intf.fields):
-            if f.has_notifier:
-                t = cpp_type(f.type_tref, domain)
-                outgoing_items.append(('field_update', f.short_name, t, p.short_name, intf, f))
+            t = cpp_type(f.type_tref, domain)
+            outgoing_items.append(('field_update', f.short_name, t, p.short_name, intf, f))
 
     # 3. R-Port RPC methods (single-arg directly without artificial Request structs)
     for r in get_service_r_ports(app, domain):
@@ -701,6 +705,7 @@ def analyze_application_types(app, domain):
                 legal_signatures.add((nested_port_tag, t))
                 legal_signatures.add((port_tag, t))
                 legal_signatures.add((port_Any_tag, t))
+                legal_signatures.add(("::reaktar::Any", t))
 
     # 7. Collect all app tags and build ergonomic tag aliases
     all_intfs = set()
@@ -862,6 +867,459 @@ def generate_dummy_ret(ret_t: str) -> str:
         return "vehicle_data::DriveMode::COMFORT"
     else:
         return f"{ret_t}{{}}"
+
+
+def resolve_example_handlers(port, domain, analysis, is_shared_service, is_provided, pass_by="const_ref"):
+    intf = resolve_intf(port, domain)
+    ns = service_ns(intf)
+    port_name = port.short_name
+    port_ident = port_name.lower()
+    incoming_handlers = []
+
+    if is_provided:
+        # Skeleton methods (Incoming)
+        for m in sorted_methods(intf.methods):
+            in_args = method_in_args(m, domain, pass_by=pass_by)
+            sig_types = tuple(a[1] for a in in_args)
+            is_uniq = is_unique_skel_method(sig_types, analysis) and not is_shared_service
+            ret_t = method_ret_type(m, domain)
+            is_faf = is_fire_and_forget(m)
+            bare_tag = m.short_name
+            is_ambig = is_bare_tag_ambiguous(bare_tag, analysis)
+            tag_expr = bare_tag if not is_ambig else f"::reaktar::tags::{ns}::methods::{m.short_name}"
+
+            if is_shared_service:
+                tag_expr = f"ports::{port_name}::{m.short_name}"
+                sig_str = ", ".join(sig_types) if sig_types else "void"
+                tag_note = f"MANDATORY TAGGED: on(ports::{port_name}::{m.short_name}, ...) (shared service across ports)"
+            elif not is_uniq:
+                sig_str = ", ".join(sig_types) if sig_types else "void"
+                tag_note = f"Tagged (resolves collision on {sig_str})"
+            else:
+                tag_note = "Untagged (unique signature)"
+
+            call_kind = "fire-and-forget" if is_faf else "RPC"
+            autosar_note = f"AUTOSAR: skeleton.{m.short_name}() {call_kind}"
+
+            incoming_handlers.append({
+                "kind": "skel_method",
+                "name": m.short_name,
+                "tag": f"::reaktar::tags::{ns}::methods::{m.short_name}",
+                "tag_expr": tag_expr,
+                "bare_tag": bare_tag,
+                "is_unique": is_uniq,
+                "in_args": [{"name": a[0], "type": a[1], "pass_type": a[2]} for a in in_args],
+                "ret_type": ret_t,
+                "dummy_ret_expr": generate_dummy_ret(ret_t),
+                "is_faf": is_faf,
+                "autosar_note": autosar_note,
+                "tag_note": tag_note,
+                "member_var": f"{port_ident}_{m.short_name.lower()}",
+            })
+
+        # Skeleton fields (Setters are Incoming)
+        for f in sorted_fields(intf.fields):
+            if getattr(f, "has_setter", False):
+                t = cpp_type(f.type_tref, domain)
+                is_uniq = is_unique_field_setter(t, analysis) and not is_shared_service
+                bare_tag = f.short_name
+                is_ambig = is_bare_tag_ambiguous(bare_tag, analysis)
+                tag_expr = bare_tag if not is_ambig else f"::reaktar::tags::{ns}::fields::{f.short_name}"
+
+                if is_shared_service:
+                    tag_expr = f"ports::{port_name}::{f.short_name}"
+                    tag_note = f"MANDATORY TAGGED: on(ports::{port_name}::{f.short_name}, ...) (shared service across ports)"
+                elif not is_uniq:
+                    tag_note = f"Tagged (resolves collision on {t})"
+                else:
+                    tag_note = "Untagged (unique field type)"
+
+                autosar_note = f"AUTOSAR: skeleton.{f.short_name}.RegisterSetHandler()"
+
+                incoming_handlers.append({
+                    "kind": "skel_field_set",
+                    "name": f.short_name,
+                    "tag": f"::reaktar::tags::{ns}::fields::{f.short_name}",
+                    "tag_expr": tag_expr,
+                    "bare_tag": bare_tag,
+                    "is_unique": is_uniq,
+                    "payload_type": t,
+                    "ret_type": t,
+                    "autosar_note": autosar_note,
+                    "tag_note": tag_note,
+                    "member_var": f"{port_ident}_{f.short_name.lower()}_set",
+                })
+    else:
+        # Proxy events (Incoming)
+        for ev in sorted_events(intf.events):
+            t = cpp_type(ev.type_tref, domain)
+            is_uniq = is_unique_incoming(t, analysis) and not is_shared_service
+            bare_tag = ev.short_name
+            is_ambig = is_bare_tag_ambiguous(bare_tag, analysis)
+            tag_expr = bare_tag if not is_ambig else f"::reaktar::tags::{ns}::events::{ev.short_name}"
+
+            if is_shared_service:
+                tag_expr = f"ports::{port_name}::{ev.short_name}"
+                tag_note = f"MANDATORY TAGGED: on(ports::{port_name}::{ev.short_name}, val) (shared service across ports)"
+            elif not is_uniq:
+                tag_note = f"Tagged (resolves collision on {t})"
+            else:
+                tag_note = "Untagged (unique type)"
+
+            autosar_note = f"AUTOSAR: proxy->{ev.short_name}.Subscribe()"
+
+            incoming_handlers.append({
+                "kind": "event",
+                "name": ev.short_name,
+                "tag": f"::reaktar::tags::{ns}::events::{ev.short_name}",
+                "tag_expr": tag_expr,
+                "bare_tag": bare_tag,
+                "is_unique": is_uniq,
+                "payload_type": t,
+                "autosar_note": autosar_note,
+                "tag_note": tag_note,
+                "member_var": f"{port_ident}_{ev.short_name.lower()}",
+            })
+
+        # Proxy fields (Notifiers are Incoming)
+        for f in sorted_fields(intf.fields):
+            if getattr(f, "has_notifier", False):
+                t = cpp_type(f.type_tref, domain)
+                is_uniq = is_unique_incoming(t, analysis) and not is_shared_service
+                bare_tag = f.short_name
+                is_ambig = is_bare_tag_ambiguous(bare_tag, analysis)
+                tag_expr = bare_tag if not is_ambig else f"::reaktar::tags::{ns}::fields::{f.short_name}"
+
+                if is_shared_service:
+                    tag_expr = f"ports::{port_name}::{f.short_name}"
+                    tag_note = f"MANDATORY TAGGED: on(ports::{port_name}::{f.short_name}, val) (shared service across ports)"
+                elif not is_uniq:
+                    tag_note = f"Tagged (resolves collision on {t})"
+                else:
+                    tag_note = "Untagged (unique type)"
+
+                autosar_note = f"AUTOSAR: proxy->{f.short_name}.Subscribe() notifier"
+
+                incoming_handlers.append({
+                    "kind": "field_notify",
+                    "name": f.short_name,
+                    "tag": f"::reaktar::tags::{ns}::fields::{f.short_name}",
+                    "tag_expr": tag_expr,
+                    "bare_tag": bare_tag,
+                    "is_unique": is_uniq,
+                    "payload_type": t,
+                    "autosar_note": autosar_note,
+                    "tag_note": tag_note,
+                    "member_var": f"{port_ident}_{f.short_name.lower()}_notify",
+                })
+
+    return incoming_handlers
+
+
+def resolve_example_emits(port, domain, analysis, port_single_counts_by_port, port_multi_counts_by_port,
+                          is_shared_service, is_provided, pass_by="const_ref"):
+    intf = resolve_intf(port, domain)
+    ns = service_ns(intf)
+    port_name = port.short_name
+    outgoing_emits = []
+
+    if is_provided:
+        # Skeleton events (Outgoing)
+        for ev in sorted_events(intf.events):
+            t = cpp_type(ev.type_tref, domain)
+            is_uniq = is_unique_outgoing(t, analysis) and not is_shared_service
+            bare_tag = ev.short_name
+            is_ambig = is_bare_tag_ambiguous(bare_tag, analysis)
+            tag_expr = bare_tag if not is_ambig else f"::reaktar::tags::{ns}::events::{ev.short_name}"
+            dummy_val = generate_dummy_value(t)
+
+            autosar_note = f"AUTOSAR: skeleton.{ev.short_name}.Send()"
+
+            if is_shared_service:
+                tag_expr = f"ports::{port_name}::{ev.short_name}"
+                call_untagged = None
+                tag_note = f"MANDATORY TAGGED: emit<{tag_expr}>(val) (shared service across ports)"
+            elif is_uniq:
+                call_untagged = f"emit({dummy_val})"
+                tag_note = f"Untagged: emit(val). Alternative: emit<{tag_expr}>(val)"
+            else:
+                call_untagged = None
+                tag_note = f"MANDATORY TAGGED: emit<{tag_expr}>(val)"
+
+            call_tagged = f"emit<{tag_expr}>({dummy_val})"
+            call_port_only = None
+            if port_single_counts_by_port.get(port_name, {}).get(t, 0) == 1:
+                call_port_only = f"emit<ports::{port_name}>({dummy_val})"
+
+            outgoing_emits.append({
+                "kind": "skeleton_event",
+                "name": ev.short_name,
+                "tag": f"::reaktar::tags::{ns}::events::{ev.short_name}",
+                "tag_expr": tag_expr,
+                "is_unique": is_uniq,
+                "example_call_untagged": call_untagged,
+                "example_call_tagged": call_tagged,
+                "example_call_port_only": call_port_only,
+                "autosar_note": autosar_note,
+                "tag_note": tag_note,
+            })
+
+        # Skeleton fields (Updates are Outgoing under Law 0: all fields)
+        for f in sorted_fields(intf.fields):
+            t = cpp_type(f.type_tref, domain)
+            is_uniq = is_unique_outgoing(t, analysis) and not is_shared_service
+            bare_tag = f.short_name
+            is_ambig = is_bare_tag_ambiguous(bare_tag, analysis)
+            tag_expr = bare_tag if not is_ambig else f"::reaktar::tags::{ns}::fields::{f.short_name}"
+            dummy_val = generate_dummy_value(t)
+
+            has_notifier = getattr(f, "has_notifier", False)
+            autosar_note = f"AUTOSAR: skeleton.{f.short_name}.Update()" if has_notifier else f"AUTOSAR: skeleton.{f.short_name}.Update() (local state update, no notifier)"
+
+            if is_shared_service:
+                tag_expr = f"ports::{port_name}::{f.short_name}"
+                call_untagged = None
+                tag_note = f"MANDATORY TAGGED: emit<{tag_expr}>(val) (shared service across ports)"
+            elif is_uniq:
+                call_untagged = f"emit({dummy_val})"
+                tag_note = f"Untagged: emit(val). Alternative: emit<{tag_expr}>(val)"
+            else:
+                call_untagged = None
+                tag_note = f"MANDATORY TAGGED: emit<{tag_expr}>(val)"
+
+            call_tagged = f"emit<{tag_expr}>({dummy_val})"
+            call_port_only = None
+            if port_single_counts_by_port.get(port_name, {}).get(t, 0) == 1:
+                call_port_only = f"emit<ports::{port_name}>({dummy_val})"
+
+            outgoing_emits.append({
+                "kind": "skeleton_field_update",
+                "name": f.short_name,
+                "tag": f"::reaktar::tags::{ns}::fields::{f.short_name}",
+                "tag_expr": tag_expr,
+                "is_unique": is_uniq,
+                "example_call_untagged": call_untagged,
+                "example_call_tagged": call_tagged,
+                "example_call_port_only": call_port_only,
+                "autosar_note": autosar_note,
+                "tag_note": tag_note,
+            })
+    else:
+        # Proxy methods (Outgoing RPC & Fire-and-Forget)
+        for m in sorted_methods(intf.methods):
+            in_args = method_in_args(m, domain, pass_by=pass_by)
+            sig_types = tuple(a[1] for a in in_args)
+            is_faf = is_fire_and_forget(m)
+            bare_tag = m.short_name
+            is_ambig = is_bare_tag_ambiguous(bare_tag, analysis)
+            tag_expr = bare_tag if not is_ambig else f"::reaktar::tags::{ns}::methods::{m.short_name}"
+            dummy_args_list = [generate_dummy_value(a[1]) for a in in_args]
+            dummy_args_str = ", ".join(dummy_args_list)
+
+            if len(in_args) == 1:
+                t = in_args[0][1]
+                is_uniq = is_unique_outgoing(t, analysis) and not is_shared_service
+                port_can_emit = (port_single_counts_by_port.get(port_name, {}).get(t, 0) == 1)
+            else:
+                is_uniq = is_unique_proxy_method(sig_types, analysis) and not is_shared_service
+                port_can_emit = (port_multi_counts_by_port.get(port_name, {}).get(sig_types, 0) == 1)
+
+            call_kind = "fire-and-forget" if is_faf else "RPC"
+            autosar_note = f"AUTOSAR: proxy->{m.short_name}() {call_kind}"
+
+            if is_shared_service:
+                call_untagged = None
+                tag_expr = f"ports::{port_name}::{m.short_name}"
+                tag_note = f"MANDATORY TAGGED: emit<{tag_expr}>({dummy_args_str})"
+            elif is_uniq:
+                call_untagged = f"emit({dummy_args_str})"
+                tag_note = f"Untagged (unique signature). Alternative: emit<{tag_expr}>({dummy_args_str})"
+            else:
+                call_untagged = None
+                tag_note = f"MANDATORY TAGGED: emit<{tag_expr}>({dummy_args_str})"
+
+            call_tagged = f"emit<{tag_expr}>({dummy_args_str})"
+            call_port_only = f"emit<ports::{port_name}>({dummy_args_str})" if port_can_emit else None
+
+            outgoing_emits.append({
+                "kind": "proxy_faf" if is_faf else "proxy_rpc",
+                "name": m.short_name,
+                "tag": f"::reaktar::tags::{ns}::methods::{m.short_name}",
+                "tag_expr": tag_expr,
+                "is_unique": is_uniq,
+                "example_call_untagged": call_untagged,
+                "example_call_tagged": call_tagged,
+                "example_call_port_only": call_port_only,
+                "autosar_note": autosar_note,
+                "tag_note": tag_note,
+            })
+
+        # Proxy fields (Setters are Outgoing)
+        for f in sorted_fields(intf.fields):
+            if getattr(f, "has_setter", False):
+                t = cpp_type(f.type_tref, domain)
+                is_uniq = is_unique_outgoing(t, analysis) and not is_shared_service
+                bare_tag = f.short_name
+                is_ambig = is_bare_tag_ambiguous(bare_tag, analysis)
+                tag_expr = bare_tag if not is_ambig else f"::reaktar::tags::{ns}::fields::{f.short_name}"
+                dummy_val = generate_dummy_value(t)
+
+                autosar_note = f"AUTOSAR: proxy->{f.short_name}.Set()"
+                if is_shared_service:
+                    call_untagged = None
+                    tag_expr = f"ports::{port_name}::{f.short_name}"
+                    tag_note = f"MANDATORY TAGGED: emit<{tag_expr}>({dummy_val})"
+                elif is_uniq:
+                    call_untagged = f"emit({dummy_val})"
+                    tag_note = f"Untagged: emit(val). Alternative: emit<{tag_expr}>({dummy_val})"
+                else:
+                    call_untagged = None
+                    tag_note = f"MANDATORY TAGGED: emit<{tag_expr}>({dummy_val})"
+
+                call_tagged = f"emit<{tag_expr}>({dummy_val})"
+                call_port_only = f"emit<ports::{port_name}>({dummy_val})" if (port_single_counts_by_port.get(port_name, {}).get(t, 0) == 1) else None
+
+                outgoing_emits.append({
+                    "kind": "proxy_field_set",
+                    "name": f.short_name,
+                    "tag": f"::reaktar::tags::{ns}::fields::{f.short_name}",
+                    "tag_expr": tag_expr,
+                    "is_unique": is_uniq,
+                    "example_call_untagged": call_untagged,
+                    "example_call_tagged": call_tagged,
+                    "example_call_port_only": call_port_only,
+                    "autosar_note": autosar_note,
+                    "tag_note": tag_note,
+                })
+
+    return outgoing_emits
+
+
+def resolve_example_reads(port, domain, analysis, is_shared_service, read_port_info, unique_read_types, read_unique_bare_fields):
+    intf = resolve_intf(port, domain)
+    ns = service_ns(intf)
+    port_name = port.short_name
+    readable_queries = []
+
+    for f in sorted_fields(intf.fields):
+        if getattr(f, "has_getter", False):
+            t = cpp_type(f.type_tref, domain)
+            tag_fq = f"::reaktar::tags::{ns}::fields::{f.short_name}"
+            port_scoped_tag = f"ports::{port_name}::{f.short_name}"
+
+            can_read_untagged = (t in unique_read_types)
+            can_read_port_only = (read_port_info is not None and read_port_info.get("readable_field_count", 0) == 1)
+
+            is_in_read_unique = any(rf["tag"] == tag_fq for rf in read_unique_bare_fields)
+            is_ambig_bare = is_bare_tag_ambiguous(f.short_name, analysis)
+
+            if is_in_read_unique and not is_shared_service:
+                can_read_bare_tag = True
+                bare_tag_expr = f.short_name if not is_ambig_bare else tag_fq
+                call_bare_tag = f"read<{bare_tag_expr}>()"
+            else:
+                can_read_bare_tag = False
+                bare_tag_expr = None
+                call_bare_tag = None
+
+            call_untagged = f"read<{t}>()" if can_read_untagged else None
+            call_port_only = f"read<ports::{port_name}>()" if can_read_port_only else None
+            call_port_scoped = f"read<{port_scoped_tag}>()"
+
+            readable_queries.append({
+                "name": f.short_name,
+                "type": t,
+                "tag": tag_fq,
+                "port_scoped_tag": port_scoped_tag,
+                "can_read_untagged": can_read_untagged,
+                "can_read_port_only": can_read_port_only,
+                "can_read_bare_tag": can_read_bare_tag,
+                "example_call_untagged": call_untagged,
+                "example_call_port_only": call_port_only,
+                "example_call_bare_tag": call_bare_tag,
+                "example_call_port_scoped": call_port_scoped,
+                "autosar_note": f"AUTOSAR: proxy->{f.short_name}.Get()",
+            })
+
+    return readable_queries
+
+
+def build_example_interfaces(app, domain, analysis, p_ports, r_ports,
+                             port_single_counts_by_port, port_multi_counts_by_port,
+                             read_ports, read_by_type, read_unique_bare_fields,
+                             pass_by="const_ref") -> list:
+    example_interfaces = []
+    p_sident_counts = Counter([service_ident(resolve_intf(p, domain)) for p in p_ports])
+    r_sident_counts = Counter([service_ident(resolve_intf(r, domain)) for r in r_ports])
+    unique_read_types = {item["type"] for item in read_by_type if not item.get("is_ambiguous", False)}
+    read_port_map = {p["name"]: p for p in read_ports}
+
+    # 1. Provided Ports (Skeletons)
+    for p_port in p_ports:
+        intf = resolve_intf(p_port, domain)
+        ns = service_ns(intf)
+        sident = service_ident(intf)
+        is_shared_service = (p_sident_counts[sident] > 1)
+        port_name = p_port.short_name
+        port_ident = port_name.lower()
+        candidate_alias = strip_port_affixes(port_name)
+
+        incoming_handlers = resolve_example_handlers(
+            p_port, domain, analysis, is_shared_service, is_provided=True, pass_by=pass_by
+        )
+        outgoing_emits = resolve_example_emits(
+            p_port, domain, analysis, port_single_counts_by_port, port_multi_counts_by_port,
+            is_shared_service, is_provided=True, pass_by=pass_by
+        )
+        readable_queries = []
+
+        example_interfaces.append({
+            "port_name": port_name,
+            "port_alias": candidate_alias,
+            "port_kind": "Provided",
+            "ident": port_ident,
+            "intf_name": intf.short_name,
+            "intf_ns": ns,
+            "incoming_handlers": incoming_handlers,
+            "outgoing_emits": outgoing_emits,
+            "readable_queries": readable_queries,
+        })
+
+    # 2. Required Ports (Proxies)
+    for r_port in r_ports:
+        intf = resolve_intf(r_port, domain)
+        ns = service_ns(intf)
+        sident = service_ident(intf)
+        is_shared_service = (r_sident_counts[sident] > 1)
+        port_name = r_port.short_name
+        port_ident = port_name.lower()
+        candidate_alias = strip_port_affixes(port_name)
+
+        incoming_handlers = resolve_example_handlers(
+            r_port, domain, analysis, is_shared_service, is_provided=False, pass_by=pass_by
+        )
+        outgoing_emits = resolve_example_emits(
+            r_port, domain, analysis, port_single_counts_by_port, port_multi_counts_by_port,
+            is_shared_service, is_provided=False, pass_by=pass_by
+        )
+        readable_queries = resolve_example_reads(
+            r_port, domain, analysis, is_shared_service,
+            read_port_map.get(port_name), unique_read_types, read_unique_bare_fields
+        )
+
+        example_interfaces.append({
+            "port_name": port_name,
+            "port_alias": candidate_alias,
+            "port_kind": "Required",
+            "ident": port_ident,
+            "intf_name": intf.short_name,
+            "intf_ns": ns,
+            "incoming_handlers": incoming_handlers,
+            "outgoing_emits": outgoing_emits,
+            "readable_queries": readable_queries,
+        })
+
+    return example_interfaces
 
 
 def collect_actor_json_types(app, domain, pass_by="const_ref"):
@@ -1072,25 +1530,37 @@ def build_actor_model(app, domain, analysis, pass_by="const_ref"):
 
     r_event_counts = Counter()
     r_field_notif_counts = Counter()
+    r_event_ports = defaultdict(list)
+    r_field_notif_ports = defaultdict(list)
     for r in r_ports:
         r_intf = resolve_intf(r, domain)
         r_ns = service_ns(r_intf)
         for ev in r_intf.events:
-            r_event_counts[f"{r_ns}::events::{ev.short_name}"] += 1
+            tag = f"{r_ns}::events::{ev.short_name}"
+            r_event_counts[tag] += 1
+            r_event_ports[tag].append(r.short_name)
         for f in r_intf.fields:
             if getattr(f, "has_notifier", False):
-                r_field_notif_counts[f"{r_ns}::fields::{f.short_name}"] += 1
+                tag = f"{r_ns}::fields::{f.short_name}"
+                r_field_notif_counts[tag] += 1
+                r_field_notif_ports[tag].append(r.short_name)
 
     p_method_counts = Counter()
     p_field_setter_counts = Counter()
+    p_method_ports = defaultdict(list)
+    p_field_setter_ports = defaultdict(list)
     for p in p_ports:
         p_intf = resolve_intf(p, domain)
         p_ns = service_ns(p_intf)
         for m in p_intf.methods:
-            p_method_counts[f"::reaktar::tags::{p_ns}::methods::{m.short_name}"] += 1
+            tag = f"::reaktar::tags::{p_ns}::methods::{m.short_name}"
+            p_method_counts[tag] += 1
+            p_method_ports[tag].append(p.short_name)
         for f in p_intf.fields:
             if getattr(f, "has_setter", False):
-                p_field_setter_counts[f"{p_ns}::fields::{f.short_name}"] += 1
+                tag = f"{p_ns}::fields::{f.short_name}"
+                p_field_setter_counts[tag] += 1
+                p_field_setter_ports[tag].append(p.short_name)
 
     consumed_proxies = []
     for r_port in r_ports:
@@ -1105,10 +1575,21 @@ def build_actor_model(app, domain, analysis, pass_by="const_ref"):
         port_incoming_types = [cpp_type(ev.type_tref, domain) for ev in intf.events] + \
                               [cpp_type(f.type_tref, domain) for f in intf.fields if getattr(f, "has_notifier", False)]
 
+        port_inbound_signals = []
+        for ev in sorted_events(intf.events):
+            t = cpp_type(ev.type_tref, domain)
+            port_inbound_signals.append({"name": ev.short_name, "type": t, "kind": "event"})
+        for f in sorted_fields(intf.fields):
+            if getattr(f, "has_notifier", False):
+                t = cpp_type(f.type_tref, domain)
+                port_inbound_signals.append({"name": f.short_name, "type": t, "kind": "field notifier"})
+
         ev_list = []
         for ev in sorted_events(intf.events):
             t = cpp_type(ev.type_tref, domain)
             tag = f"{ns}::events::{ev.short_name}"
+            matching_ports = sorted(r_event_ports[tag])
+            competing_on_port = [it for it in port_inbound_signals if it["type"] == t]
             ev_list.append({
                 "name": ev.short_name,
                 "type": t,
@@ -1117,6 +1598,8 @@ def build_actor_model(app, domain, analysis, pass_by="const_ref"):
                 "is_unique_on_port": (port_incoming_types.count(t) == 1),
                 "is_unique_across_ports": (r_event_counts[tag] == 1),
                 "port_count": r_event_counts[tag],
+                "matching_ports": matching_ports,
+                "competing_on_port": competing_on_port,
             })
 
         field_list = []
@@ -1126,6 +1609,8 @@ def build_actor_model(app, domain, analysis, pass_by="const_ref"):
             has_notif = bool(getattr(f, "has_notifier", False))
             has_get = bool(getattr(f, "has_getter", False))
             has_set = bool(getattr(f, "has_setter", False))
+            matching_ports = sorted(r_field_notif_ports[tag]) if has_notif else []
+            competing_on_port = [it for it in port_inbound_signals if it["type"] == t] if has_notif else []
             field_list.append({
                 "name": f.short_name,
                 "type": t,
@@ -1137,6 +1622,8 @@ def build_actor_model(app, domain, analysis, pass_by="const_ref"):
                 "is_unique_on_port": (port_incoming_types.count(t) == 1) if has_notif else True,
                 "is_unique_across_ports": (r_field_notif_counts[tag] == 1) if has_notif else True,
                 "port_count": r_field_notif_counts[tag],
+                "matching_ports": matching_ports,
+                "competing_on_port": competing_on_port,
             })
 
         proxy_methods_list = []
@@ -1172,6 +1659,8 @@ def build_actor_model(app, domain, analysis, pass_by="const_ref"):
                 "port_count": ev["port_count"],
                 "port_name": r_port.short_name,
                 "port_ident": port_ident,
+                "matching_ports": ev["matching_ports"],
+                "competing_on_port": ev["competing_on_port"],
             })
         for f in field_list:
             if f["has_notifier"]:
@@ -1190,6 +1679,8 @@ def build_actor_model(app, domain, analysis, pass_by="const_ref"):
                     "port_count": f["port_count"],
                     "port_name": r_port.short_name,
                     "port_ident": port_ident,
+                    "matching_ports": f["matching_ports"],
+                    "competing_on_port": f["competing_on_port"],
                 })
 
         consumed_proxies.append({
@@ -1239,6 +1730,8 @@ def build_actor_model(app, domain, analysis, pass_by="const_ref"):
             sig_types = tuple(a[1] for a in in_args)
             port_method_sigs.append(sig_types)
 
+        port_setter_items = [{"name": f.short_name, "type": cpp_type(f.type_tref, domain)} for f in sorted_fields(intf.fields) if getattr(f, "has_setter", False)]
+
         method_list = []
         for m in sorted_methods(intf.methods):
             in_args = method_in_args(m, domain, pass_by=pass_by)
@@ -1248,6 +1741,7 @@ def build_actor_model(app, domain, analysis, pass_by="const_ref"):
             tag = f"::reaktar::tags::{ns}::methods::{m.short_name}"
             is_unique_sig = is_unique_skel_method(sig_types, analysis)
             is_unique_sig_on_port = (port_method_sigs.count(tuple(sig_types)) == 1)
+            matching_ports = sorted(p_method_ports[tag])
 
             method_list.append({
                 "name": m.short_name,
@@ -1258,11 +1752,16 @@ def build_actor_model(app, domain, analysis, pass_by="const_ref"):
                     {"name": aname, "type": atype, "pass_type": ptype}
                     for aname, atype, ptype in in_args
                 ],
+                "sig_types": sig_types,
                 "is_unique_sig": is_unique_sig,
                 "is_unique_sig_on_port": is_unique_sig_on_port,
                 "is_unique_across_ports": (p_method_counts[tag] == 1),
                 "port_count": p_method_counts[tag],
+                "matching_ports": matching_ports,
             })
+
+        for m in method_list:
+            m["competing_on_port"] = [om for om in method_list if om["sig_types"] == m["sig_types"]]
 
         port_setter_types = [cpp_type(f.type_tref, domain) for f in intf.fields if getattr(f, "has_setter", False)]
 
@@ -1275,6 +1774,8 @@ def build_actor_model(app, domain, analysis, pass_by="const_ref"):
             has_set = bool(getattr(f, "has_setter", False))
             is_uniq_set = is_unique_field_setter(t, analysis) if has_set else False
             is_uniq_setter_on_port = (port_setter_types.count(t) == 1) if has_set else False
+            matching_ports = sorted(p_field_setter_ports[tag]) if has_set else []
+            competing_on_port = [it for it in port_setter_items if it["type"] == t] if has_set else []
 
             f_info = {
                 "name": f.short_name,
@@ -1290,6 +1791,8 @@ def build_actor_model(app, domain, analysis, pass_by="const_ref"):
                 "is_unique_setter_on_port": is_uniq_setter_on_port,
                 "is_unique_across_ports": (p_field_setter_counts[tag] == 1) if has_set else True,
                 "port_count": p_field_setter_counts[tag],
+                "matching_ports": matching_ports,
+                "competing_on_port": competing_on_port,
             }
             field_list.append(f_info)
             skeleton_fields_flat.append(f_info)
@@ -1321,6 +1824,7 @@ def build_actor_model(app, domain, analysis, pass_by="const_ref"):
         is_unique = (p_sident_counts[sident] == 1)
 
         for ev in sorted_events(intf.events):
+            ev_arg_types = [cpp_type(ev.type_tref, domain)]
             outbound_tagged.append({
                 "kind": "skeleton_event",
                 "tag": f"typename ActorBase::ports::{p_port.short_name}::{ev.short_name}",
@@ -1329,6 +1833,7 @@ def build_actor_model(app, domain, analysis, pass_by="const_ref"):
                 "slot_name": None,
                 "port_name": p_port.short_name,
                 "service_ident": None,
+                "arg_types": ev_arg_types,
             })
             if is_unique:
                 outbound_tagged.append({
@@ -1339,6 +1844,7 @@ def build_actor_model(app, domain, analysis, pass_by="const_ref"):
                     "slot_name": None,
                     "port_name": p_port.short_name,
                     "service_ident": None,
+                    "arg_types": ev_arg_types,
                 })
             else:
                 ambig_tag = f"::reaktar::tags::{ns}::events::{ev.short_name}"
@@ -1351,36 +1857,38 @@ def build_actor_model(app, domain, analysis, pass_by="const_ref"):
                         "ports": matching_ports,
                     })
         for f in sorted_fields(intf.fields):
-            if getattr(f, "has_notifier", False):
+            f_arg_types = [cpp_type(f.type_tref, domain)]
+            outbound_tagged.append({
+                "kind": "skeleton_field_update",
+                "tag": f"typename ActorBase::ports::{p_port.short_name}::{f.short_name}",
+                "var_name": var_name,
+                "member": f.short_name,
+                "slot_name": None,
+                "port_name": p_port.short_name,
+                "service_ident": None,
+                "arg_types": f_arg_types,
+            })
+            if is_unique:
                 outbound_tagged.append({
                     "kind": "skeleton_field_update",
-                    "tag": f"typename ActorBase::ports::{p_port.short_name}::{f.short_name}",
+                    "tag": f"::reaktar::tags::{ns}::fields::{f.short_name}",
                     "var_name": var_name,
                     "member": f.short_name,
                     "slot_name": None,
                     "port_name": p_port.short_name,
                     "service_ident": None,
+                    "arg_types": f_arg_types,
                 })
-                if is_unique:
-                    outbound_tagged.append({
-                        "kind": "skeleton_field_update",
-                        "tag": f"::reaktar::tags::{ns}::fields::{f.short_name}",
-                        "var_name": var_name,
-                        "member": f.short_name,
-                        "slot_name": None,
-                        "port_name": p_port.short_name,
-                        "service_ident": None,
+            else:
+                ambig_tag = f"::reaktar::tags::{ns}::fields::{f.short_name}"
+                matching_ports = sorted([p.short_name for p in p_ports if service_ident(resolve_intf(p, domain)) == sident])
+                if ambig_tag not in [x["tag"] for x in outbound_ambiguous_tags]:
+                    outbound_ambiguous_tags.append({
+                        "tag": ambig_tag,
+                        "service": sident,
+                        "name": f.short_name,
+                        "ports": matching_ports,
                     })
-                else:
-                    ambig_tag = f"::reaktar::tags::{ns}::fields::{f.short_name}"
-                    matching_ports = sorted([p.short_name for p in p_ports if service_ident(resolve_intf(p, domain)) == sident])
-                    if ambig_tag not in [x["tag"] for x in outbound_ambiguous_tags]:
-                        outbound_ambiguous_tags.append({
-                            "tag": ambig_tag,
-                            "service": sident,
-                            "name": f.short_name,
-                            "ports": matching_ports,
-                        })
 
     # 2. Proxy methods & fields
     for r_port in r_ports:
@@ -1393,6 +1901,8 @@ def build_actor_model(app, domain, analysis, pass_by="const_ref"):
 
         for m in sorted_methods(intf.methods):
             is_faf = is_fire_and_forget(m)
+            m_in_args = method_in_args(m, domain, pass_by=pass_by)
+            m_arg_types = [a[1] for a in m_in_args]
             outbound_tagged.append({
                 "kind": "proxy_faf" if is_faf else "proxy_rpc",
                 "tag": f"typename ActorBase::ports::{r_port.short_name}::{m.short_name}",
@@ -1401,6 +1911,7 @@ def build_actor_model(app, domain, analysis, pass_by="const_ref"):
                 "slot_name": slot_name,
                 "port_name": r_port.short_name,
                 "service_ident": sident,
+                "arg_types": m_arg_types,
             })
             if is_unique:
                 outbound_tagged.append({
@@ -1411,6 +1922,7 @@ def build_actor_model(app, domain, analysis, pass_by="const_ref"):
                     "slot_name": slot_name,
                     "port_name": r_port.short_name,
                     "service_ident": sident,
+                    "arg_types": m_arg_types,
                 })
             else:
                 ambig_tag = f"::reaktar::tags::{ns}::methods::{m.short_name}"
@@ -1424,6 +1936,7 @@ def build_actor_model(app, domain, analysis, pass_by="const_ref"):
                     })
         for f in sorted_fields(intf.fields):
             if getattr(f, "has_setter", False):
+                f_set_arg_types = [cpp_type(f.type_tref, domain)]
                 outbound_tagged.append({
                     "kind": "proxy_field_set",
                     "tag": f"typename ActorBase::ports::{r_port.short_name}::{f.short_name}",
@@ -1432,6 +1945,7 @@ def build_actor_model(app, domain, analysis, pass_by="const_ref"):
                     "slot_name": slot_name,
                     "port_name": r_port.short_name,
                     "service_ident": sident,
+                    "arg_types": f_set_arg_types,
                 })
                 if is_unique:
                     outbound_tagged.append({
@@ -1442,6 +1956,7 @@ def build_actor_model(app, domain, analysis, pass_by="const_ref"):
                         "slot_name": slot_name,
                         "port_name": r_port.short_name,
                         "service_ident": sident,
+                        "arg_types": f_set_arg_types,
                     })
                 else:
                     ambig_tag = f"::reaktar::tags::{ns}::fields::{f.short_name}"
@@ -1585,16 +2100,15 @@ def build_actor_model(app, domain, analysis, pass_by="const_ref"):
                 "port_name": p_port.short_name,
             })
         for f in sorted_fields(intf.fields):
-            if getattr(f, "has_notifier", False):
-                t = cpp_type(f.type_tref, domain)
-                all_raw_outbound_items.append({
-                    "kind": "skeleton_field_update",
-                    "type": t,
-                    "var_name": var_name,
-                    "member": f.short_name,
-                    "slot_name": None,
-                    "port_name": p_port.short_name,
-                })
+            t = cpp_type(f.type_tref, domain)
+            all_raw_outbound_items.append({
+                "kind": "skeleton_field_update",
+                "type": t,
+                "var_name": var_name,
+                "member": f.short_name,
+                "slot_name": None,
+                "port_name": p_port.short_name,
+            })
 
     for r_port in r_ports:
         intf = resolve_intf(r_port, domain)
@@ -1631,15 +2145,15 @@ def build_actor_model(app, domain, analysis, pass_by="const_ref"):
     outgoing_items = analysis.get("outgoing_items", [])
 
     def format_outbound_kind(kind, obj=None):
-        if kind == "event":
+        if kind in ("event", "skeleton_event"):
             return "event"
-        elif kind == "field_update":
-            return "field notifier"
-        elif kind == "rpc_arg":
+        elif kind in ("field_update", "field", "skeleton_field_update"):
+            return "field"
+        elif kind in ("rpc_arg", "proxy_rpc", "proxy_faf"):
             if obj is not None and is_fire_and_forget(obj):
                 return "fire-and-forget method"
             return "RPC method"
-        elif kind == "field_set":
+        elif kind in ("field_set", "proxy_field_set"):
             return "field setter"
         return kind
 
@@ -1694,18 +2208,17 @@ def build_actor_model(app, domain, analysis, pass_by="const_ref"):
                     "service_ident": None,
                 })
         for f in sorted_fields(intf.fields):
-            if getattr(f, "has_notifier", False):
-                t = cpp_type(f.type_tref, domain)
-                if is_unique_outgoing(t, analysis):
-                    outbound_by_type.append({
-                        "kind": "skeleton_field_update",
-                        "type": t,
-                        "var_name": var_name,
-                        "member": f.short_name,
-                        "slot_name": None,
-                        "port_name": p_port.short_name,
-                        "service_ident": None,
-                    })
+            t = cpp_type(f.type_tref, domain)
+            if is_unique_outgoing(t, analysis):
+                outbound_by_type.append({
+                    "kind": "skeleton_field_update",
+                    "type": t,
+                    "var_name": var_name,
+                    "member": f.short_name,
+                    "slot_name": None,
+                    "port_name": p_port.short_name,
+                    "service_ident": None,
+                })
 
     for r_port in r_ports:
         intf = resolve_intf(r_port, domain)
@@ -1860,14 +2373,13 @@ def build_actor_model(app, domain, analysis, pass_by="const_ref"):
                     "port_name": port_name,
                 })
             for f in port["fields"]:
-                if f.get("has_notifier", False):
-                    raw_single_items.append({
-                        "kind": "skeleton_field_update",
-                        "type": f["type"],
-                        "var_name": var_name,
-                        "member": f["name"],
-                        "port_name": port_name,
-                    })
+                raw_single_items.append({
+                    "kind": "skeleton_field_update",
+                    "type": f["type"],
+                    "var_name": var_name,
+                    "member": f["name"],
+                    "port_name": port_name,
+                })
         else:
             slot_name = port["slot_name"]
             for m in port["methods"]:
@@ -1910,7 +2422,7 @@ def build_actor_model(app, domain, analysis, pass_by="const_ref"):
 
         display_kinds = {
             "skeleton_event": "event",
-            "skeleton_field_update": "field notifier",
+            "skeleton_field_update": "field",
             "proxy_faf": "fire-and-forget method",
             "proxy_rpc": "RPC method",
             "proxy_field_set": "field setter",
@@ -1987,380 +2499,299 @@ def build_actor_model(app, domain, analysis, pass_by="const_ref"):
 
     ports_outbound.sort(key=lambda x: x["name"])
 
+    # -------------------------------------------------------------------------
+    # Inbound Handlers (on) Ambiguity & Port Dispatch Structures
+    # -------------------------------------------------------------------------
+    # Inbound sources:
+    # 1. R-Port Events (kind: "event", 1-arg payload)
+    # 2. R-Port Field Notifiers (kind: "field_notifier", 1-arg payload)
+    # 3. P-Port Skeleton Methods (kind: "method", single-arg or multi-arg)
+    # 4. P-Port Field Setters (kind: "field_setter", 1-arg payload)
+    all_raw_inbound_items = []
+    inbound_tagged = []
+    inbound_ambiguous_tags = []
+
+    # 1. R-Ports (Events & Field Notifiers)
+    for r_port in r_ports:
+        intf = resolve_intf(r_port, domain)
+        ns = service_ns(intf)
+        sident = service_ident(intf)
+        is_unique_intf = (r_sident_counts[sident] == 1)
+
+        for ev in sorted_events(intf.events):
+            t = cpp_type(ev.type_tref, domain)
+            all_raw_inbound_items.append({
+                "kind": "event",
+                "type": t,
+                "member": ev.short_name,
+                "port_name": r_port.short_name,
+                "display_kind": "event",
+            })
+            inbound_tagged.append({
+                "kind": "event",
+                "tag": f"typename ActorBase::ports::{r_port.short_name}::{ev.short_name}",
+                "member": ev.short_name,
+                "port_name": r_port.short_name,
+                "type": t,
+            })
+            if is_unique_intf:
+                inbound_tagged.append({
+                    "kind": "event",
+                    "tag": f"::reaktar::tags::{ns}::events::{ev.short_name}",
+                    "member": ev.short_name,
+                    "port_name": r_port.short_name,
+                    "type": t,
+                })
+            else:
+                ambig_tag = f"::reaktar::tags::{ns}::events::{ev.short_name}"
+                matching_ports = sorted([r.short_name for r in r_ports if service_ident(resolve_intf(r, domain)) == sident])
+                if ambig_tag not in [x["tag"] for x in inbound_ambiguous_tags]:
+                    inbound_ambiguous_tags.append({
+                        "tag": ambig_tag,
+                        "service": sident,
+                        "name": ev.short_name,
+                        "kind": "event",
+                        "ports": matching_ports,
+                    })
+
+        for f in sorted_fields(intf.fields):
+            if getattr(f, "has_notifier", False):
+                t = cpp_type(f.type_tref, domain)
+                all_raw_inbound_items.append({
+                    "kind": "field_notifier",
+                    "type": t,
+                    "member": f.short_name,
+                    "port_name": r_port.short_name,
+                    "display_kind": "field notifier",
+                })
+                inbound_tagged.append({
+                    "kind": "field_notifier",
+                    "tag": f"typename ActorBase::ports::{r_port.short_name}::{f.short_name}",
+                    "member": f.short_name,
+                    "port_name": r_port.short_name,
+                    "type": t,
+                })
+                if is_unique_intf:
+                    inbound_tagged.append({
+                        "kind": "field_notifier",
+                        "tag": f"::reaktar::tags::{ns}::fields::{f.short_name}",
+                        "member": f.short_name,
+                        "port_name": r_port.short_name,
+                        "type": t,
+                    })
+                else:
+                    ambig_tag = f"::reaktar::tags::{ns}::fields::{f.short_name}"
+                    matching_ports = sorted([r.short_name for r in r_ports if service_ident(resolve_intf(r, domain)) == sident])
+                    if ambig_tag not in [x["tag"] for x in inbound_ambiguous_tags]:
+                        inbound_ambiguous_tags.append({
+                            "tag": ambig_tag,
+                            "service": sident,
+                            "name": f.short_name,
+                            "kind": "field notifier",
+                            "ports": matching_ports,
+                        })
+
+    # 2. P-Ports (Methods & Field Setters)
+    for p_port in p_ports:
+        intf = resolve_intf(p_port, domain)
+        ns = service_ns(intf)
+        sident = service_ident(intf)
+        is_unique_intf = (p_sident_counts[sident] == 1)
+
+        for m in sorted_methods(intf.methods):
+            in_args = method_in_args(m, domain, pass_by=pass_by)
+            sig_types = [a[1] for a in in_args]
+            is_faf = is_fire_and_forget(m)
+            disp_k = "fire-and-forget method" if is_faf else "RPC method"
+            if len(in_args) == 1:
+                all_raw_inbound_items.append({
+                    "kind": "method",
+                    "type": in_args[0][1],
+                    "member": m.short_name,
+                    "port_name": p_port.short_name,
+                    "display_kind": disp_k,
+                    "is_faf": is_faf,
+                    "sig_types": sig_types,
+                })
+            inbound_tagged.append({
+                "kind": "method",
+                "tag": f"typename ActorBase::ports::{p_port.short_name}::{m.short_name}",
+                "member": m.short_name,
+                "port_name": p_port.short_name,
+                "sig_types": sig_types,
+                "is_faf": is_faf,
+            })
+            if is_unique_intf:
+                inbound_tagged.append({
+                    "kind": "method",
+                    "tag": f"::reaktar::tags::{ns}::methods::{m.short_name}",
+                    "member": m.short_name,
+                    "port_name": p_port.short_name,
+                    "sig_types": sig_types,
+                    "is_faf": is_faf,
+                })
+            else:
+                ambig_tag = f"::reaktar::tags::{ns}::methods::{m.short_name}"
+                matching_ports = sorted([p.short_name for p in p_ports if service_ident(resolve_intf(p, domain)) == sident])
+                if ambig_tag not in [x["tag"] for x in inbound_ambiguous_tags]:
+                    inbound_ambiguous_tags.append({
+                        "tag": ambig_tag,
+                        "service": sident,
+                        "name": m.short_name,
+                        "kind": disp_k,
+                        "ports": matching_ports,
+                    })
+
+        for f in sorted_fields(intf.fields):
+            if getattr(f, "has_setter", False):
+                t = cpp_type(f.type_tref, domain)
+                all_raw_inbound_items.append({
+                    "kind": "field_setter",
+                    "type": t,
+                    "member": f.short_name,
+                    "port_name": p_port.short_name,
+                    "display_kind": "field setter",
+                })
+                inbound_tagged.append({
+                    "kind": "field_setter",
+                    "tag": f"typename ActorBase::ports::{p_port.short_name}::{f.short_name}",
+                    "member": f.short_name,
+                    "port_name": p_port.short_name,
+                    "type": t,
+                })
+                if is_unique_intf:
+                    inbound_tagged.append({
+                        "kind": "field_setter",
+                        "tag": f"::reaktar::tags::{ns}::fields::{f.short_name}",
+                        "member": f.short_name,
+                        "port_name": p_port.short_name,
+                        "type": t,
+                    })
+                else:
+                    ambig_tag = f"::reaktar::tags::{ns}::fields::{f.short_name}"
+                    matching_ports = sorted([p.short_name for p in p_ports if service_ident(resolve_intf(p, domain)) == sident])
+                    if ambig_tag not in [x["tag"] for x in inbound_ambiguous_tags]:
+                        inbound_ambiguous_tags.append({
+                            "tag": ambig_tag,
+                            "service": sident,
+                            "name": f.short_name,
+                            "kind": "field setter",
+                            "ports": matching_ports,
+                        })
+
+    # Group all 1-arg inbound items by type to detect bare on(payload) ambiguity
+    inbound_type_map = defaultdict(list)
+    for it in all_raw_inbound_items:
+        inbound_type_map[it["type"]].append(it)
+
+    # Inbound ambiguous types across the actor
+    inbound_ambiguous_types = sorted(list(
+        set(analysis.get("incoming_conflicting_types", {}).keys()) |
+        {t for t, items in inbound_type_map.items() if len(items) > 1}
+    ))
+
+    ambiguous_untagged_on_details = []
+    for t in inbound_ambiguous_types:
+        seen_targets = set()
+        targets = []
+        for it in inbound_type_map[t]:
+            key = (it["port_name"], it["member"], it["display_kind"])
+            if key not in seen_targets:
+                seen_targets.add(key)
+                targets.append({
+                    "port": it["port_name"],
+                    "member": it["member"],
+                    "kind": it["display_kind"],
+                })
+        targets.sort(key=lambda x: (x["port"], x["member"]))
+        ambiguous_untagged_on_details.append({
+            "type": t,
+            "targets": targets,
+        })
+    ambiguous_untagged_on_details.sort(key=lambda x: x["type"])
+
+    inbound_by_type = []
+    for t, items in sorted(inbound_type_map.items(), key=lambda x: x[0]):
+        if len(items) == 1:
+            inbound_by_type.append(items[0])
+
+    inbound_all_types = sorted(list(inbound_type_map.keys()))
+
+    inbound_fan_in_tags = []
+    seen_fan_in = set()
+    for it in inbound_tagged:
+        tag_str = it["tag"]
+        if tag_str.startswith("::reaktar::tags::"):
+            if tag_str not in seen_fan_in:
+                seen_fan_in.add(tag_str)
+                inbound_fan_in_tags.append({"tag": tag_str})
+    for amb in inbound_ambiguous_tags:
+        tag_str = amb["tag"]
+        if tag_str not in seen_fan_in:
+            seen_fan_in.add(tag_str)
+            inbound_fan_in_tags.append({"tag": tag_str})
+    inbound_fan_in_tags.sort(key=lambda x: x["tag"])
+
+    # Per-port inbound breakdown
+    ports_inbound = []
+    for port in all_ports:
+        port_name = port["port_name"]
+        raw_items_for_port = [it for it in all_raw_inbound_items if it["port_name"] == port_name]
+        port_type_counts = Counter([it["type"] for it in raw_items_for_port])
+
+        seen_types = set()
+        single_arg_items = []
+        for it in sorted(raw_items_for_port, key=lambda x: (x["type"], x["member"])):
+            t = it["type"]
+            if t in seen_types:
+                continue
+            seen_types.add(t)
+            is_ambig = (port_type_counts[t] > 1)
+            item_copy = dict(it)
+            item_copy["is_ambiguous"] = is_ambig
+            single_arg_items.append(item_copy)
+
+        ambiguous_single_groups = []
+        ambig_types = sorted([t for t, count in port_type_counts.items() if count > 1])
+        for t in ambig_types:
+            matching = [dict(it) for it in raw_items_for_port if it["type"] == t]
+            matching.sort(key=lambda x: x["member"])
+            ambiguous_single_groups.append({
+                "type": t,
+                "targets": matching,
+            })
+
+        # Method signature conflicts on port (methods with 1 or more args)
+        if port.get("kind") == "Provided":
+            port_methods = [m for m in port.get("methods", []) if "sig_types" in m]
+        else:
+            port_methods = []
+        method_sig_counts = Counter([tuple(m["sig_types"]) for m in port_methods])
+        ambiguous_method_sigs = []
+        for sig_tuple, count in sorted(method_sig_counts.items()):
+            if count > 1:
+                matching_m = [m["name"] for m in port_methods if tuple(m["sig_types"]) == sig_tuple]
+                ambiguous_method_sigs.append({
+                    "sig_types": list(sig_tuple),
+                    "methods": sorted(matching_m),
+                })
+
+        total_inbound = len(raw_items_for_port) + sum(1 for m in port_methods if len(m["sig_types"]) != 1)
+        ports_inbound.append({
+            "name": port_name,
+            "total_inbound_count": total_inbound,
+            "single_arg_items": single_arg_items,
+            "ambiguous_single_groups": ambiguous_single_groups,
+            "ambiguous_method_sigs": ambiguous_method_sigs,
+        })
+    ports_inbound.sort(key=lambda x: x["name"])
+
     app_base = re.sub(r'(?:App|Application)$', '', app.short_name)
     example_class_name = f"{app_base}Example"
     example_alias_name = f"{app.short_name}Example"
 
     raw_snake = re.sub(r'(?<!^)(?=[A-Z])', '_', exe_name).lower()
     base_snake = re.sub(r'_exe$', '', raw_snake)
-
-    example_interfaces = []
-    p_sident_counts = Counter([service_ident(resolve_intf(p, domain)) for p in p_ports])
-    r_sident_counts = Counter([service_ident(resolve_intf(r, domain)) for r in r_ports])
-
-    # 1. Provided Ports (Skeletons)
-    for p_port in p_ports:
-        intf = resolve_intf(p_port, domain)
-        ns = service_ns(intf)
-        sident = service_ident(intf)
-        is_shared_service = (p_sident_counts[sident] > 1)
-        port_name = p_port.short_name
-        port_ident = port_name.lower()
-        candidate_alias = strip_port_affixes(port_name)
-
-        incoming_handlers = []
-        outgoing_emits = []
-
-        # Skeleton methods (Incoming)
-        for m in sorted_methods(intf.methods):
-            in_args = method_in_args(m, domain, pass_by=pass_by)
-            sig_types = tuple(a[1] for a in in_args)
-            is_uniq = is_unique_skel_method(sig_types, analysis)
-            ret_t = method_ret_type(m, domain)
-            is_faf = is_fire_and_forget(m)
-            bare_tag = m.short_name
-            is_ambig = is_bare_tag_ambiguous(bare_tag, analysis)
-            tag_expr = bare_tag if not is_ambig else f"::reaktar::tags::{ns}::methods::{m.short_name}"
-
-            if is_shared_service:
-                is_uniq = False
-                tag_expr = f"ports::{port_name}::{m.short_name}"
-                sig_str = ", ".join(sig_types) if sig_types else "void"
-                tag_note = f"MANDATORY TAGGED: on(ports::{port_name}::{m.short_name}, ...) (shared service across ports)"
-            elif not is_uniq:
-                sig_str = ", ".join(sig_types) if sig_types else "void"
-                tag_note = f"Tagged (resolves collision on {sig_str})"
-            else:
-                tag_note = "Untagged (unique signature)"
-
-            call_kind = "fire-and-forget" if is_faf else "RPC"
-            autosar_note = f"AUTOSAR: skeleton.{m.short_name}() {call_kind}"
-
-            incoming_handlers.append({
-                "kind": "skel_method",
-                "name": m.short_name,
-                "tag": f"::reaktar::tags::{ns}::methods::{m.short_name}",
-                "tag_expr": tag_expr,
-                "bare_tag": bare_tag,
-                "is_unique": is_uniq,
-                "in_args": [{"name": a[0], "type": a[1], "pass_type": a[2]} for a in in_args],
-                "ret_type": ret_t,
-                "dummy_ret_expr": generate_dummy_ret(ret_t),
-                "is_faf": is_faf,
-                "autosar_note": autosar_note,
-                "tag_note": tag_note,
-                "member_var": f"{port_ident}_{m.short_name.lower()}",
-            })
-
-        # Skeleton fields (Setters are Incoming)
-        for f in sorted_fields(intf.fields):
-            if getattr(f, "has_setter", False):
-                t = cpp_type(f.type_tref, domain)
-                is_uniq = is_unique_field_setter(t, analysis)
-                bare_tag = f.short_name
-                is_ambig = is_bare_tag_ambiguous(bare_tag, analysis)
-                tag_expr = bare_tag if not is_ambig else f"::reaktar::tags::{ns}::fields::{f.short_name}"
-
-                if is_shared_service:
-                    is_uniq = False
-                    tag_expr = f"ports::{port_name}::{f.short_name}"
-                    tag_note = f"MANDATORY TAGGED: on(ports::{port_name}::{f.short_name}, ...) (shared service across ports)"
-                elif not is_uniq:
-                    tag_note = f"Tagged (resolves collision on {t})"
-                else:
-                    tag_note = "Untagged (unique field type)"
-
-                autosar_note = f"AUTOSAR: skeleton.{f.short_name}.RegisterSetHandler()"
-
-                incoming_handlers.append({
-                    "kind": "skel_field_set",
-                    "name": f.short_name,
-                    "tag": f"::reaktar::tags::{ns}::fields::{f.short_name}",
-                    "tag_expr": tag_expr,
-                    "bare_tag": bare_tag,
-                    "is_unique": is_uniq,
-                    "payload_type": t,
-                    "ret_type": t,
-                    "autosar_note": autosar_note,
-                    "tag_note": tag_note,
-                    "member_var": f"{port_ident}_{f.short_name.lower()}_set",
-                })
-
-        # Skeleton events (Outgoing)
-        for ev in sorted_events(intf.events):
-            t = cpp_type(ev.type_tref, domain)
-            is_uniq = is_unique_outgoing(t, analysis)
-            bare_tag = ev.short_name
-            is_ambig = is_bare_tag_ambiguous(bare_tag, analysis)
-            tag_expr = bare_tag if not is_ambig else f"::reaktar::tags::{ns}::events::{ev.short_name}"
-            dummy_val = generate_dummy_value(t)
-
-            autosar_note = f"AUTOSAR: skeleton.{ev.short_name}.Send()"
-
-            if is_shared_service:
-                is_uniq = False
-                tag_expr = f"ports::{port_name}::{ev.short_name}"
-                call_untagged = None
-                tag_note = f"MANDATORY TAGGED: emit<{tag_expr}>(val) (shared service across ports)"
-            elif is_uniq:
-                call_untagged = f"emit({dummy_val})"
-                tag_note = f"Untagged: emit(val). Alternative: emit<{tag_expr}>(val)"
-            else:
-                call_untagged = None
-                tag_note = f"MANDATORY TAGGED: emit<{tag_expr}>(val)"
-
-            call_tagged = f"emit<{tag_expr}>({dummy_val})"
-            call_port_only = None
-            if is_shared_service and port_single_counts_by_port[port_name][t] == 1:
-                call_port_only = f"emit<ports::{port_name}>({dummy_val})"
-
-            outgoing_emits.append({
-                "kind": "skeleton_event",
-                "name": ev.short_name,
-                "tag": f"::reaktar::tags::{ns}::events::{ev.short_name}",
-                "tag_expr": tag_expr,
-                "is_unique": is_uniq,
-                "example_call_untagged": call_untagged,
-                "example_call_tagged": call_tagged,
-                "example_call_port_only": call_port_only,
-                "autosar_note": autosar_note,
-                "tag_note": tag_note,
-            })
-
-        # Skeleton fields (Notifiers are Outgoing)
-        for f in sorted_fields(intf.fields):
-            if getattr(f, "has_notifier", False):
-                t = cpp_type(f.type_tref, domain)
-                is_uniq = is_unique_outgoing(t, analysis)
-                bare_tag = f.short_name
-                is_ambig = is_bare_tag_ambiguous(bare_tag, analysis)
-                tag_expr = bare_tag if not is_ambig else f"::reaktar::tags::{ns}::fields::{f.short_name}"
-                dummy_val = generate_dummy_value(t)
-
-                autosar_note = f"AUTOSAR: skeleton.{f.short_name}.Update()"
-
-                if is_shared_service:
-                    is_uniq = False
-                    tag_expr = f"ports::{port_name}::{f.short_name}"
-                    call_untagged = None
-                    tag_note = f"MANDATORY TAGGED: emit<{tag_expr}>(val) (shared service across ports)"
-                elif is_uniq:
-                    call_untagged = f"emit({dummy_val})"
-                    tag_note = f"Untagged: emit(val). Alternative: emit<{tag_expr}>(val)"
-                else:
-                    call_untagged = None
-                    tag_note = f"MANDATORY TAGGED: emit<{tag_expr}>(val)"
-
-                call_tagged = f"emit<{tag_expr}>({dummy_val})"
-                call_port_only = None
-                if is_shared_service and port_single_counts_by_port[port_name][t] == 1:
-                    call_port_only = f"emit<ports::{port_name}>({dummy_val})"
-
-                outgoing_emits.append({
-                    "kind": "skeleton_field_update",
-                    "name": f.short_name,
-                    "tag": f"::reaktar::tags::{ns}::fields::{f.short_name}",
-                    "tag_expr": tag_expr,
-                    "is_unique": is_uniq,
-                    "example_call_untagged": call_untagged,
-                    "example_call_tagged": call_tagged,
-                    "example_call_port_only": call_port_only,
-                    "autosar_note": autosar_note,
-                    "tag_note": tag_note,
-                })
-
-        example_interfaces.append({
-            "port_name": port_name,
-            "port_alias": candidate_alias,
-            "port_kind": "Provided",
-            "ident": port_ident,
-            "intf_name": intf.short_name,
-            "intf_ns": ns,
-            "incoming_handlers": incoming_handlers,
-            "outgoing_emits": outgoing_emits,
-        })
-
-    # 2. Required Ports (Proxies)
-    for r_port in r_ports:
-        intf = resolve_intf(r_port, domain)
-        ns = service_ns(intf)
-        sident = service_ident(intf)
-        is_shared_service = (r_sident_counts[sident] > 1)
-        port_name = r_port.short_name
-        port_ident = port_name.lower()
-        candidate_alias = strip_port_affixes(port_name)
-
-        incoming_handlers = []
-        outgoing_emits = []
-
-        # Proxy events (Incoming)
-        for ev in sorted_events(intf.events):
-            t = cpp_type(ev.type_tref, domain)
-            is_uniq = is_unique_incoming(t, analysis)
-            bare_tag = ev.short_name
-            is_ambig = is_bare_tag_ambiguous(bare_tag, analysis)
-            tag_expr = bare_tag if not is_ambig else f"::reaktar::tags::{ns}::events::{ev.short_name}"
-
-            if is_shared_service:
-                is_uniq = False
-                tag_expr = f"ports::{port_name}::{ev.short_name}"
-                tag_note = f"MANDATORY TAGGED: on(ports::{port_name}::{ev.short_name}, val) (shared service across ports)"
-            elif not is_uniq:
-                tag_note = f"Tagged (resolves collision on {t})"
-            else:
-                tag_note = "Untagged (unique type)"
-
-            autosar_note = f"AUTOSAR: proxy->{ev.short_name}.Subscribe()"
-
-            incoming_handlers.append({
-                "kind": "event",
-                "name": ev.short_name,
-                "tag": f"::reaktar::tags::{ns}::events::{ev.short_name}",
-                "tag_expr": tag_expr,
-                "bare_tag": bare_tag,
-                "is_unique": is_uniq,
-                "payload_type": t,
-                "autosar_note": autosar_note,
-                "tag_note": tag_note,
-                "member_var": f"{port_ident}_{ev.short_name.lower()}",
-            })
-
-        # Proxy fields (Notifiers are Incoming)
-        for f in sorted_fields(intf.fields):
-            if getattr(f, "has_notifier", False):
-                t = cpp_type(f.type_tref, domain)
-                is_uniq = is_unique_incoming(t, analysis)
-                bare_tag = f.short_name
-                is_ambig = is_bare_tag_ambiguous(bare_tag, analysis)
-                tag_expr = bare_tag if not is_ambig else f"::reaktar::tags::{ns}::fields::{f.short_name}"
-
-                if is_shared_service:
-                    is_uniq = False
-                    tag_expr = f"ports::{port_name}::{f.short_name}"
-                    tag_note = f"MANDATORY TAGGED: on(ports::{port_name}::{f.short_name}, val) (shared service across ports)"
-                elif not is_uniq:
-                    tag_note = f"Tagged (resolves collision on {t})"
-                else:
-                    tag_note = "Untagged (unique type)"
-
-                autosar_note = f"AUTOSAR: proxy->{f.short_name}.Subscribe() notifier"
-
-                incoming_handlers.append({
-                    "kind": "field_notify",
-                    "name": f.short_name,
-                    "tag": f"::reaktar::tags::{ns}::fields::{f.short_name}",
-                    "tag_expr": tag_expr,
-                    "bare_tag": bare_tag,
-                    "is_unique": is_uniq,
-                    "payload_type": t,
-                    "autosar_note": autosar_note,
-                    "tag_note": tag_note,
-                    "member_var": f"{port_ident}_{f.short_name.lower()}_notify",
-                })
-
-        # Proxy methods (Outgoing RPC & Fire-and-Forget)
-        for m in sorted_methods(intf.methods):
-            in_args = method_in_args(m, domain, pass_by=pass_by)
-            sig_types = tuple(a[1] for a in in_args)
-            is_faf = is_fire_and_forget(m)
-            bare_tag = m.short_name
-            is_ambig = is_bare_tag_ambiguous(bare_tag, analysis)
-            tag_expr = bare_tag if not is_ambig else f"::reaktar::tags::{ns}::methods::{m.short_name}"
-            dummy_args_list = [generate_dummy_value(a[1]) for a in in_args]
-            dummy_args_str = ", ".join(dummy_args_list)
-
-            if len(in_args) == 1:
-                t = in_args[0][1]
-                is_uniq = is_unique_outgoing(t, analysis)
-            else:
-                is_uniq = is_unique_proxy_method(sig_types, analysis)
-
-            call_kind = "fire-and-forget" if is_faf else "RPC"
-            autosar_note = f"AUTOSAR: proxy->{m.short_name}() {call_kind}"
-
-            if is_shared_service:
-                is_uniq = False
-                call_untagged = None
-                tag_expr = f"ports::{port_name}::{m.short_name}"
-                tag_note = f"MANDATORY TAGGED: emit<{tag_expr}>({dummy_args_str})"
-            elif is_uniq:
-                call_untagged = f"emit({dummy_args_str})"
-                tag_note = f"Untagged (unique signature). Alternative: emit<{tag_expr}>({dummy_args_str})"
-            else:
-                call_untagged = None
-                tag_note = f"MANDATORY TAGGED: emit<{tag_expr}>({dummy_args_str})"
-
-            call_tagged = f"emit<{tag_expr}>({dummy_args_str})"
-            call_port_only = None
-            if is_shared_service:
-                if len(in_args) == 1 and port_single_counts_by_port[port_name][in_args[0][1]] == 1:
-                    call_port_only = f"emit<ports::{port_name}>({dummy_args_str})"
-                elif len(in_args) != 1 and port_multi_counts_by_port[port_name][sig_types] == 1:
-                    call_port_only = f"emit<ports::{port_name}>({dummy_args_str})"
-
-            outgoing_emits.append({
-                "kind": "proxy_faf" if is_faf else "proxy_rpc",
-                "name": m.short_name,
-                "tag": f"::reaktar::tags::{ns}::methods::{m.short_name}",
-                "tag_expr": tag_expr,
-                "is_unique": is_uniq,
-                "example_call_untagged": call_untagged,
-                "example_call_tagged": call_tagged,
-                "example_call_port_only": call_port_only,
-                "autosar_note": autosar_note,
-                "tag_note": tag_note,
-            })
-
-        # Proxy fields (Setters are Outgoing)
-        for f in sorted_fields(intf.fields):
-            if getattr(f, "has_setter", False):
-                t = cpp_type(f.type_tref, domain)
-                is_uniq = is_unique_outgoing(t, analysis)
-                bare_tag = f.short_name
-                is_ambig = is_bare_tag_ambiguous(bare_tag, analysis)
-                tag_expr = bare_tag if not is_ambig else f"::reaktar::tags::{ns}::fields::{f.short_name}"
-                dummy_val = generate_dummy_value(t)
-
-                autosar_note = f"AUTOSAR: proxy->{f.short_name}.Set()"
-                if is_shared_service:
-                    is_uniq = False
-                    call_untagged = None
-                    tag_expr = f"ports::{port_name}::{f.short_name}"
-                    tag_note = f"MANDATORY TAGGED: emit<{tag_expr}>({dummy_val})"
-                elif is_uniq:
-                    call_untagged = f"emit({dummy_val})"
-                    tag_note = f"Untagged: emit(val). Alternative: emit<{tag_expr}>({dummy_val})"
-                else:
-                    call_untagged = None
-                    tag_note = f"MANDATORY TAGGED: emit<{tag_expr}>({dummy_val})"
-                call_tagged = f"emit<{tag_expr}>({dummy_val})"
-                call_port_only = None
-                if is_shared_service and port_single_counts_by_port[port_name][t] == 1:
-                    call_port_only = f"emit<ports::{port_name}>({dummy_val})"
-
-                outgoing_emits.append({
-                    "kind": "proxy_field_set",
-                    "name": f.short_name,
-                    "tag": f"::reaktar::tags::{ns}::fields::{f.short_name}",
-                    "tag_expr": tag_expr,
-                    "is_unique": is_uniq,
-                    "example_call_untagged": call_untagged,
-                    "example_call_tagged": call_tagged,
-                    "example_call_port_only": call_port_only,
-                    "autosar_note": autosar_note,
-                    "tag_note": tag_note,
-                })
-
-        example_interfaces.append({
-            "port_name": port_name,
-            "port_alias": candidate_alias,
-            "port_kind": "Required",
-            "ident": port_ident,
-            "intf_name": intf.short_name,
-            "intf_ns": ns,
-            "incoming_handlers": incoming_handlers,
-            "outgoing_emits": outgoing_emits,
-        })
 
     legal_signatures = list(analysis["legal_signatures"])
     legal_types = list(analysis["legal_types"])
@@ -2388,15 +2819,36 @@ def build_actor_model(app, domain, analysis, pass_by="const_ref"):
     req_ports = [p for p in all_ports if p.get("kind") != "Provided"]
     skeleton_setters = [f for f in skeleton_fields_flat if f.get("has_setter")]
 
+    ambiguous_untagged_on_map = {d["type"]: d["targets"] for d in ambiguous_untagged_on_details}
+    for sig in inbound_signals_flat:
+        sig["competing_all"] = ambiguous_untagged_on_map.get(sig["type"], [])
+    for f in skeleton_setters:
+        f["competing_all"] = ambiguous_untagged_on_map.get(f["type"], [])
+
+    all_skel_methods_by_sig = defaultdict(list)
+    for skel in skeletons:
+        for m in skel["methods"]:
+            all_skel_methods_by_sig[tuple(m["sig_types"])].append({
+                "port": skel["port_name"],
+                "name": m["name"],
+            })
+    for skel in skeletons:
+        for m in skel["methods"]:
+            m["competing_all"] = all_skel_methods_by_sig.get(tuple(m["sig_types"]), [])
+
     # -------------------------------------------------------------------------
     # Inbound Read (Field Getters) Model Structures
     # -------------------------------------------------------------------------
     read_ports = []
     read_fields_by_port_tag = []
     r_all_field_counts = Counter()
+    tag_to_ports = defaultdict(list)
     for cp in consumed_proxies:
         for f in cp["fields"]:
-            r_all_field_counts[f"::reaktar::tags::{f['tag']}"] += 1
+            tag_name = f"::reaktar::tags::{f['tag']}"
+            r_all_field_counts[tag_name] += 1
+            if cp["port_name"] not in tag_to_ports[tag_name]:
+                tag_to_ports[tag_name].append(cp["port_name"])
 
     type_to_readable_fields = defaultdict(list)
 
@@ -2430,8 +2882,12 @@ def build_actor_model(app, domain, analysis, pass_by="const_ref"):
             "name": p_name,
             "ident": cp["ident"],
             "slot_name": p_slot,
+            "service_ns": cp["service_ns"],
+            "events": cp["events"],
+            "methods": cp["methods"],
             "readable_field_count": len(readable_fields_on_port),
             "unique_field": unique_readable_field,
+            "readable_fields": readable_fields_on_port,
             "all_fields": all_fields_for_port,
         })
 
@@ -2454,15 +2910,20 @@ def build_actor_model(app, domain, analysis, pass_by="const_ref"):
             else:
                 if tag_name not in seen_ambig_tags:
                     seen_ambig_tags.add(tag_name)
+                    matching_ports = sorted(tag_to_ports[tag_name])
+                    ports_str = ", ".join(f"'{p}'" for p in matching_ports)
                     read_ambiguous_bare_tags.append({
                         "tag": tag_name,
                         "name": f["name"],
                         "service": cp["service_ident"],
+                        "ports": matching_ports,
+                        "ports_str": ports_str,
                     })
 
     read_by_type = []
+    read_ambiguous_types = []
     for t in sorted(type_to_readable_fields.keys()):
-        fields = type_to_readable_fields[t]
+        fields = sorted(type_to_readable_fields[t], key=lambda x: (x["port_name"], x["name"]))
         if len(fields) == 1:
             read_by_type.append({
                 "type": t,
@@ -2470,11 +2931,257 @@ def build_actor_model(app, domain, analysis, pass_by="const_ref"):
                 "field": fields[0],
             })
         else:
-            read_by_type.append({
+            item = {
                 "type": t,
                 "is_ambiguous": True,
                 "fields": fields,
+            }
+            read_by_type.append(item)
+            read_ambiguous_types.append(item)
+
+    read_available_types = sorted(list(type_to_readable_fields.keys()))
+    read_available_tags = sorted(list({f["tag"] for f in read_fields_by_port_tag if f.get("has_getter")}))
+
+    # -------------------------------------------------------------------------
+    # Diagnostics collections for emit(...) and on(...) validation
+    # -------------------------------------------------------------------------
+    proxy_fields_without_setter = []
+    proxy_fields_without_notifier = []
+    all_provided_events = set()
+    all_provided_methods = set()
+    all_provided_fields_with_setter = set()
+    all_provided_fields_with_notifier = set()
+
+    for p_port in p_ports:
+        intf = resolve_intf(p_port, domain)
+        ns = service_ns(intf)
+        for ev in intf.events:
+            all_provided_events.add((ns, ev.short_name))
+        for m in intf.methods:
+            all_provided_methods.add((ns, m.short_name))
+        for f in intf.fields:
+            if getattr(f, "has_setter", False):
+                all_provided_fields_with_setter.add((ns, f.short_name))
+            if getattr(f, "has_notifier", False):
+                all_provided_fields_with_notifier.add((ns, f.short_name))
+
+    all_required_events = set()
+    all_required_methods = set()
+    all_required_fields_with_setter = set()
+    all_required_fields_with_notifier = set()
+
+    for r_port in r_ports:
+        intf = resolve_intf(r_port, domain)
+        ns = service_ns(intf)
+        for ev in intf.events:
+            all_required_events.add((ns, ev.short_name))
+        for m in intf.methods:
+            all_required_methods.add((ns, m.short_name))
+        for f in intf.fields:
+            if getattr(f, "has_setter", False):
+                all_required_fields_with_setter.add((ns, f.short_name))
+            if getattr(f, "has_notifier", False):
+                all_required_fields_with_notifier.add((ns, f.short_name))
+
+    proxy_fields_without_setter = []
+    proxy_fields_without_notifier = []
+    proxy_events = []
+    proxy_methods = []
+
+    for r_port in r_ports:
+        intf = resolve_intf(r_port, domain)
+        ns = service_ns(intf)
+        sident = service_ident(intf)
+        is_unique_intf = (r_sident_counts[sident] == 1)
+
+        for ev in sorted_events(intf.events):
+            t = cpp_type(ev.type_tref, domain)
+            tag_port = f"typename ActorBase::ports::{r_port.short_name}::{ev.short_name}"
+            tag_bare = f"::reaktar::tags::{ns}::events::{ev.short_name}"
+            proxy_events.append({
+                "port_name": r_port.short_name,
+                "name": ev.short_name,
+                "tag": tag_port,
+                "type": t,
             })
+            if is_unique_intf and (ns, ev.short_name) not in all_provided_events:
+                proxy_events.append({
+                    "port_name": r_port.short_name,
+                    "name": ev.short_name,
+                    "tag": tag_bare,
+                    "type": t,
+                })
+
+        for m in sorted_methods(intf.methods):
+            in_args = method_in_args(m, domain, pass_by=pass_by)
+            sig_types = [a[1] for a in in_args]
+            is_faf = is_fire_and_forget(m)
+            tag_port = f"typename ActorBase::ports::{r_port.short_name}::{m.short_name}"
+            tag_bare = f"::reaktar::tags::{ns}::methods::{m.short_name}"
+            proxy_methods.append({
+                "port_name": r_port.short_name,
+                "name": m.short_name,
+                "tag": tag_port,
+                "sig_types": sig_types,
+                "is_faf": is_faf,
+            })
+            if is_unique_intf and (ns, m.short_name) not in all_provided_methods:
+                proxy_methods.append({
+                    "port_name": r_port.short_name,
+                    "name": m.short_name,
+                    "tag": tag_bare,
+                    "sig_types": sig_types,
+                    "is_faf": is_faf,
+                })
+
+        for f in sorted_fields(intf.fields):
+            t = cpp_type(f.type_tref, domain)
+            tag_port = f"typename ActorBase::ports::{r_port.short_name}::{f.short_name}"
+            tag_bare = f"::reaktar::tags::{ns}::fields::{f.short_name}"
+            has_setter = bool(getattr(f, "has_setter", False))
+            has_notifier = bool(getattr(f, "has_notifier", False))
+            if not has_setter:
+                proxy_fields_without_setter.append({
+                    "port_name": r_port.short_name,
+                    "name": f.short_name,
+                    "tag": tag_port,
+                    "type": t,
+                })
+                if is_unique_intf and (ns, f.short_name) not in all_required_fields_with_setter and (ns, f.short_name) not in all_provided_fields_with_notifier:
+                    proxy_fields_without_setter.append({
+                        "port_name": r_port.short_name,
+                        "name": f.short_name,
+                        "tag": tag_bare,
+                        "type": t,
+                    })
+            if not has_notifier:
+                proxy_fields_without_notifier.append({
+                    "port_name": r_port.short_name,
+                    "name": f.short_name,
+                    "tag": tag_port,
+                    "type": t,
+                })
+                if is_unique_intf and (ns, f.short_name) not in all_required_fields_with_notifier and (ns, f.short_name) not in all_provided_fields_with_setter:
+                    proxy_fields_without_notifier.append({
+                        "port_name": r_port.short_name,
+                        "name": f.short_name,
+                        "tag": tag_bare,
+                        "type": t,
+                    })
+
+    skeleton_fields_without_notifier = []
+    skeleton_fields_without_setter = []
+    skeleton_events = []
+    skeleton_methods = []
+
+    for p_port in p_ports:
+        intf = resolve_intf(p_port, domain)
+        ns = service_ns(intf)
+        sident = service_ident(intf)
+        is_unique_intf = (p_sident_counts[sident] == 1)
+
+        for ev in sorted_events(intf.events):
+            t = cpp_type(ev.type_tref, domain)
+            tag_port = f"typename ActorBase::ports::{p_port.short_name}::{ev.short_name}"
+            tag_bare = f"::reaktar::tags::{ns}::events::{ev.short_name}"
+            skeleton_events.append({
+                "port_name": p_port.short_name,
+                "name": ev.short_name,
+                "tag": tag_port,
+                "type": t,
+            })
+            if is_unique_intf and (ns, ev.short_name) not in all_required_events:
+                skeleton_events.append({
+                    "port_name": p_port.short_name,
+                    "name": ev.short_name,
+                    "tag": tag_bare,
+                    "type": t,
+                })
+
+        for m in sorted_methods(intf.methods):
+            in_args = method_in_args(m, domain, pass_by=pass_by)
+            sig_types = [a[1] for a in in_args]
+            is_faf = is_fire_and_forget(m)
+            tag_port = f"typename ActorBase::ports::{p_port.short_name}::{m.short_name}"
+            tag_bare = f"::reaktar::tags::{ns}::methods::{m.short_name}"
+            skeleton_methods.append({
+                "port_name": p_port.short_name,
+                "name": m.short_name,
+                "tag": tag_port,
+                "sig_types": sig_types,
+                "is_faf": is_faf,
+            })
+            if is_unique_intf and (ns, m.short_name) not in all_required_methods:
+                skeleton_methods.append({
+                    "port_name": p_port.short_name,
+                    "name": m.short_name,
+                    "tag": tag_bare,
+                    "sig_types": sig_types,
+                    "is_faf": is_faf,
+                })
+
+        for f in sorted_fields(intf.fields):
+            t = cpp_type(f.type_tref, domain)
+            tag_port = f"typename ActorBase::ports::{p_port.short_name}::{f.short_name}"
+            tag_bare = f"::reaktar::tags::{ns}::fields::{f.short_name}"
+            has_setter = bool(getattr(f, "has_setter", False))
+            has_notifier = bool(getattr(f, "has_notifier", False))
+            if not has_notifier:
+                skeleton_fields_without_notifier.append({
+                    "port_name": p_port.short_name,
+                    "name": f.short_name,
+                    "tag": tag_port,
+                    "type": t,
+                })
+                if is_unique_intf and (ns, f.short_name) not in all_provided_fields_with_notifier and (ns, f.short_name) not in all_required_fields_with_setter:
+                    skeleton_fields_without_notifier.append({
+                        "port_name": p_port.short_name,
+                        "name": f.short_name,
+                        "tag": tag_bare,
+                        "type": t,
+                    })
+            if not has_setter:
+                skeleton_fields_without_setter.append({
+                    "port_name": p_port.short_name,
+                    "name": f.short_name,
+                    "tag": tag_port,
+                    "type": t,
+                })
+                if is_unique_intf and (ns, f.short_name) not in all_provided_fields_with_setter and (ns, f.short_name) not in all_required_fields_with_notifier:
+                    skeleton_fields_without_setter.append({
+                        "port_name": p_port.short_name,
+                        "name": f.short_name,
+                        "tag": tag_bare,
+                        "type": t,
+                    })
+
+    all_fields_without_setter = []
+    seen_no_setter = set()
+    for item in proxy_fields_without_setter + skeleton_fields_without_setter:
+        if item["tag"] not in seen_no_setter:
+            seen_no_setter.add(item["tag"])
+            all_fields_without_setter.append(item)
+
+    all_fields_without_notifier = []
+    seen_no_notifier = set()
+    for item in proxy_fields_without_notifier + skeleton_fields_without_notifier:
+        if item["tag"] not in seen_no_notifier:
+            seen_no_notifier.add(item["tag"])
+            all_fields_without_notifier.append(item)
+
+    example_interfaces = build_example_interfaces(
+        app=app,
+        domain=domain,
+        analysis=analysis,
+        p_ports=p_ports,
+        r_ports=r_ports,
+        port_single_counts_by_port=port_single_counts_by_port,
+        port_multi_counts_by_port=port_multi_counts_by_port,
+        read_ports=read_ports,
+        read_by_type=read_by_type,
+        read_unique_bare_fields=read_unique_bare_fields,
+        pass_by=pass_by,
+    )
 
     return {
         "exe_name": exe_name,
@@ -2505,11 +3212,33 @@ def build_actor_model(app, domain, analysis, pass_by="const_ref"):
         "outbound_by_type": outbound_by_type,
         "outbound_multi": outbound_multi,
         "ambiguous_outbound_multi": ambiguous_outbound_multi,
+        "all_raw_inbound_items": all_raw_inbound_items,
+        "inbound_tagged": inbound_tagged,
+        "inbound_ambiguous_tags": inbound_ambiguous_tags,
+        "inbound_ambiguous_types": inbound_ambiguous_types,
+        "ambiguous_untagged_on_details": ambiguous_untagged_on_details,
+        "inbound_by_type": inbound_by_type,
+        "inbound_all_types": inbound_all_types,
+        "inbound_fan_in_tags": inbound_fan_in_tags,
+        "ports_inbound": ports_inbound,
         "read_ports": read_ports,
         "read_fields_by_port_tag": read_fields_by_port_tag,
         "read_unique_bare_fields": read_unique_bare_fields,
         "read_ambiguous_bare_tags": read_ambiguous_bare_tags,
         "read_by_type": read_by_type,
+        "read_ambiguous_types": read_ambiguous_types,
+        "read_available_types": read_available_types,
+        "read_available_tags": read_available_tags,
+        "proxy_fields_without_setter": proxy_fields_without_setter,
+        "proxy_fields_without_notifier": proxy_fields_without_notifier,
+        "proxy_events": proxy_events,
+        "proxy_methods": proxy_methods,
+        "skeleton_fields_without_notifier": skeleton_fields_without_notifier,
+        "skeleton_fields_without_setter": skeleton_fields_without_setter,
+        "skeleton_events": skeleton_events,
+        "skeleton_methods": skeleton_methods,
+        "all_fields_without_setter": all_fields_without_setter,
+        "all_fields_without_notifier": all_fields_without_notifier,
         "legal_signatures": legal_signatures,
         "legal_types": legal_types,
         "legal_tags": analysis["legal_tags"],

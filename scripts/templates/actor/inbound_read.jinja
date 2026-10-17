@@ -46,14 +46,56 @@
 {% endif %}
             }
 {% endfor %}
+{% for ev in port.events %}
+            else if constexpr (
+                std::is_same_v<ItemTag, typename ActorBase::ports::{{ port.name }}::{{ ev.name }}>
+                || std::is_same_v<ItemTag, ::reaktar::tags::{{ port.service_ns }}::events::{{ ev.name }}>
+            ) {
+                static_assert(!sizeof(PortTag*),
+                    "reaktar: read<Port, Event>() is invalid! '{{ ev.name }}' is an Event on port '{{ port.name }}', not a readable Field. Events are received via on(...) or emitted via emit(...).");
+            }
+{% endfor %}
+{% for m in port.methods %}
+            else if constexpr (
+                std::is_same_v<ItemTag, typename ActorBase::ports::{{ port.name }}::{{ m.name }}>
+                || std::is_same_v<ItemTag, ::reaktar::tags::{{ port.service_ns }}::methods::{{ m.name }}>
+            ) {
+                static_assert(!sizeof(PortTag*),
+                    "reaktar: read<Port, Method>() is invalid! '{{ m.name }}' is an RPC Method on port '{{ port.name }}', not a readable Field. Methods are called via emit(...) or handled via on(...).");
+            }
+{% endfor %}
+            else if constexpr (
+                std::is_same_v<ItemTag, ::reaktar::Any>
+                || std::is_same_v<ItemTag, ::reaktar::All>
+                || std::is_same_v<ItemTag, typename ActorBase::ports::{{ port.name }}::Any>
+            ) {
+                static_assert(!sizeof(PortTag*),
+                    "reaktar: read<Port, Any>() is invalid! read() does not support wildcard queries.");
+            }
             else {
-                static_assert(!sizeof(PortTag*), "reaktar: Port '{{ port.name }}' has no such field tag!");
+                static_assert(!sizeof(PortTag*),
+                    "reaktar: Port '{{ port.name }}' has no such field tag!\n"
+{% if port.readable_fields | length > 0 %}
+                    "Readable fields on port '{{ port.name }}':\n"
+{% for rf in port.readable_fields %}
+                    "  - ports::{{ port.name }}::{{ rf.name }} (type: {{ rf.type }})\n"
+{% endfor %}
+{% endif %}
+                );
             }
 {% endif %}
         }
 {% endfor %}
         else {
-            static_assert(!sizeof(PortTag*), "reaktar: read<Port, Tag>() called with unknown port tag!");
+            static_assert(!sizeof(PortTag*),
+                "reaktar: read<Port, Tag>() called with unknown port tag!\n"
+{% if model.read_ports | length > 0 %}
+                "Available readable ports are:\n"
+{% for p in model.read_ports %}
+                "  - ports::{{ p.name }}\n"
+{% endfor %}
+{% endif %}
+            );
         }
     }
 
@@ -63,9 +105,23 @@
 {% for port in model.read_ports %}
         {{ "if" if loop.first else "else if" }} constexpr (std::is_same_v<Tag, typename ActorBase::ports::{{ port.name }}>) {
 {% if port.readable_field_count == 0 %}
-            static_assert(!sizeof(Tag*), "reaktar: Port '{{ port.name }}' has no readable fields with getters!");
+            static_assert(!sizeof(Tag*),
+                "reaktar: Port '{{ port.name }}' has no readable fields with getters!\n"
+{% if port.all_fields | length > 0 %}
+                "Fields on port '{{ port.name }}' without getters:\n"
+{% for f in port.all_fields %}
+                "  - {{ f.name }} (type: {{ f.type }})\n"
+{% endfor %}
+{% endif %}
+            );
 {% elif port.readable_field_count > 1 %}
-            static_assert(!sizeof(Tag*), "reaktar: read<Port>() is ambiguous on port '{{ port.name }}'! Port has multiple readable fields. Specify the field tag via read<Port::FieldTag>() or read<Port, FieldTag>().");
+            static_assert(!sizeof(Tag*),
+                "reaktar: read<Port>() is ambiguous on port '{{ port.name }}'! Port has multiple readable fields. Specify the field tag via read<Port::FieldTag>() or read<Port, FieldTag>().\n"
+                "Readable fields on port '{{ port.name }}':\n"
+{% for rf in port.readable_fields %}
+                "  - ports::{{ port.name }}::{{ rf.name }} (type: {{ rf.type }})\n"
+{% endfor %}
+            );
 {% else %}
             auto proxy_lease = this->{{ port.slot_name }}.acquire("{{ port.name }}");
             using AsyncResType = decltype(make_async_result(proxy_lease->{{ port.unique_field.name }}.Get()));
@@ -112,7 +168,13 @@
         // 4. Ambiguous bare field tags: read<AmbiguousTag>()
 {% for ambig in model.read_ambiguous_bare_tags %}
         else if constexpr (std::is_same_v<Tag, {{ ambig.tag }}>) {
-            static_assert(!sizeof(Tag*), "reaktar: read<Tag>() is ambiguous across multiple ports sharing the '{{ ambig.service }}' interface! Use read<ports::PortName::Tag>() or read<ports::PortName, Tag>() instead.");
+            static_assert(!sizeof(Tag*),
+                "reaktar: read<Tag>() is ambiguous across multiple ports sharing the '{{ ambig.service }}' interface! Use read<ports::PortName::Tag>() or read<ports::PortName, Tag>() instead.\n"
+                "Competing candidate ports providing this field are:\n"
+{% for p in ambig.ports %}
+                "  - ports::{{ p }}\n"
+{% endfor %}
+            );
         }
 {% endfor %}
 
@@ -120,7 +182,13 @@
 {% for item in model.read_by_type %}
         else if constexpr (std::is_same_v<Tag, {{ item.type }}>) {
 {% if item.is_ambiguous %}
-            static_assert(!sizeof(Tag*), "reaktar: read<DataType>() is ambiguous! Multiple fields across ports return type '{{ item.type }}'. Specify the field tag or port.");
+            static_assert(!sizeof(Tag*),
+                "reaktar: read<DataType>() is ambiguous! Multiple fields across ports return type '{{ item.type }}'. Specify the field tag or port.\n"
+                "Fields returning type '{{ item.type }}':\n"
+{% for f in item.fields %}
+                "  - Port '{{ f.port_name }}', field '{{ f.name }}'\n"
+{% endfor %}
+            );
 {% else %}
             auto proxy_lease = this->{{ item.field.slot_name }}.acquire("{{ item.field.port_name }}");
             using AsyncResType = decltype(make_async_result(proxy_lease->{{ item.field.name }}.Get()));
@@ -131,8 +199,80 @@
 {% endif %}
         }
 {% endfor %}
+
+        // 6. Reject wildcard Any queries on read()
+        else if constexpr (
+            std::is_same_v<Tag, ::reaktar::Any> ||
+            std::is_same_v<Tag, ::reaktar::All>
+{% for p in model.ports %}
+            || std::is_same_v<Tag, typename ActorBase::ports::{{ p.port_name }}::Any>
+{% for ev in p.events %}
+            || std::is_same_v<Tag, typename ActorBase::ports::{{ p.port_name }}::{{ ev.name }}::Any>
+            || std::is_same_v<Tag, ::reaktar::tags::{{ p.service_ns }}::events::{{ ev.name }}::Any>
+{% endfor %}
+{% for f in p.fields %}
+            || std::is_same_v<Tag, typename ActorBase::ports::{{ p.port_name }}::{{ f.name }}::Any>
+            || std::is_same_v<Tag, ::reaktar::tags::{{ p.service_ns }}::fields::{{ f.name }}::Any>
+{% endfor %}
+{% for m in p.methods %}
+            || std::is_same_v<Tag, typename ActorBase::ports::{{ p.port_name }}::{{ m.name }}::Any>
+            || std::is_same_v<Tag, ::reaktar::tags::{{ p.service_ns }}::methods::{{ m.name }}::Any>
+{% endfor %}
+{% endfor %}
+        ) {
+            static_assert(!sizeof(Tag*),
+                "reaktar: read<reaktar::Any>() is invalid! read() does not support broadcast/wildcard dispatch because field read operations pull a single concrete value. Use read<Port, FieldTag>() or read<FieldTag>() to read a specific field.");
+        }
+
+        // 7. Reject event tags on read()
+        else if constexpr (
+{% for p in model.ports %}
+{% for ev in p.events %}
+            std::is_same_v<Tag, typename ActorBase::ports::{{ p.port_name }}::{{ ev.name }}> ||
+            std::is_same_v<Tag, ::reaktar::tags::{{ p.service_ns }}::events::{{ ev.name }}> ||
+{% endfor %}
+{% endfor %}
+            false
+        ) {
+            static_assert(!sizeof(Tag*),
+                "reaktar: read<Event>() is invalid! Event tags cannot be read via read(). Events are received via on(...) or emitted via emit(...).");
+        }
+
+        // 8. Reject RPC method tags on read()
+        else if constexpr (
+{% for p in model.ports %}
+{% for m in p.methods %}
+            std::is_same_v<Tag, typename ActorBase::ports::{{ p.port_name }}::{{ m.name }}> ||
+            std::is_same_v<Tag, ::reaktar::tags::{{ p.service_ns }}::methods::{{ m.name }}> ||
+{% endfor %}
+{% endfor %}
+            false
+        ) {
+            static_assert(!sizeof(Tag*),
+                "reaktar: read<Method>() is invalid! RPC method tags cannot be read via read(). RPC methods are called via emit(...) or handled via on(...).");
+        }
         else {
-            static_assert(!sizeof(Tag*), "reaktar: read called with unknown tag, port, or type!");
+            static_assert(!sizeof(Tag*),
+                "reaktar: read called with unknown tag, port, or type!\n"
+{% if model.read_ports | length > 0 %}
+                "Available readable ports:\n"
+{% for p in model.read_ports %}
+                "  - ports::{{ p.name }}\n"
+{% endfor %}
+{% endif %}
+{% if model.read_available_tags | length > 0 %}
+                "Available readable field tags:\n"
+{% for t in model.read_available_tags %}
+                "  - {{ t }}\n"
+{% endfor %}
+{% endif %}
+{% if model.read_available_types | length > 0 %}
+                "Available readable data types:\n"
+{% for ty in model.read_available_types %}
+                "  - {{ ty }}\n"
+{% endfor %}
+{% endif %}
+            );
         }
     }
 

@@ -16,8 +16,8 @@
  * for compile-time verification of lock invariants and data race prevention.
  *
  * Portability:
- * These attributes are Clang-specific. When compiling with non-Clang toolchains
- * (e.g. GCC, QNX QCC, or MSVC), all annotations expand to empty tokens.
+ * These attributes are Clang-specific. When compiling with other standard toolchains
+ * (e.g. GCC), all annotations expand to empty tokens.
  */
 
 #if defined(__clang__)

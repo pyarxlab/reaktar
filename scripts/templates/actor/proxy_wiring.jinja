@@ -364,11 +364,16 @@ private:
 {% for f in model.skeleton_setters %}
         using {{ f.port_ident }}_{{ f.name }}_Port_ = typename ActorBase::ports::{{ f.port_name }};
         using {{ f.port_ident }}_{{ f.name }}_PortTag_ = typename {{ f.port_ident }}_{{ f.name }}_Port_::{{ f.name }};
+        using {{ f.port_ident }}_{{ f.name }}_PortAny_ = typename {{ f.port_ident }}_{{ f.name }}_Port_::Any;
+        using {{ f.port_ident }}_{{ f.name }}_TagAny_ = typename {{ f.tag }}::Any;
 
-        static constexpr bool kHas_on_{{ f.port_ident }}_{{ f.name }}_port_tag  = ::reaktar::has_on_setter_v<Derived, {{ f.port_ident }}_{{ f.name }}_PortTag_, {{ f.type }}>;
-        static constexpr bool kHas_on_{{ f.port_ident }}_{{ f.name }}_port_bare = ::reaktar::has_on_setter_v<Derived, {{ f.port_ident }}_{{ f.name }}_Port_, {{ f.type }}>;
-        static constexpr bool kHas_on_{{ f.port_ident }}_{{ f.name }}_tagged    = ::reaktar::has_on_setter_v<Derived, {{ f.tag }}, {{ f.type }}>;
-        static constexpr bool kHas_on_{{ f.port_ident }}_{{ f.name }}_direct    = ::reaktar::has_on_direct_setter_v<Derived, {{ f.type }}>;
+        static constexpr bool kHas_on_{{ f.port_ident }}_{{ f.name }}_port_tag   = ::reaktar::has_on_setter_v<Derived, {{ f.port_ident }}_{{ f.name }}_PortTag_, {{ f.type }}>;
+        static constexpr bool kHas_on_{{ f.port_ident }}_{{ f.name }}_port_bare  = ::reaktar::has_on_setter_v<Derived, {{ f.port_ident }}_{{ f.name }}_Port_, {{ f.type }}>;
+        static constexpr bool kHas_on_{{ f.port_ident }}_{{ f.name }}_port_any   = ::reaktar::has_on_setter_v<Derived, {{ f.port_ident }}_{{ f.name }}_PortAny_, {{ f.type }}>;
+        static constexpr bool kHas_on_{{ f.port_ident }}_{{ f.name }}_tag_any    = ::reaktar::has_on_setter_v<Derived, {{ f.port_ident }}_{{ f.name }}_TagAny_, {{ f.type }}>;
+        static constexpr bool kHas_on_{{ f.port_ident }}_{{ f.name }}_tagged     = ::reaktar::has_on_setter_v<Derived, {{ f.tag }}, {{ f.type }}>;
+        static constexpr bool kHas_on_{{ f.port_ident }}_{{ f.name }}_global_any = ::reaktar::has_on_setter_v<Derived, ::reaktar::Any, {{ f.type }}>;
+        static constexpr bool kHas_on_{{ f.port_ident }}_{{ f.name }}_direct     = ::reaktar::has_on_direct_setter_v<Derived, {{ f.type }}>;
 
         auto register_{{ f.port_ident }}_{{ f.name }} = [this](auto&& invoke) {
             if constexpr (std::is_same_v<ExecutionPolicy, ::reaktar::DirectExecution>) {
@@ -402,12 +407,39 @@ private:
         }
 {% else %}
         else if constexpr (kHas_on_{{ f.port_ident }}_{{ f.name }}_port_bare) {
-            static_assert(!sizeof(Derived*), "reaktar::on() collision: field type '{{ f.type }}' is shared across multiple field setters on port '{{ f.port_name }}'. You must specify the port field tag: on(ports::{{ f.port_name }}::{{ f.name }}, const {{ f.type }}& val) instead of on(ports::{{ f.port_name }}, ...).");
+#if REAKTAR_AMBIGUITY_VALIDATION
+            static_assert(!sizeof(Derived*),
+                "reaktar::on() collision: field type '{{ f.type }}' is shared across multiple field setters on port '{{ f.port_name }}'. You must specify the port field tag: on(ports::{{ f.port_name }}::{{ f.name }}, const {{ f.type }}& val) instead of on(ports::{{ f.port_name }}, ...).\n"
+                "Competing field setters on port '{{ f.port_name }}':\n"
+{% for item in f.competing_on_port %}
+                "  - ports::{{ f.port_name }}::{{ item.name }}\n"
+{% endfor %}
+            );
+#else
+            register_{{ f.port_ident }}_{{ f.name }}([this](const {{ f.type }}& val) {
+                return self().on({{ f.port_ident }}_{{ f.name }}_Port_{}, val);
+            });
+#endif
         }
 {% endif %}
+        else if constexpr (kHas_on_{{ f.port_ident }}_{{ f.name }}_port_any) {
+            register_{{ f.port_ident }}_{{ f.name }}([this](const {{ f.type }}& val) {
+                return self().on({{ f.port_ident }}_{{ f.name }}_PortAny_{}, val);
+            });
+        }
+        else if constexpr (kHas_on_{{ f.port_ident }}_{{ f.name }}_tag_any) {
+            register_{{ f.port_ident }}_{{ f.name }}([this](const {{ f.type }}& val) {
+                return self().on({{ f.port_ident }}_{{ f.name }}_TagAny_{}, val);
+            });
+        }
         else if constexpr (kHas_on_{{ f.port_ident }}_{{ f.name }}_tagged) {
             register_{{ f.port_ident }}_{{ f.name }}([this](const {{ f.type }}& val) {
                 return self().on({{ f.tag }}{}, val);
+            });
+        }
+        else if constexpr (kHas_on_{{ f.port_ident }}_{{ f.name }}_global_any) {
+            register_{{ f.port_ident }}_{{ f.name }}([this](const {{ f.type }}& val) {
+                return self().on(::reaktar::Any{}, val);
             });
         }
 {% if f.is_unique_setter %}
@@ -418,7 +450,19 @@ private:
         }
 {% else %}
         else if constexpr (kHas_on_{{ f.port_ident }}_{{ f.name }}_direct) {
-            static_assert(!sizeof(Derived*), "reaktar::on() collision: field type '{{ f.type }}' is shared across multiple field setters. You must specify the tag: on({{ f.tag }}, const {{ f.type }}& val) or port tag: on(typename ActorBase::ports::{{ f.port_name }}::{{ f.name }}, const {{ f.type }}& val).");
+#if REAKTAR_AMBIGUITY_VALIDATION
+            static_assert(!sizeof(Derived*),
+                "reaktar::on() collision: field type '{{ f.type }}' is shared across multiple field setters. You must specify the tag: on({{ f.tag }}, const {{ f.type }}& val) or port tag: on(typename ActorBase::ports::{{ f.port_name }}::{{ f.name }}, const {{ f.type }}& val).\n"
+                "Competing incoming channels for type '{{ f.type }}':\n"
+{% for tgt in f.competing_all %}
+                "  - ports::{{ tgt.port }}::{{ tgt.member }} ({{ tgt.kind }})\n"
+{% endfor %}
+            );
+#else
+            register_{{ f.port_ident }}_{{ f.name }}([this](const {{ f.type }}& val) {
+                return self().on(val);
+            });
+#endif
         }
 {% endif %}
 {% endfor %}
@@ -438,20 +482,59 @@ private:
             constexpr bool kHas_tagged     = has_on_event_v<Derived, {{ sig.tag }}, {{ sig.type }}>;
             constexpr bool kHas_direct     = has_on_direct_event_v<Derived, {{ sig.type }}>;
             constexpr bool kHas_global_any = has_on_event_v<Derived, ::reaktar::Any, {{ sig.type }}>;
+#if REAKTAR_AMBIGUITY_VALIDATION
             static_assert(
                 (int(kHas_port_tag) + int(kHas_port_bare) + int(kHas_port_any) + int(kHas_signal_any) + int(kHas_tagged) + int(kHas_direct) + int(kHas_global_any)) <= 1,
                 "reaktar: Multiple conflicting on(...) handlers declared for {{ sig.signal_label }} '{{ sig.name }}' on port '{{ sig.port_name }}'! "
                 "You must define only one: on(ports::{{ sig.port_name }}::{{ sig.name }}, ...), on({{ sig.tag }}, ...), on(ports::{{ sig.port_name }}::Any, ...), on({{ sig.tag }}::Any, ...), on(reaktar::Any, ...), on(ports::{{ sig.port_name }}, ...), or on(...)."
             );
 {% if not sig.is_unique_across_ports %}
-            static_assert(!kHas_tagged, "reaktar::on() collision: {{ sig.signal_label }} '{{ sig.name }}' is provided by multiple ports ({{ sig.port_count }} ports). You cannot use bare on({{ sig.tag }}, ...); you must specify the port via on(ports::{{ sig.port_name }}::{{ sig.name }}, ...) or use explicit fan-in on({{ sig.tag }}::Any, ...).");
+            static_assert(!kHas_tagged,
+                "reaktar::on() collision: {{ sig.signal_label }} '{{ sig.name }}' is provided by multiple ports ({{ sig.port_count }} ports). You cannot use bare on({{ sig.tag }}, ...); you must specify the port via on(ports::{{ sig.port_name }}::{{ sig.name }}, ...) or use explicit fan-in on({{ sig.tag }}::Any, ...).\n"
+                "Ports providing {{ sig.signal_label }} '{{ sig.name }}':\n"
+{% for p in sig.matching_ports %}
+                "  - ports::{{ p }}\n"
+{% endfor %}
+            );
 {% endif %}
 {% if not sig.is_unique_on_port %}
-            static_assert(!kHas_port_bare, "reaktar::on() collision: {{ sig.shared_type_label }} '{{ sig.type }}' is shared across multiple events/notifiers on port '{{ sig.port_name }}'. You must specify the {{ sig.port_tag_label }}: on(ports::{{ sig.port_name }}::{{ sig.name }}, const {{ sig.type }}& val) instead of on(ports::{{ sig.port_name }}, ...).");
+            static_assert(!kHas_port_bare,
+                "reaktar::on() collision: {{ sig.shared_type_label }} '{{ sig.type }}' is shared across multiple events/notifiers on port '{{ sig.port_name }}'. You must specify the {{ sig.port_tag_label }}: on(ports::{{ sig.port_name }}::{{ sig.name }}, const {{ sig.type }}& val) instead of on(ports::{{ sig.port_name }}, ...).\n"
+                "Competing items on port '{{ sig.port_name }}':\n"
+{% for item in sig.competing_on_port %}
+                "  - ports::{{ sig.port_name }}::{{ item.name }} ({{ item.kind }})\n"
+{% endfor %}
+            );
 {% endif %}
 {% if not sig.is_unique %}
-            static_assert(!kHas_direct, "reaktar::on() collision: type '{{ sig.type }}' is shared across multiple incoming channels (events/fields). You must specify the tag: void on({{ sig.tag }}, const {{ sig.type }}& val) or port tag: void on(typename ActorBase::ports::{{ sig.port_name }}::{{ sig.name }}, const {{ sig.type }}& val).");
+            static_assert(!kHas_direct,
+                "reaktar::on() collision: type '{{ sig.type }}' is shared across multiple incoming channels (events/fields). You must specify the tag: void on({{ sig.tag }}, const {{ sig.type }}& val) or port tag: void on(typename ActorBase::ports::{{ sig.port_name }}::{{ sig.name }}, const {{ sig.type }}& val).\n"
+                "Competing incoming channels for type '{{ sig.type }}':\n"
+{% for tgt in sig.competing_all %}
+                "  - ports::{{ tgt.port }}::{{ tgt.member }} ({{ tgt.kind }})\n"
+{% endfor %}
+            );
 {% endif %}
+#else
+            if constexpr ((int(kHas_port_tag) + int(kHas_port_bare) + int(kHas_port_any) + int(kHas_signal_any) + int(kHas_tagged) + int(kHas_direct) + int(kHas_global_any)) > 1) {
+                REAKTAR_EMIT_AMBIGUITY_WARNING(::reaktar::diagnostics::conflicting_handler_warning<Derived, Port_, PortTag_, void>);
+            }
+{% if not sig.is_unique_across_ports %}
+            if constexpr (kHas_tagged) {
+                REAKTAR_EMIT_AMBIGUITY_WARNING(::reaktar::diagnostics::multi_port_ambiguity_warning<Derived, {{ sig.tag }}, std::tuple<{% for p in sig.matching_ports %}typename ActorBase::ports::{{ p }}{{ ", " if not loop.last else "" }}{% endfor %}>>);
+            }
+{% endif %}
+{% if not sig.is_unique_on_port %}
+            if constexpr (kHas_port_bare) {
+                REAKTAR_EMIT_AMBIGUITY_WARNING(::reaktar::diagnostics::port_payload_ambiguity_warning<Derived, Port_, {{ sig.type }}, std::tuple<{% for item in sig.competing_on_port %}typename Port_::{{ item.name }}{{ ", " if not loop.last else "" }}{% endfor %}>>);
+            }
+{% endif %}
+{% if not sig.is_unique %}
+            if constexpr (kHas_direct) {
+                REAKTAR_EMIT_AMBIGUITY_WARNING(::reaktar::diagnostics::direct_payload_ambiguity_warning<Derived, {{ sig.type }}, std::tuple<{% for tgt in sig.competing_all %}typename ActorBase::ports::{{ tgt.port }}::{{ tgt.member }}{{ ", " if not loop.last else "" }}{% endfor %}>>);
+            }
+{% endif %}
+#endif
             if constexpr (kHas_port_tag) {
                 static_assert(std::is_void_v<decltype(std::declval<Derived&>().on(std::declval<PortTag_>(), std::declval<const {{ sig.type }}&>()))>,
                     "reaktar::on() error: {{ sig.signal_label_cap }} handler for '{{ sig.name }}' on port '{{ sig.port_name }}' must return void!");
@@ -482,11 +565,17 @@ private:
         {
             using Port_ = typename ActorBase::ports::{{ f.port_name }};
             using PortTag_ = typename Port_::{{ f.name }};
+            using PortAny_ = typename Port_::Any;
+            using TagAny_ = typename {{ f.tag }}::Any;
+            using GlobalAny_ = ::reaktar::Any;
 
-            constexpr bool kHas_on_port_tag  = ::reaktar::has_on_setter_v<Derived, PortTag_, {{ f.type }}>;
-            constexpr bool kHas_on_port_bare = ::reaktar::has_on_setter_v<Derived, Port_, {{ f.type }}>;
-            constexpr bool kHas_on_tagged    = ::reaktar::has_on_setter_v<Derived, {{ f.tag }}, {{ f.type }}>;
-            constexpr bool kHas_on_direct    = ::reaktar::has_on_direct_setter_v<Derived, {{ f.type }}>;
+            constexpr bool kHas_on_port_tag   = ::reaktar::has_on_setter_v<Derived, PortTag_, {{ f.type }}>;
+            constexpr bool kHas_on_port_bare  = ::reaktar::has_on_setter_v<Derived, Port_, {{ f.type }}>;
+            constexpr bool kHas_on_port_any   = ::reaktar::has_on_setter_v<Derived, PortAny_, {{ f.type }}>;
+            constexpr bool kHas_on_tag_any    = ::reaktar::has_on_setter_v<Derived, TagAny_, {{ f.type }}>;
+            constexpr bool kHas_on_tagged     = ::reaktar::has_on_setter_v<Derived, {{ f.tag }}, {{ f.type }}>;
+            constexpr bool kHas_on_global_any = ::reaktar::has_on_setter_v<Derived, GlobalAny_, {{ f.type }}>;
+            constexpr bool kHas_on_direct     = ::reaktar::has_on_direct_setter_v<Derived, {{ f.type }}>;
 
             constexpr bool kHas_on_set_port_tag  = ::reaktar::has_on_field_set_v<Derived, PortTag_, {{ f.type }}>;
             constexpr bool kHas_on_set_port_bare = ::reaktar::has_on_field_set_v<Derived, Port_, {{ f.type }}>;
@@ -498,11 +587,17 @@ private:
             static_assert(!kHas_on_set,
                 "reaktar error: on_set() has been removed! Field setters must be declared using on(...).");
 
+#if REAKTAR_AMBIGUITY_VALIDATION
             static_assert(
-                (int(kHas_on_port_tag) + int(kHas_on_port_bare) + int(kHas_on_tagged) + int(kHas_on_direct)) <= 1,
+                (int(kHas_on_port_tag) + int(kHas_on_port_bare) + int(kHas_on_port_any) + int(kHas_on_tag_any) + int(kHas_on_tagged) + int(kHas_on_direct) + int(kHas_on_global_any)) <= 1,
                 "reaktar: Multiple conflicting on(...) handlers declared for field setter '{{ f.name }}' on port '{{ f.port_name }}'! "
-                "You must define only one: on(ports::{{ f.port_name }}::{{ f.name }}, ...), on({{ f.tag }}, ...), on(ports::{{ f.port_name }}, ...), or on(...)."
+                "You must define only one: on(ports::{{ f.port_name }}::{{ f.name }}, ...), on({{ f.tag }}, ...), on(ports::{{ f.port_name }}::Any, ...), on({{ f.tag }}::Any, ...), on(reaktar::Any, ...), on(ports::{{ f.port_name }}, ...), or on(...)."
             );
+#else
+            if constexpr ((int(kHas_on_port_tag) + int(kHas_on_port_bare) + int(kHas_on_port_any) + int(kHas_on_tag_any) + int(kHas_on_tagged) + int(kHas_on_direct) + int(kHas_on_global_any)) > 1) {
+                REAKTAR_EMIT_AMBIGUITY_WARNING(::reaktar::diagnostics::conflicting_handler_warning<Derived, Port_, PortTag_, void>);
+            }
+#endif
 
             if constexpr (kHas_on_port_tag) {
                 using Ret = ::reaktar::on_setter_return_type_t<Derived, PortTag_, {{ f.type }}>;
@@ -512,8 +607,20 @@ private:
                 using Ret = ::reaktar::on_setter_return_type_t<Derived, Port_, {{ f.type }}>;
                 static_assert(!std::is_void_v<Ret>, "reaktar::on() error: Field setter handler for '{{ f.name }}' must return '{{ f.type }}' (or Future<...>), but returns void!");
             }
+            if constexpr (kHas_on_port_any) {
+                using Ret = ::reaktar::on_setter_return_type_t<Derived, PortAny_, {{ f.type }}>;
+                static_assert(!std::is_void_v<Ret>, "reaktar::on() error: Field setter handler for '{{ f.name }}' must return '{{ f.type }}' (or Future<...>), but returns void!");
+            }
+            if constexpr (kHas_on_tag_any) {
+                using Ret = ::reaktar::on_setter_return_type_t<Derived, TagAny_, {{ f.type }}>;
+                static_assert(!std::is_void_v<Ret>, "reaktar::on() error: Field setter handler for '{{ f.name }}' must return '{{ f.type }}' (or Future<...>), but returns void!");
+            }
             if constexpr (kHas_on_tagged) {
                 using Ret = ::reaktar::on_setter_return_type_t<Derived, {{ f.tag }}, {{ f.type }}>;
+                static_assert(!std::is_void_v<Ret>, "reaktar::on() error: Field setter handler for '{{ f.name }}' must return '{{ f.type }}' (or Future<...>), but returns void!");
+            }
+            if constexpr (kHas_on_global_any) {
+                using Ret = ::reaktar::on_setter_return_type_t<Derived, GlobalAny_, {{ f.type }}>;
                 static_assert(!std::is_void_v<Ret>, "reaktar::on() error: Field setter handler for '{{ f.name }}' must return '{{ f.type }}' (or Future<...>), but returns void!");
             }
             if constexpr (kHas_on_direct) {
@@ -522,14 +629,83 @@ private:
             }
 
 {% if not f.is_unique_across_ports %}
-            static_assert(!kHas_on_tagged, "reaktar::on() collision: field '{{ f.name }}' is provided by multiple ports ({{ f.port_count }} ports). You cannot use bare on({{ f.tag }}, ...); you must specify the port via on(ports::{{ f.port_name }}::{{ f.name }}, ...).");
+#if REAKTAR_AMBIGUITY_VALIDATION
+            static_assert(!kHas_on_tagged,
+                "reaktar::on() collision: field '{{ f.name }}' is provided by multiple ports ({{ f.port_count }} ports). You cannot use bare on({{ f.tag }}, ...); you must specify the port via on(ports::{{ f.port_name }}::{{ f.name }}, ...).\n"
+                "Ports providing field '{{ f.name }}':\n"
+{% for p in f.matching_ports %}
+                "  - ports::{{ p }}\n"
+{% endfor %}
+            );
+#else
+            if constexpr (kHas_on_tagged) {
+                REAKTAR_EMIT_AMBIGUITY_WARNING(::reaktar::diagnostics::multi_port_ambiguity_warning<Derived, {{ f.tag }}, std::tuple<{% for p in f.matching_ports %}typename ActorBase::ports::{{ p }}{{ ", " if not loop.last else "" }}{% endfor %}>>);
+            }
+#endif
 {% endif %}
 {% if not f.is_unique_setter_on_port %}
-            static_assert(!kHas_on_port_bare, "reaktar::on() collision: field type '{{ f.type }}' is shared across multiple field setters on port '{{ f.port_name }}'. You must specify the port field tag: on(ports::{{ f.port_name }}::{{ f.name }}, const {{ f.type }}& val) instead of on(ports::{{ f.port_name }}, ...).");
+#if REAKTAR_AMBIGUITY_VALIDATION
+            static_assert(!kHas_on_port_bare,
+                "reaktar::on() collision: field type '{{ f.type }}' is shared across multiple field setters on port '{{ f.port_name }}'. You must specify the port field tag: on(ports::{{ f.port_name }}::{{ f.name }}, const {{ f.type }}& val) instead of on(ports::{{ f.port_name }}, ...).\n"
+                "Competing field setters on port '{{ f.port_name }}':\n"
+{% for item in f.competing_on_port %}
+                "  - ports::{{ f.port_name }}::{{ item.name }}\n"
+{% endfor %}
+            );
+#else
+            if constexpr (kHas_on_port_bare) {
+                REAKTAR_EMIT_AMBIGUITY_WARNING(::reaktar::diagnostics::port_payload_ambiguity_warning<Derived, Port_, {{ f.type }}, std::tuple<{% for item in f.competing_on_port %}typename Port_::{{ item.name }}{{ ", " if not loop.last else "" }}{% endfor %}>>);
+            }
+#endif
 {% endif %}
 {% if not f.is_unique_setter %}
-            static_assert(!kHas_on_direct, "reaktar::on() collision: field type '{{ f.type }}' is shared across multiple field setters or channels. You must specify the tag: on({{ f.tag }}, const {{ f.type }}& val) or port tag: on(typename ActorBase::ports::{{ f.port_name }}::{{ f.name }}, const {{ f.type }}& val).");
+#if REAKTAR_AMBIGUITY_VALIDATION
+            static_assert(!kHas_on_direct,
+                "reaktar::on() collision: field type '{{ f.type }}' is shared across multiple field setters or channels. You must specify the tag: on({{ f.tag }}, const {{ f.type }}& val) or port tag: on(typename ActorBase::ports::{{ f.port_name }}::{{ f.name }}, const {{ f.type }}& val).\n"
+                "Competing incoming channels for type '{{ f.type }}':\n"
+{% for tgt in f.competing_all %}
+                "  - ports::{{ tgt.port }}::{{ tgt.member }} ({{ tgt.kind }})\n"
+{% endfor %}
+            );
+#else
+            if constexpr (kHas_on_direct) {
+                REAKTAR_EMIT_AMBIGUITY_WARNING(::reaktar::diagnostics::direct_payload_ambiguity_warning<Derived, {{ f.type }}, std::tuple<{% for tgt in f.competing_all %}typename ActorBase::ports::{{ tgt.port }}::{{ tgt.member }}{{ ", " if not loop.last else "" }}{% endfor %}>>);
+            }
+#endif
 {% endif %}
+        }
+{% endfor %}
+{% for f in model.skeleton_fields_without_setter %}
+        {
+            constexpr bool kHas_on_no_setter = ::reaktar::has_on_setter_v<Derived, {{ f.tag }}, {{ f.type }}> ||
+                                               ::reaktar::has_on_event_v<Derived, {{ f.tag }}, {{ f.type }}> ||
+                                               ::reaktar::has_on_nullary_v<Derived, {{ f.tag }}>;
+            static_assert(!kHas_on_no_setter,
+                "reaktar: 'on(...)' handler declared for field '{{ f.name }}' on provided port '{{ f.port_name }}', but this field does not have a setter in ARXML! Provided ports can only handle setters for fields declared with hasSetter=true.");
+        }
+{% endfor %}
+{% for f in model.proxy_fields_without_notifier %}
+        {
+            constexpr bool kHas_on_no_notifier = ::reaktar::has_on_event_v<Derived, {{ f.tag }}, {{ f.type }}> ||
+                                                 ::reaktar::has_on_nullary_v<Derived, {{ f.tag }}>;
+            static_assert(!kHas_on_no_notifier,
+                "reaktar: 'on(...)' handler declared for field '{{ f.name }}' on required port '{{ f.port_name }}', but this field does not have a notifier in ARXML! Required ports can only subscribe to fields declared with hasNotifier=true.");
+        }
+{% endfor %}
+{% for ev in model.skeleton_events %}
+        {
+            constexpr bool kHas_on_skel_ev = ::reaktar::has_on_event_v<Derived, {{ ev.tag }}, {{ ev.type }}> ||
+                                             ::reaktar::has_on_nullary_v<Derived, {{ ev.tag }}>;
+            static_assert(!kHas_on_skel_ev,
+                "reaktar: 'on(...)' handler declared for event '{{ ev.name }}' on provided port '{{ ev.port_name }}'! Provided ports emit events; they cannot receive them via on(...).");
+        }
+{% endfor %}
+{% for m in model.proxy_methods %}
+        {
+            constexpr bool kHas_on_proxy_method = ::reaktar::has_method_handler_v<Derived, {{ m.tag }}{% for t in m.sig_types %}, {{ t }}{% endfor %}> ||
+                                                  ::reaktar::has_on_nullary_v<Derived, {{ m.tag }}>;
+            static_assert(!kHas_on_proxy_method,
+                "reaktar: 'on(...)' handler declared for RPC method '{{ m.name }}' on required port '{{ m.port_name }}'! Required ports call/emit RPC methods; they cannot implement them via on(...).");
         }
 {% endfor %}
     }
@@ -576,17 +752,22 @@ private:
                 self().on({{ proxy.ident }}_{{ sig.name }}_PortTag_{}, s);
             });
         }
-{% if sig.is_unique_on_port %}
         else if constexpr (kHas_{{ proxy.ident }}_{{ sig.name }}_port_bare) {
+#if REAKTAR_AMBIGUITY_VALIDATION
+{% if not sig.is_unique_on_port %}
+            static_assert(!sizeof(Derived*),
+                "reaktar::on() collision: {{ sig.shared_type_label }} '{{ sig.type }}' is shared across multiple events/notifiers on port '{{ proxy.port_name }}'. You must specify the {{ sig.port_tag_label }}: on(ports::{{ proxy.port_name }}::{{ sig.name }}, const {{ sig.type }}& val) instead of on(ports::{{ proxy.port_name }}, ...).\n"
+                "Competing items on port '{{ proxy.port_name }}':\n"
+{% for item in sig.competing_on_port %}
+                "  - ports::{{ proxy.port_name }}::{{ item.name }} ({{ item.kind }})\n"
+{% endfor %}
+            );
+{% endif %}
+#endif
             register_{{ sig.name }}_handler([this](const auto& s) {
                 self().on({{ proxy.ident }}_{{ sig.name }}_Port_{}, s);
             });
         }
-{% else %}
-        else if constexpr (kHas_{{ proxy.ident }}_{{ sig.name }}_port_bare) {
-            static_assert(!sizeof(Derived*), "reaktar::on() collision: {{ sig.shared_type_label }} '{{ sig.type }}' is shared across multiple events/notifiers on port '{{ proxy.port_name }}'. You must specify the {{ sig.port_tag_label }}: on(ports::{{ proxy.port_name }}::{{ sig.name }}, const {{ sig.type }}& val) instead of on(ports::{{ proxy.port_name }}, ...).");
-        }
-{% endif %}
         else if constexpr (kHas_{{ proxy.ident }}_{{ sig.name }}_port_any) {
             register_{{ sig.name }}_handler([this](const auto& s) {
                 self().on({{ proxy.ident }}_{{ sig.name }}_PortAny_{}, s);
@@ -607,17 +788,22 @@ private:
                 self().on(::reaktar::Any{}, s);
             });
         }
-{% if sig.is_unique %}
         else if constexpr (kHas_{{ proxy.ident }}_{{ sig.name }}_direct) {
+#if REAKTAR_AMBIGUITY_VALIDATION
+{% if not sig.is_unique %}
+            static_assert(!sizeof(Derived*),
+                "reaktar::on() collision: type '{{ sig.type }}' is shared across multiple incoming channels (events/fields). You must specify the tag: void on({{ sig.tag }}, const {{ sig.type }}& val) or port tag: void on(typename ActorBase::ports::{{ proxy.port_name }}::{{ sig.name }}, const {{ sig.type }}& val).\n"
+                "Competing incoming channels for type '{{ sig.type }}':\n"
+{% for tgt in sig.competing_all %}
+                "  - ports::{{ tgt.port }}::{{ tgt.member }} ({{ tgt.kind }})\n"
+{% endfor %}
+            );
+{% endif %}
+#endif
             register_{{ sig.name }}_handler([this](const auto& s) {
                 self().on(s);
             });
         }
-{% else %}
-        else if constexpr (kHas_{{ proxy.ident }}_{{ sig.name }}_direct) {
-            static_assert(!sizeof(Derived*), "reaktar::on() collision: type '{{ sig.type }}' is shared across multiple incoming channels (events/fields). You must specify the tag: void on({{ sig.tag }}, const {{ sig.type }}& val) or port tag: void on(typename ActorBase::ports::{{ proxy.port_name }}::{{ sig.name }}, const {{ sig.type }}& val).");
-        }
-{% endif %}
 {% endfor %}
     }
 

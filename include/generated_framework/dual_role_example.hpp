@@ -188,31 +188,51 @@ public:
     void demonstrate_alertprovider_emits() {
         std::cout << "[DualRoleExample] Outgoing emits for AlertProvider\n";
 
-        emit<::reaktar::tags::fan_out_alert::events::EmergencyAlert>(vehicle_data::EmergencyAlert{1001u, ara::core::String{"Speed limit exceeded"}}); // EmergencyAlert (tagged, resolves type collision)
+        emit<ports::AlertProvider>(vehicle_data::EmergencyAlert{1001u, ara::core::String{"Speed limit exceeded"}}); // EmergencyAlert (port-targeted emit)
+        emit<::reaktar::tags::fan_out_alert::events::EmergencyAlert>(vehicle_data::EmergencyAlert{1001u, ara::core::String{"Speed limit exceeded"}}); // same as above, fully qualified tag
     }
 
     void demonstrate_supervisorprovided_emits() {
         std::cout << "[DualRoleExample] Outgoing emits for SupervisorProvided\n";
 
-        emit(ara::core::Map<uint32_t, vehicle_data::EmergencyAlert>{}); // ActiveDiagnosticMap
+        emit(ara::core::Map<uint32_t, vehicle_data::EmergencyAlert>{}); // ActiveDiagnosticMap (untagged: unique signature across actor)
+        emit<ports::SupervisorProvided>(ara::core::Map<uint32_t, vehicle_data::EmergencyAlert>{}); // same as above, port-targeted emit
         emit<ActiveDiagnosticMap>(ara::core::Map<uint32_t, vehicle_data::EmergencyAlert>{}); // same as above, explicit tag
 
-        emit(vehicle_data::VehicleDiagnostics{}); // DiagnosticsReport
+        emit(vehicle_data::VehicleDiagnostics{}); // DiagnosticsReport (untagged: unique signature across actor)
+        emit<ports::SupervisorProvided>(vehicle_data::VehicleDiagnostics{}); // same as above, port-targeted emit
         emit<DiagnosticsReport>(vehicle_data::VehicleDiagnostics{}); // same as above, explicit tag
 
-        emit(ara::core::Vector<vehicle_data::DriveMode>{}); // DriveHistory
+        emit(ara::core::Vector<vehicle_data::DriveMode>{}); // DriveHistory (untagged: unique signature across actor)
+        emit<ports::SupervisorProvided>(ara::core::Vector<vehicle_data::DriveMode>{}); // same as above, port-targeted emit
         emit<DriveHistory>(ara::core::Vector<vehicle_data::DriveMode>{}); // same as above, explicit tag
 
-        emit<::reaktar::tags::vehicle_supervisor::events::EmergencyAlert>(vehicle_data::EmergencyAlert{1001u, ara::core::String{"Speed limit exceeded"}}); // EmergencyAlert (tagged, resolves type collision)
+        emit<ports::SupervisorProvided>(vehicle_data::EmergencyAlert{1001u, ara::core::String{"Speed limit exceeded"}}); // EmergencyAlert (port-targeted emit)
+        emit<::reaktar::tags::vehicle_supervisor::events::EmergencyAlert>(vehicle_data::EmergencyAlert{1001u, ara::core::String{"Speed limit exceeded"}}); // same as above, fully qualified tag
 
         emit<PrimaryWarning>(100u); // PrimaryWarning (tagged, resolves type collision)
 
         emit<SecondaryWarning>(100u); // SecondaryWarning (tagged, resolves type collision)
 
-        emit<ActiveAlerts>(ara::core::Vector<vehicle_data::EmergencyAlert>{}); // ActiveAlerts (tagged, resolves type collision)
+        emit<ports::SupervisorProvided>(ara::core::Vector<vehicle_data::EmergencyAlert>{}); // ActiveAlerts (port-targeted emit)
+        emit<ActiveAlerts>(ara::core::Vector<vehicle_data::EmergencyAlert>{}); // same as above, fully qualified tag
 
-        emit(ara::core::Array<vehicle_data::SystemStatus, 4>{}); // SystemMatrix
+        emit<CalibrationKey>(1000u); // CalibrationKey (tagged, resolves type collision)
+
+        emit<ports::SupervisorProvided>(vehicle_data::DriveMode::COMFORT); // CurrentDriveMode (port-targeted emit)
+        emit<CurrentDriveMode>(vehicle_data::DriveMode::COMFORT); // same as above, fully qualified tag
+
+        emit<ports::SupervisorProvided>(ara::core::Map<ara::core::String, bool>{}); // FeatureFlags (port-targeted emit)
+        emit<FeatureFlags>(ara::core::Map<ara::core::String, bool>{}); // same as above, fully qualified tag
+
+        emit<HardwareRevision>(1000u); // HardwareRevision (tagged, resolves type collision)
+
+        emit(ara::core::Array<vehicle_data::SystemStatus, 4>{}); // SystemMatrix (untagged: unique signature across actor)
+        emit<ports::SupervisorProvided>(ara::core::Array<vehicle_data::SystemStatus, 4>{}); // same as above, port-targeted emit
         emit<SystemMatrix>(ara::core::Array<vehicle_data::SystemStatus, 4>{}); // same as above, explicit tag
+
+        emit<ports::SupervisorProvided>(ara::core::Map<ara::core::String, ara::core::String>{}); // VehicleConfig (port-targeted emit)
+        emit<VehicleConfig>(ara::core::Map<ara::core::String, ara::core::String>{}); // same as above, fully qualified tag
     }
 
     void demonstrate_supervisorrequired_emits() {
@@ -220,26 +240,29 @@ public:
 
         emit<CalibrateOdometer>(1000u); // CalibrateOdometer (tagged, resolves type collision)
 
-        emit(); // ResetTripMeter
+        emit(); // ResetTripMeter (untagged: unique signature across actor)
+        emit<ports::SupervisorRequired>(); // same as above, port-targeted emit
         emit<ResetTripMeter>(); // same as above, explicit tag
 
-        emit(25.0f, true); // SetSpeedLimiter
+        emit(25.0f, true); // SetSpeedLimiter (untagged: unique signature across actor)
+        emit<ports::SupervisorRequired>(25.0f, true); // same as above, port-targeted emit
         emit<SetSpeedLimiter>(25.0f, true); // same as above, explicit tag
 
         emit<TriggerDiagnostic>(1000u); // TriggerDiagnostic (tagged, resolves type collision)
 
-        emit<ActiveAlerts>(ara::core::Vector<vehicle_data::EmergencyAlert>{}); // ActiveAlerts (tagged, resolves type collision)
+        emit<ports::SupervisorRequired>(ara::core::Vector<vehicle_data::EmergencyAlert>{}); // ActiveAlerts (port-targeted emit)
+        emit<ActiveAlerts>(ara::core::Vector<vehicle_data::EmergencyAlert>{}); // same as above, fully qualified tag
 
         emit<CalibrationKey>(1000u); // CalibrationKey (tagged, resolves type collision)
 
-        emit(vehicle_data::DriveMode::COMFORT); // CurrentDriveMode
-        emit<CurrentDriveMode>(vehicle_data::DriveMode::COMFORT); // same as above, explicit tag
+        emit<ports::SupervisorRequired>(vehicle_data::DriveMode::COMFORT); // CurrentDriveMode (port-targeted emit)
+        emit<CurrentDriveMode>(vehicle_data::DriveMode::COMFORT); // same as above, fully qualified tag
 
-        emit(ara::core::Map<ara::core::String, bool>{}); // FeatureFlags
-        emit<FeatureFlags>(ara::core::Map<ara::core::String, bool>{}); // same as above, explicit tag
+        emit<ports::SupervisorRequired>(ara::core::Map<ara::core::String, bool>{}); // FeatureFlags (port-targeted emit)
+        emit<FeatureFlags>(ara::core::Map<ara::core::String, bool>{}); // same as above, fully qualified tag
 
-        emit(ara::core::Map<ara::core::String, ara::core::String>{}); // VehicleConfig
-        emit<VehicleConfig>(ara::core::Map<ara::core::String, ara::core::String>{}); // same as above, explicit tag
+        emit<ports::SupervisorRequired>(ara::core::Map<ara::core::String, ara::core::String>{}); // VehicleConfig (port-targeted emit)
+        emit<VehicleConfig>(ara::core::Map<ara::core::String, ara::core::String>{}); // same as above, fully qualified tag
     }
 
     void demonstrate_all_emits() {
@@ -247,6 +270,61 @@ public:
         demonstrate_alertprovider_emits();
         demonstrate_supervisorprovided_emits();
         demonstrate_supervisorrequired_emits();
+    }
+
+    // =============================================================================================
+    // INCOMING READ DEMONSTRATIONS (GROUPED BY PORT & SERVICE INTERFACE)
+    // =============================================================================================
+
+    void demonstrate_supervisorrequired_reads() {
+        std::cout << "[DualRoleExample] Pull reads for SupervisorRequired\n";
+        // [SupervisorRequired::ActiveAlerts] AUTOSAR: proxy->ActiveAlerts.Get()
+        auto val_untagged_activealerts = read<ara::core::Vector<vehicle_data::EmergencyAlert>>(); // Untagged (unique field type across actor)
+        (void)val_untagged_activealerts;
+        auto val_bare_activealerts = read<ActiveAlerts>(); // Bare tag (unique field across required ports)
+        (void)val_bare_activealerts;
+        auto val_scoped_activealerts = read<ports::SupervisorRequired::ActiveAlerts>(); // Port-scoped tag (always unambiguous)
+        (void)val_scoped_activealerts;
+        // [SupervisorRequired::CurrentDriveMode] AUTOSAR: proxy->CurrentDriveMode.Get()
+        auto val_untagged_currentdrivemode = read<vehicle_data::DriveMode>(); // Untagged (unique field type across actor)
+        (void)val_untagged_currentdrivemode;
+        auto val_bare_currentdrivemode = read<CurrentDriveMode>(); // Bare tag (unique field across required ports)
+        (void)val_bare_currentdrivemode;
+        auto val_scoped_currentdrivemode = read<ports::SupervisorRequired::CurrentDriveMode>(); // Port-scoped tag (always unambiguous)
+        (void)val_scoped_currentdrivemode;
+        // [SupervisorRequired::FeatureFlags] AUTOSAR: proxy->FeatureFlags.Get()
+        auto val_untagged_featureflags = read<ara::core::Map<ara::core::String, bool>>(); // Untagged (unique field type across actor)
+        (void)val_untagged_featureflags;
+        auto val_bare_featureflags = read<FeatureFlags>(); // Bare tag (unique field across required ports)
+        (void)val_bare_featureflags;
+        auto val_scoped_featureflags = read<ports::SupervisorRequired::FeatureFlags>(); // Port-scoped tag (always unambiguous)
+        (void)val_scoped_featureflags;
+        // [SupervisorRequired::HardwareRevision] AUTOSAR: proxy->HardwareRevision.Get()
+        auto val_untagged_hardwarerevision = read<uint32_t>(); // Untagged (unique field type across actor)
+        (void)val_untagged_hardwarerevision;
+        auto val_bare_hardwarerevision = read<HardwareRevision>(); // Bare tag (unique field across required ports)
+        (void)val_bare_hardwarerevision;
+        auto val_scoped_hardwarerevision = read<ports::SupervisorRequired::HardwareRevision>(); // Port-scoped tag (always unambiguous)
+        (void)val_scoped_hardwarerevision;
+        // [SupervisorRequired::SystemMatrix] AUTOSAR: proxy->SystemMatrix.Get()
+        auto val_untagged_systemmatrix = read<ara::core::Array<vehicle_data::SystemStatus, 4>>(); // Untagged (unique field type across actor)
+        (void)val_untagged_systemmatrix;
+        auto val_bare_systemmatrix = read<SystemMatrix>(); // Bare tag (unique field across required ports)
+        (void)val_bare_systemmatrix;
+        auto val_scoped_systemmatrix = read<ports::SupervisorRequired::SystemMatrix>(); // Port-scoped tag (always unambiguous)
+        (void)val_scoped_systemmatrix;
+        // [SupervisorRequired::VehicleConfig] AUTOSAR: proxy->VehicleConfig.Get()
+        auto val_untagged_vehicleconfig = read<ara::core::Map<ara::core::String, ara::core::String>>(); // Untagged (unique field type across actor)
+        (void)val_untagged_vehicleconfig;
+        auto val_bare_vehicleconfig = read<VehicleConfig>(); // Bare tag (unique field across required ports)
+        (void)val_bare_vehicleconfig;
+        auto val_scoped_vehicleconfig = read<ports::SupervisorRequired::VehicleConfig>(); // Port-scoped tag (always unambiguous)
+        (void)val_scoped_vehicleconfig;
+    }
+
+    void demonstrate_all_reads() {
+        std::cout << "[DualRoleExample] Demonstrating all pull reads...\n";
+        demonstrate_supervisorrequired_reads();
     }
 
     /**
@@ -263,6 +341,7 @@ public:
         }
 
         demonstrate_all_emits();
+        demonstrate_all_reads();
         stop();
         std::cout << "[DualRoleExample] Finished demonstration.\n";
         return true;

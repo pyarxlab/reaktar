@@ -90,6 +90,8 @@ struct ActorJsonWriter<::{{ e.fq_name }}> {
 {% for ns in ns_parts %}
 namespace {{ ns }} {
 {% endfor %}
+using ::reaktar::json::operator<<;
+
 {% for s in struct_list %}
 template <typename Stream>
 inline Stream& operator<<(Stream& os, const {{ s.name }}& v) {
@@ -107,6 +109,8 @@ inline Stream& operator<<(Stream& os, const {{ s.name }}& v) {
 {% for ns in ns_parts %}
 namespace {{ ns }} {
 {% endfor %}
+using ::reaktar::json::operator<<;
+
 {% for e in enum_list %}
 template <typename Stream>
 inline Stream& operator<<(Stream& os, const {{ e.name }}& v) {

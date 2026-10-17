@@ -225,6 +225,8 @@ struct ActorJsonWriter<::vehicle_data::SystemStatus> {
 // Enabled via ADL in type namespaces
 // ==============================================================================
 namespace vehicle_data {
+using ::reaktar::json::operator<<;
+
 template <typename Stream>
 inline Stream& operator<<(Stream& os, const BatteryCell& v) {
     ::reaktar::json::StreamSink<Stream> sink(os);
@@ -264,6 +266,8 @@ inline Stream& operator<<(Stream& os, const VehicleDiagnostics& v) {
 } // namespace vehicle_data
 
 namespace vehicle_data {
+using ::reaktar::json::operator<<;
+
 template <typename Stream>
 inline Stream& operator<<(Stream& os, const DriveMode& v) {
     ::reaktar::json::StreamSink<Stream> sink(os);

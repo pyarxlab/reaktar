@@ -283,34 +283,38 @@
 {% for item in model.outbound_tagged %}
         // Tier 1: Exact Channel Tag Point-to-Point Dispatch
         else if constexpr (std::is_same_v<Tag, {{ item.tag }}>) {
+            if constexpr (!ActorBase::traits::template can_tag_emit_with_args_v<Tag, Args...>) {
+                static_assert(!sizeof(Tag*), "reaktar: Arguments passed to emit<Tag>(...) do not match signature of '{{ item.member }}' on port '{{ item.port_name }}'.");
+            } else {
 {% if item.kind == "skeleton_event" %}
-            {{ item.var_name }}.{{ item.member }}.Send(std::forward<Args>(args)...);
-            return ::reaktar::EmitStatus{true};
-{% elif item.kind == "skeleton_field_update" %}
-            {{ item.var_name }}.{{ item.member }}.Update(std::forward<Args>(args)...);
-            return ::reaktar::EmitStatus{true};
-{% elif item.kind == "proxy_faf" %}
-            auto proxy_lease = this->{{ item.slot_name }}.acquire("{{ item.port_name }}");
-            if (proxy_lease) {
-                proxy_lease->{{ item.member }}(std::forward<Args>(args)...);
+                {{ item.var_name }}.{{ item.member }}.Send(std::forward<Args>(args)...);
                 return ::reaktar::EmitStatus{true};
-            }
-            return ::reaktar::EmitStatus{false};
+{% elif item.kind == "skeleton_field_update" %}
+                {{ item.var_name }}.{{ item.member }}.Update(std::forward<Args>(args)...);
+                return ::reaktar::EmitStatus{true};
+{% elif item.kind == "proxy_faf" %}
+                auto proxy_lease = this->{{ item.slot_name }}.acquire("{{ item.port_name }}");
+                if (proxy_lease) {
+                    proxy_lease->{{ item.member }}(std::forward<Args>(args)...);
+                    return ::reaktar::EmitStatus{true};
+                }
+                return ::reaktar::EmitStatus{false};
 {% elif item.kind == "proxy_rpc" %}
-            auto proxy_lease = this->{{ item.slot_name }}.acquire("{{ item.port_name }}");
-            using AsyncResType = decltype(make_async_result(proxy_lease->{{ item.member }}(std::forward<Args>(args)...)));
-            if (proxy_lease) {
-                return make_async_result(proxy_lease->{{ item.member }}(std::forward<Args>(args)...));
-            }
-            return AsyncResType::Failed();
+                auto proxy_lease = this->{{ item.slot_name }}.acquire("{{ item.port_name }}");
+                using AsyncResType = decltype(make_async_result(proxy_lease->{{ item.member }}(std::forward<Args>(args)...)));
+                if (proxy_lease) {
+                    return make_async_result(proxy_lease->{{ item.member }}(std::forward<Args>(args)...));
+                }
+                return AsyncResType::Failed();
 {% elif item.kind == "proxy_field_set" %}
-            auto proxy_lease = this->{{ item.slot_name }}.acquire("{{ item.port_name }}");
-            using AsyncResType = decltype(make_async_result(proxy_lease->{{ item.member }}.Set(std::forward<Args>(args)...)));
-            if (proxy_lease) {
-                return make_async_result(proxy_lease->{{ item.member }}.Set(std::forward<Args>(args)...));
-            }
-            return AsyncResType::Failed();
+                auto proxy_lease = this->{{ item.slot_name }}.acquire("{{ item.port_name }}");
+                using AsyncResType = decltype(make_async_result(proxy_lease->{{ item.member }}.Set(std::forward<Args>(args)...)));
+                if (proxy_lease) {
+                    return make_async_result(proxy_lease->{{ item.member }}.Set(std::forward<Args>(args)...));
+                }
+                return AsyncResType::Failed();
 {% endif %}
+            }
         }
 {% endfor %}
 {% for ambig in model.outbound_ambiguous_tags %}
@@ -326,8 +330,23 @@
             );
         }
 {% endfor %}
+{% for f in model.proxy_fields_without_setter %}
+        else if constexpr (std::is_same_v<Tag, {{ f.tag }}>) {
+            static_assert(!sizeof(Tag*), "reaktar: emit<Tag>(...) failed! Field '{{ f.name }}' on required port '{{ f.port_name }}' does not have a setter in ARXML! It cannot be set.");
+        }
+{% endfor %}
+{% for ev in model.proxy_events %}
+        else if constexpr (std::is_same_v<Tag, {{ ev.tag }}>) {
+            static_assert(!sizeof(Tag*), "reaktar: emit<Tag>(...) failed! Event '{{ ev.name }}' on required port '{{ ev.port_name }}' is an inbound event. It cannot be emitted; use on(...) to handle it.");
+        }
+{% endfor %}
+{% for m in model.skeleton_methods %}
+        else if constexpr (std::is_same_v<Tag, {{ m.tag }}>) {
+            static_assert(!sizeof(Tag*), "reaktar: emit<Tag>(...) failed! Method '{{ m.name }}' on provided port '{{ m.port_name }}' is an inbound RPC method. It cannot be emitted; use on(...) to handle it.");
+        }
+{% endfor %}
         else {
-            static_assert(!sizeof(Tag*), "reaktar: emit<Tag::Any>(...) failed! Tag does not match any outbound port or interface.");
+            static_assert(!sizeof(Tag*), "reaktar: emit<Tag>(...) failed! Tag does not match any outbound port or interface.");
         }
     }
 

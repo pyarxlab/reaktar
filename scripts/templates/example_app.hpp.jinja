@@ -133,7 +133,10 @@ public:
 {% for em in intf_group.outgoing_emits %}
 
 {% if em.is_unique and em.example_call_untagged %}
-        {{ em.example_call_untagged }}; // {{ em.name }}
+        {{ em.example_call_untagged }}; // {{ em.name }} (untagged: unique signature across actor)
+{% if em.example_call_port_only %}
+        {{ em.example_call_port_only }}; // same as above, port-targeted emit
+{% endif %}
         {{ em.example_call_tagged }}; // same as above, explicit tag
 {% elif em.example_call_port_only %}
         {{ em.example_call_port_only }}; // {{ em.name }} (port-targeted emit)
@@ -155,6 +158,44 @@ public:
 {% endfor %}
     }
 
+    // =============================================================================================
+    // INCOMING READ DEMONSTRATIONS (GROUPED BY PORT & SERVICE INTERFACE)
+    // =============================================================================================
+{% for intf_group in model.example_interfaces %}
+{% if intf_group.readable_queries | length > 0 %}
+
+    void demonstrate_{{ intf_group.ident }}_reads() {
+        std::cout << "[{{ model.example_class_name }}] Pull reads for {{ intf_group.port_name }}\n";
+{% for rd in intf_group.readable_queries %}
+        // [{{ intf_group.port_name }}::{{ rd.name }}] {{ rd.autosar_note }}
+{% if rd.can_read_untagged and rd.example_call_untagged %}
+        auto val_untagged_{{ rd.name | lower }} = {{ rd.example_call_untagged }}; // Untagged (unique field type across actor)
+        (void)val_untagged_{{ rd.name | lower }};
+{% endif %}
+{% if rd.can_read_port_only and rd.example_call_port_only %}
+        auto val_port_{{ rd.name | lower }} = {{ rd.example_call_port_only }}; // Port-targeted (single readable field on port)
+        (void)val_port_{{ rd.name | lower }};
+{% endif %}
+{% if rd.can_read_bare_tag and rd.example_call_bare_tag %}
+        auto val_bare_{{ rd.name | lower }} = {{ rd.example_call_bare_tag }}; // Bare tag (unique field across required ports)
+        (void)val_bare_{{ rd.name | lower }};
+{% endif %}
+        auto val_scoped_{{ rd.name | lower }} = {{ rd.example_call_port_scoped }}; // Port-scoped tag (always unambiguous)
+        (void)val_scoped_{{ rd.name | lower }};
+{% endfor %}
+    }
+{% endif %}
+{% endfor %}
+
+    void demonstrate_all_reads() {
+        std::cout << "[{{ model.example_class_name }}] Demonstrating all pull reads...\n";
+{% for intf_group in model.example_interfaces %}
+{% if intf_group.readable_queries | length > 0 %}
+        demonstrate_{{ intf_group.ident }}_reads();
+{% endif %}
+{% endfor %}
+    }
+
     /**
      * @brief Starts the actor, waits for proxies to resolve, emits test data, and stops cleanly.
      */
@@ -169,6 +210,7 @@ public:
         }
 
         demonstrate_all_emits();
+        demonstrate_all_reads();
         stop();
         std::cout << "[{{ model.example_class_name }}] Finished demonstration.\n";
         return true;

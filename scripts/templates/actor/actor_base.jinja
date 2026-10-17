@@ -227,6 +227,225 @@ public:
 {% endif %}
 {% endfor %}
             false;
+
+        // --- 8. Inbound Handlers (on) Traits ---
+        template <typename Payload>
+        static constexpr bool is_ambiguous_on_v =
+{% for ambig_t in model.inbound_ambiguous_types %}
+            std::is_same_v<std::decay_t<Payload>, {{ ambig_t }}> ||
+{% endfor %}
+            false;
+
+        template <typename Payload>
+        static constexpr bool can_on_v =
+{% for item in model.inbound_by_type %}
+            std::is_same_v<std::decay_t<Payload>, {{ item.type }}> ||
+{% endfor %}
+            false;
+
+        template <typename Payload>
+        static constexpr bool can_fan_in_v =
+{% for t in model.inbound_all_types %}
+            std::is_same_v<std::decay_t<Payload>, {{ t }}> ||
+{% endfor %}
+            false;
+
+        template <typename Port>
+        static constexpr bool has_port_inbound_v =
+{% for port in model.ports_inbound %}
+{% if port.total_inbound_count > 0 %}
+            std::is_same_v<Port, ports::{{ port.name }}> ||
+{% endif %}
+{% endfor %}
+            false;
+
+        template <typename Port, typename Payload>
+        static constexpr bool is_port_on_ambiguous_v =
+{% for port in model.ports_inbound %}
+{% for item in port.single_arg_items %}
+{% if item.is_ambiguous %}
+            (std::is_same_v<Port, ports::{{ port.name }}> && std::is_same_v<std::decay_t<Payload>, {{ item.type }}>) ||
+{% endif %}
+{% endfor %}
+{% endfor %}
+            false;
+
+        template <typename Port, typename Payload>
+        static constexpr bool can_port_on_v =
+{% for port in model.ports_inbound %}
+{% for item in port.single_arg_items %}
+{% if not item.is_ambiguous %}
+            (std::is_same_v<Port, ports::{{ port.name }}> && std::is_same_v<std::decay_t<Payload>, {{ item.type }}>) ||
+{% endif %}
+{% endfor %}
+{% endfor %}
+            false;
+
+        template <typename Tag>
+        static constexpr bool is_ambiguous_tag_on_v =
+{% for ambig in model.inbound_ambiguous_tags %}
+            std::is_same_v<Tag, {{ ambig.tag }}> ||
+{% endfor %}
+            false;
+
+        template <typename Tag>
+        static constexpr bool can_tag_on_v =
+{% for item in model.inbound_tagged %}
+            std::is_same_v<Tag, {{ item.tag | replace('typename ActorBase::', '') }}> ||
+{% endfor %}
+{% for item in model.inbound_fan_in_tags %}
+            std::is_same_v<Tag, typename {{ item.tag }}::Any> ||
+{% endfor %}
+{% for port in model.ports_inbound %}
+            std::is_same_v<Tag, typename ports::{{ port.name }}::Any> ||
+{% endfor %}
+            false;
+
+        template <typename Tag>
+        static constexpr bool can_tag_fan_in_v =
+{% for item in model.inbound_fan_in_tags %}
+            std::is_same_v<Tag, {{ item.tag }}> ||
+            std::is_same_v<Tag, typename {{ item.tag }}::Any> ||
+{% endfor %}
+            false;
+
+        // --- 9. Inbound Field Reader (read) Traits ---
+        template <typename Port>
+        static constexpr bool has_port_readable_v =
+{% for port in model.read_ports %}
+{% if port.readable_field_count > 0 %}
+            std::is_same_v<Port, ports::{{ port.name }}> ||
+{% endif %}
+{% endfor %}
+            false;
+
+        template <typename Port>
+        static constexpr bool is_port_read_ambiguous_v =
+{% for port in model.read_ports %}
+{% if port.readable_field_count > 1 %}
+            std::is_same_v<Port, ports::{{ port.name }}> ||
+{% endif %}
+{% endfor %}
+            false;
+
+        template <typename Port, typename Tag>
+        static constexpr bool can_port_read_v =
+{% for port in model.read_ports %}
+{% for field in port.readable_fields %}
+            (std::is_same_v<Port, ports::{{ port.name }}> && (
+                std::is_same_v<Tag, ports::{{ port.name }}::{{ field.name }}> ||
+                std::is_same_v<Tag, {{ field.tag }}>
+            )) ||
+{% endfor %}
+{% endfor %}
+            false;
+
+        template <typename Tag>
+        static constexpr bool is_ambiguous_read_tag_v =
+{% for ambig in model.read_ambiguous_bare_tags %}
+            std::is_same_v<Tag, {{ ambig.tag }}> ||
+{% endfor %}
+            false;
+
+        template <typename Tag>
+        static constexpr bool can_read_tag_v =
+{% for field in model.read_fields_by_port_tag %}
+{% if field.has_getter %}
+            std::is_same_v<Tag, ports::{{ field.port_name }}::{{ field.name }}> ||
+{% endif %}
+{% endfor %}
+{% for field in model.read_unique_bare_fields %}
+{% if field.has_getter %}
+            std::is_same_v<Tag, {{ field.tag }}> ||
+{% endif %}
+{% endfor %}
+            false;
+
+        template <typename DataType>
+        static constexpr bool is_ambiguous_read_type_v =
+{% for item in model.read_ambiguous_types %}
+            std::is_same_v<std::decay_t<DataType>, {{ item.type }}> ||
+{% endfor %}
+            false;
+
+        template <typename DataType>
+        static constexpr bool can_read_type_v =
+{% for item in model.read_by_type %}
+{% if not item.is_ambiguous %}
+            std::is_same_v<std::decay_t<DataType>, {{ item.type }}> ||
+{% endif %}
+{% endfor %}
+            false;
+
+        template <typename Tag>
+        static constexpr bool can_read_v =
+            // 1. Port with exactly one readable field
+{% for port in model.read_ports %}
+{% if port.readable_field_count == 1 %}
+            std::is_same_v<Tag, ports::{{ port.name }}> ||
+{% endif %}
+{% endfor %}
+            // 2. Port-scoped field tag with getter
+{% for field in model.read_fields_by_port_tag %}
+{% if field.has_getter %}
+            std::is_same_v<Tag, ports::{{ field.port_name }}::{{ field.name }}> ||
+{% endif %}
+{% endfor %}
+            // 3. Unique bare field tag with getter
+{% for field in model.read_unique_bare_fields %}
+{% if field.has_getter %}
+            std::is_same_v<Tag, {{ field.tag }}> ||
+{% endif %}
+{% endfor %}
+            // 4. Unique data type
+{% for item in model.read_by_type %}
+{% if not item.is_ambiguous %}
+            std::is_same_v<std::decay_t<Tag>, {{ item.type }}> ||
+{% endif %}
+{% endfor %}
+            false;
+
+        template <typename Tag>
+        static constexpr bool is_ambiguous_read_v =
+            // 1. Port with multiple readable fields
+{% for port in model.read_ports %}
+{% if port.readable_field_count > 1 %}
+            std::is_same_v<Tag, ports::{{ port.name }}> ||
+{% endif %}
+{% endfor %}
+            // 2. Ambiguous bare field tag
+{% for ambig in model.read_ambiguous_bare_tags %}
+            std::is_same_v<Tag, {{ ambig.tag }}> ||
+{% endfor %}
+            // 3. Ambiguous data type
+{% for item in model.read_ambiguous_types %}
+            std::is_same_v<std::decay_t<Tag>, {{ item.type }}> ||
+{% endfor %}
+            false;
+
+        // --- 10. Tag Exact Arguments & Field Capabilities Traits ---
+        template <typename Tag, typename... Args>
+        static constexpr bool can_tag_emit_with_args_v =
+{% for item in model.outbound_tagged %}
+            (std::is_same_v<Tag, {{ item.tag | replace('typename ActorBase::', '') }}> &&
+             sizeof...(Args) == {{ item.arg_types | length }} &&
+             std::is_constructible_v<std::tuple<{{ item.arg_types | join(', ') }}>, Args...>) ||
+{% endfor %}
+            false;
+
+        template <typename Tag>
+        static constexpr bool is_field_without_setter_v =
+{% for item in model.all_fields_without_setter %}
+            std::is_same_v<Tag, {{ item.tag | replace('typename ActorBase::', '') }}> ||
+{% endfor %}
+            false;
+
+        template <typename Tag>
+        static constexpr bool is_field_without_notifier_v =
+{% for item in model.all_fields_without_notifier %}
+            std::is_same_v<Tag, {{ item.tag | replace('typename ActorBase::', '') }}> ||
+{% endfor %}
+            false;
     };
 
     {{ model.exe_name }}ActorBase() = default;

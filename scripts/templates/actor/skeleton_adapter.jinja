@@ -43,19 +43,38 @@
                 has_method_handler_v<Derived, GlobalAny_{% for a in m.in_args %}, {{ a.pass_type }}{% endfor %}> ||
                 has_method_handler_v<Derived, GlobalAny_{% for a in m.in_args %}, {{ a.type }}{% endfor %}>;
 
+#if REAKTAR_AMBIGUITY_VALIDATION
             static_assert(
                 (int(kHas_port_tag) + int(kHas_port_bare) + int(kHas_port_any) + int(kHas_method_any) + int(kHas_tagged) + int(kHas_direct) + int(kHas_global_any)) <= 1,
                 "reaktar: Multiple conflicting on(...) RPC handlers declared for method '{{ m.name }}' on port '{{ skel.port_name }}'! "
                 "You must define only one: on(ports::{{ skel.port_name }}::{{ m.name }}, ...), on({{ m.tag }}, ...), on(ports::{{ skel.port_name }}::Any, ...), on({{ m.tag }}::Any, ...), on(reaktar::Any, ...), on(ports::{{ skel.port_name }}, ...), or on(...)."
             );
 {% if not m.is_unique_across_ports %}
-            static_assert(!kHas_tagged, "reaktar::on() collision: RPC method '{{ m.name }}' is provided by multiple ports ({{ m.port_count }} ports). You cannot use bare on({{ m.tag }}, ...); you must specify the port via on(ports::{{ skel.port_name }}::{{ m.name }}, ...) or use explicit fan-in on({{ m.tag }}::Any, ...).");
+            static_assert(!kHas_tagged,
+                "reaktar::on() collision: RPC method '{{ m.name }}' is provided by multiple ports ({{ m.port_count }} ports). You cannot use bare on({{ m.tag }}, ...); you must specify the port via on(ports::{{ skel.port_name }}::{{ m.name }}, ...) or use explicit fan-in on({{ m.tag }}::Any, ...).\n"
+                "Ports providing RPC method '{{ m.name }}':\n"
+{% for p in m.matching_ports %}
+                "  - ports::{{ p }}\n"
+{% endfor %}
+            );
 {% endif %}
+#else
+            if constexpr ((int(kHas_port_tag) + int(kHas_port_bare) + int(kHas_port_any) + int(kHas_method_any) + int(kHas_tagged) + int(kHas_direct) + int(kHas_global_any)) > 1) {
+                REAKTAR_EMIT_AMBIGUITY_WARNING(::reaktar::diagnostics::conflicting_handler_warning<Derived, Port_, PortMethodTag_, void>);
+            }
+{% if not m.is_unique_across_ports %}
+            if constexpr (kHas_tagged) {
+                REAKTAR_EMIT_AMBIGUITY_WARNING(::reaktar::diagnostics::multi_port_ambiguity_warning<Derived, {{ m.tag }}, std::tuple<{% for p in m.matching_ports %}typename ActorBase::ports::{{ p }}{{ ", " if not loop.last else "" }}{% endfor %}>>);
+            }
+{% endif %}
+#endif
 
             auto dispatch = [&](auto&& fn) {
+#if REAKTAR_AMBIGUITY_VALIDATION
                 using HandlerRet = decltype(fn());
                 static_assert(std::is_void_v<HandlerRet>,
                     "reaktar::on() error: Fire-and-forget method handler for '{{ m.name }}' must return void!");
+#endif
                 if constexpr (std::is_same_v<ExecutionPolicy, ::reaktar::DirectExecution>) {
                     fn();
                 } else if constexpr (std::is_same_v<ExecutionPolicy, ::reaktar::SynchronizedExecution>) {
@@ -75,7 +94,18 @@
             }
 {% else %}
             else if constexpr (kHas_port_bare) {
-                static_assert(!sizeof(Derived*), "reaktar::on() collision: RPC method argument signature is shared across multiple methods on port '{{ skel.port_name }}'. You must specify the method tag: on(ports::{{ skel.port_name }}::{{ m.name }}, ...) instead of on(ports::{{ skel.port_name }}, ...).");
+#if REAKTAR_AMBIGUITY_VALIDATION
+                static_assert(!sizeof(Derived*),
+                    "reaktar::on() collision: RPC method argument signature is shared across multiple methods on port '{{ skel.port_name }}'. You must specify the method tag: on(ports::{{ skel.port_name }}::{{ m.name }}, ...) instead of on(ports::{{ skel.port_name }}, ...).\n"
+                    "Competing RPC methods on port '{{ skel.port_name }}':\n"
+{% for item in m.competing_on_port %}
+                    "  - ports::{{ skel.port_name }}::{{ item.name }}(...)\n"
+{% endfor %}
+                );
+#else
+                REAKTAR_EMIT_AMBIGUITY_WARNING(::reaktar::diagnostics::port_payload_ambiguity_warning<Derived, Port_, std::tuple<{% for a in m.in_args %}{{ a.type }}{{ ", " if not loop.last else "" }}{% endfor %}>, std::tuple<{% for item in m.competing_on_port %}typename Port_::{{ item.name }}{{ ", " if not loop.last else "" }}{% endfor %}>>);
+                dispatch([&] { actor_->self().on(Port_{}{% for a in m.in_args %}, {{ a.name }}{% endfor %}); });
+#endif
             }
 {% endif %}
             else if constexpr (kHas_port_any) {
@@ -93,7 +123,18 @@
             }
 {% else %}
             else if constexpr (kHas_direct) {
-                static_assert(!sizeof(Derived*), "reaktar::on() collision: RPC method argument signature is shared across multiple methods. You must specify the method tag: on(MethodTag, ...) or port tag: on(typename ActorBase::ports::{{ skel.port_name }}::{{ m.name }}, ...).");
+#if REAKTAR_AMBIGUITY_VALIDATION
+                static_assert(!sizeof(Derived*),
+                    "reaktar::on() collision: RPC method argument signature is shared across multiple methods. You must specify the method tag: on(MethodTag, ...) or port tag: on(typename ActorBase::ports::{{ skel.port_name }}::{{ m.name }}, ...).\n"
+                    "Competing methods across ports:\n"
+{% for tgt in m.competing_all %}
+                    "  - ports::{{ tgt.port }}::{{ tgt.name }}(...)\n"
+{% endfor %}
+                );
+#else
+                REAKTAR_EMIT_AMBIGUITY_WARNING(::reaktar::diagnostics::direct_payload_ambiguity_warning<Derived, std::tuple<{% for a in m.in_args %}{{ a.type }}{{ ", " if not loop.last else "" }}{% endfor %}>, std::tuple<{% for tgt in m.competing_all %}typename ActorBase::ports::{{ tgt.port }}::{{ tgt.name }}{{ ", " if not loop.last else "" }}{% endfor %}>>);
+                dispatch([&] { actor_->self().on({% for a in m.in_args %}{{ a.name }}{{ ", " if not loop.last else "" }}{% endfor %}); });
+#endif
             }
 {% endif %}
             else if constexpr (kHas_global_any) {
@@ -136,19 +177,38 @@
                 has_method_handler_v<Derived, GlobalAny_{% for a in m.in_args %}, {{ a.pass_type }}{% endfor %}> ||
                 has_method_handler_v<Derived, GlobalAny_{% for a in m.in_args %}, {{ a.type }}{% endfor %}>;
 
+#if REAKTAR_AMBIGUITY_VALIDATION
             static_assert(
                 (int(kHas_port_tag) + int(kHas_port_bare) + int(kHas_port_any) + int(kHas_method_any) + int(kHas_tagged) + int(kHas_direct) + int(kHas_global_any)) <= 1,
                 "reaktar: Multiple conflicting on(...) RPC handlers declared for method '{{ m.name }}' on port '{{ skel.port_name }}'! "
                 "You must define only one: on(ports::{{ skel.port_name }}::{{ m.name }}, ...), on({{ m.tag }}, ...), on(ports::{{ skel.port_name }}::Any, ...), on({{ m.tag }}::Any, ...), on(reaktar::Any, ...), on(ports::{{ skel.port_name }}, ...), or on(...)."
             );
 {% if not m.is_unique_across_ports %}
-            static_assert(!kHas_tagged, "reaktar::on() collision: RPC method '{{ m.name }}' is provided by multiple ports ({{ m.port_count }} ports). You cannot use bare on({{ m.tag }}, ...); you must specify the port via on(ports::{{ skel.port_name }}::{{ m.name }}, ...) or use explicit fan-in on({{ m.tag }}::Any, ...).");
+            static_assert(!kHas_tagged,
+                "reaktar::on() collision: RPC method '{{ m.name }}' is provided by multiple ports ({{ m.port_count }} ports). You cannot use bare on({{ m.tag }}, ...); you must specify the port via on(ports::{{ skel.port_name }}::{{ m.name }}, ...) or use explicit fan-in on({{ m.tag }}::Any, ...).\n"
+                "Ports providing RPC method '{{ m.name }}':\n"
+{% for p in m.matching_ports %}
+                "  - ports::{{ p }}\n"
+{% endfor %}
+            );
 {% endif %}
+#else
+            if constexpr ((int(kHas_port_tag) + int(kHas_port_bare) + int(kHas_port_any) + int(kHas_method_any) + int(kHas_tagged) + int(kHas_direct) + int(kHas_global_any)) > 1) {
+                REAKTAR_EMIT_AMBIGUITY_WARNING(::reaktar::diagnostics::conflicting_handler_warning<Derived, Port_, PortMethodTag_, void>);
+            }
+{% if not m.is_unique_across_ports %}
+            if constexpr (kHas_tagged) {
+                REAKTAR_EMIT_AMBIGUITY_WARNING(::reaktar::diagnostics::multi_port_ambiguity_warning<Derived, {{ m.tag }}, std::tuple<{% for p in m.matching_ports %}typename ActorBase::ports::{{ p }}{{ ", " if not loop.last else "" }}{% endfor %}>>);
+            }
+{% endif %}
+#endif
 
             auto dispatch = [&](auto&& invoke_fn) -> {{ m.name }}RetType {
                 using HandlerRet = decltype(invoke_fn());
+#if REAKTAR_AMBIGUITY_VALIDATION
                 static_assert(!std::is_void_v<HandlerRet>,
                     "reaktar::on() error: RPC method handler for '{{ m.name }}' must return a non-void value (or Future/Result), but returns void!");
+#endif
                 if constexpr (!std::is_void_v<HandlerRet>) {
                     if constexpr (std::is_same_v<ExecutionPolicy, ::reaktar::DirectExecution>) {
                         return result_adapter<{{ m.name }}RetType, HandlerRet>::adapt(invoke_fn());
@@ -174,7 +234,18 @@
             }
 {% else %}
             else if constexpr (kHas_port_bare) {
-                static_assert(!sizeof(Derived*), "reaktar::on() collision: RPC method argument signature is shared across multiple methods on port '{{ skel.port_name }}'. You must specify the method tag: on(ports::{{ skel.port_name }}::{{ m.name }}, ...) instead of on(ports::{{ skel.port_name }}, ...).");
+#if REAKTAR_AMBIGUITY_VALIDATION
+                static_assert(!sizeof(Derived*),
+                    "reaktar::on() collision: RPC method argument signature is shared across multiple methods on port '{{ skel.port_name }}'. You must specify the method tag: on(ports::{{ skel.port_name }}::{{ m.name }}, ...) instead of on(ports::{{ skel.port_name }}, ...).\n"
+                    "Competing RPC methods on port '{{ skel.port_name }}':\n"
+{% for item in m.competing_on_port %}
+                    "  - ports::{{ skel.port_name }}::{{ item.name }}(...)\n"
+{% endfor %}
+                );
+#else
+                REAKTAR_EMIT_AMBIGUITY_WARNING(::reaktar::diagnostics::port_payload_ambiguity_warning<Derived, Port_, std::tuple<{% for a in m.in_args %}{{ a.type }}{{ ", " if not loop.last else "" }}{% endfor %}>, std::tuple<{% for item in m.competing_on_port %}typename Port_::{{ item.name }}{{ ", " if not loop.last else "" }}{% endfor %}>>);
+                return dispatch([&] { return actor_->self().on(Port_{}{% for a in m.in_args %}, {{ a.name }}{% endfor %}); });
+#endif
             }
 {% endif %}
             else if constexpr (kHas_port_any) {
@@ -192,7 +263,18 @@
             }
 {% else %}
             else if constexpr (kHas_direct) {
-                static_assert(!sizeof(Derived*), "reaktar::on() collision: RPC method argument signature is shared across multiple methods. You must specify the method tag: on(MethodTag, ...) or port tag: on(typename ActorBase::ports::{{ skel.port_name }}::{{ m.name }}, ...).");
+#if REAKTAR_AMBIGUITY_VALIDATION
+                static_assert(!sizeof(Derived*),
+                    "reaktar::on() collision: RPC method argument signature is shared across multiple methods. You must specify the method tag: on(MethodTag, ...) or port tag: on(typename ActorBase::ports::{{ skel.port_name }}::{{ m.name }}, ...).\n"
+                    "Competing methods across ports:\n"
+{% for tgt in m.competing_all %}
+                    "  - ports::{{ tgt.port }}::{{ tgt.name }}(...)\n"
+{% endfor %}
+                );
+#else
+                REAKTAR_EMIT_AMBIGUITY_WARNING(::reaktar::diagnostics::direct_payload_ambiguity_warning<Derived, std::tuple<{% for a in m.in_args %}{{ a.type }}{{ ", " if not loop.last else "" }}{% endfor %}>, std::tuple<{% for tgt in m.competing_all %}typename ActorBase::ports::{{ tgt.port }}::{{ tgt.name }}{{ ", " if not loop.last else "" }}{% endfor %}>>);
+                return dispatch([&] { return actor_->self().on({% for a in m.in_args %}{{ a.name }}{{ ", " if not loop.last else "" }}{% endfor %}); });
+#endif
             }
 {% endif %}
             else if constexpr (kHas_global_any) {

@@ -182,49 +182,101 @@ public:
     void demonstrate_supervisorport_emits() {
         std::cout << "[VehicleSupervisorExample] Outgoing emits for SupervisorPort\n";
 
-        emit(ara::core::Map<uint32_t, vehicle_data::EmergencyAlert>{}); // ActiveDiagnosticMap
+        emit(ara::core::Map<uint32_t, vehicle_data::EmergencyAlert>{}); // ActiveDiagnosticMap (untagged: unique signature across actor)
+        emit<ports::SupervisorPort>(ara::core::Map<uint32_t, vehicle_data::EmergencyAlert>{}); // same as above, port-targeted emit
         emit<ActiveDiagnosticMap>(ara::core::Map<uint32_t, vehicle_data::EmergencyAlert>{}); // same as above, explicit tag
 
-        emit(vehicle_data::VehicleDiagnostics{}); // DiagnosticsReport
+        emit(vehicle_data::VehicleDiagnostics{}); // DiagnosticsReport (untagged: unique signature across actor)
+        emit<ports::SupervisorPort>(vehicle_data::VehicleDiagnostics{}); // same as above, port-targeted emit
         emit<DiagnosticsReport>(vehicle_data::VehicleDiagnostics{}); // same as above, explicit tag
 
-        emit(ara::core::Vector<vehicle_data::DriveMode>{}); // DriveHistory
+        emit(ara::core::Vector<vehicle_data::DriveMode>{}); // DriveHistory (untagged: unique signature across actor)
+        emit<ports::SupervisorPort>(ara::core::Vector<vehicle_data::DriveMode>{}); // same as above, port-targeted emit
         emit<DriveHistory>(ara::core::Vector<vehicle_data::DriveMode>{}); // same as above, explicit tag
 
-        emit(vehicle_data::EmergencyAlert{1001u, ara::core::String{"Speed limit exceeded"}}); // EmergencyAlert
+        emit(vehicle_data::EmergencyAlert{1001u, ara::core::String{"Speed limit exceeded"}}); // EmergencyAlert (untagged: unique signature across actor)
+        emit<ports::SupervisorPort>(vehicle_data::EmergencyAlert{1001u, ara::core::String{"Speed limit exceeded"}}); // same as above, port-targeted emit
         emit<EmergencyAlert>(vehicle_data::EmergencyAlert{1001u, ara::core::String{"Speed limit exceeded"}}); // same as above, explicit tag
 
         emit<PrimaryWarning>(100u); // PrimaryWarning (tagged, resolves type collision)
 
         emit<SecondaryWarning>(100u); // SecondaryWarning (tagged, resolves type collision)
 
-        emit(ara::core::Vector<vehicle_data::EmergencyAlert>{}); // ActiveAlerts
+        emit(ara::core::Vector<vehicle_data::EmergencyAlert>{}); // ActiveAlerts (untagged: unique signature across actor)
+        emit<ports::SupervisorPort>(ara::core::Vector<vehicle_data::EmergencyAlert>{}); // same as above, port-targeted emit
         emit<ActiveAlerts>(ara::core::Vector<vehicle_data::EmergencyAlert>{}); // same as above, explicit tag
 
-        emit(ara::core::Array<vehicle_data::SystemStatus, 4>{}); // SystemMatrix
+        emit<CalibrationKey>(1000u); // CalibrationKey (tagged, resolves type collision)
+
+        emit(vehicle_data::DriveMode::COMFORT); // CurrentDriveMode (untagged: unique signature across actor)
+        emit<ports::SupervisorPort>(vehicle_data::DriveMode::COMFORT); // same as above, port-targeted emit
+        emit<CurrentDriveMode>(vehicle_data::DriveMode::COMFORT); // same as above, explicit tag
+
+        emit(ara::core::Map<ara::core::String, bool>{}); // FeatureFlags (untagged: unique signature across actor)
+        emit<ports::SupervisorPort>(ara::core::Map<ara::core::String, bool>{}); // same as above, port-targeted emit
+        emit<FeatureFlags>(ara::core::Map<ara::core::String, bool>{}); // same as above, explicit tag
+
+        emit<HardwareRevision>(1000u); // HardwareRevision (tagged, resolves type collision)
+
+        emit(ara::core::Array<vehicle_data::SystemStatus, 4>{}); // SystemMatrix (untagged: unique signature across actor)
+        emit<ports::SupervisorPort>(ara::core::Array<vehicle_data::SystemStatus, 4>{}); // same as above, port-targeted emit
         emit<SystemMatrix>(ara::core::Array<vehicle_data::SystemStatus, 4>{}); // same as above, explicit tag
+
+        emit(ara::core::Map<ara::core::String, ara::core::String>{}); // VehicleConfig (untagged: unique signature across actor)
+        emit<ports::SupervisorPort>(ara::core::Map<ara::core::String, ara::core::String>{}); // same as above, port-targeted emit
+        emit<VehicleConfig>(ara::core::Map<ara::core::String, ara::core::String>{}); // same as above, explicit tag
     }
 
     void demonstrate_bodycontrolin_emits() {
         std::cout << "[VehicleSupervisorExample] Outgoing emits for BodyControlIn\n";
 
-        emit(1000u, 1000u); // FlashLights
+        emit(1000u, 1000u); // FlashLights (untagged: unique signature across actor)
+        emit<ports::BodyControlIn>(1000u, 1000u); // same as above, port-targeted emit
         emit<FlashLights>(1000u, 1000u); // same as above, explicit tag
 
-        emit(true); // LockDoors
+        emit(true); // LockDoors (untagged: unique signature across actor)
+        emit<ports::BodyControlIn>(true); // same as above, port-targeted emit
         emit<LockDoors>(true); // same as above, explicit tag
 
-        emit(25.0f); // TargetCabinTemperature
+        emit(25.0f); // TargetCabinTemperature (untagged: unique signature across actor)
+        emit<ports::BodyControlIn>(25.0f); // same as above, port-targeted emit
         emit<TargetCabinTemperature>(25.0f); // same as above, explicit tag
 
-        emit(1000u); // WindowPosition
-        emit<WindowPosition>(1000u); // same as above, explicit tag
+        emit<ports::BodyControlIn>(1000u); // WindowPosition (port-targeted emit)
+        emit<WindowPosition>(1000u); // same as above, fully qualified tag
     }
 
     void demonstrate_all_emits() {
         std::cout << "[VehicleSupervisorExample] Demonstrating all outgoing emits...\n";
         demonstrate_supervisorport_emits();
         demonstrate_bodycontrolin_emits();
+    }
+
+    // =============================================================================================
+    // INCOMING READ DEMONSTRATIONS (GROUPED BY PORT & SERVICE INTERFACE)
+    // =============================================================================================
+
+    void demonstrate_bodycontrolin_reads() {
+        std::cout << "[VehicleSupervisorExample] Pull reads for BodyControlIn\n";
+        // [BodyControlIn::OutsideAirQuality] AUTOSAR: proxy->OutsideAirQuality.Get()
+        auto val_untagged_outsideairquality = read<uint32_t>(); // Untagged (unique field type across actor)
+        (void)val_untagged_outsideairquality;
+        auto val_bare_outsideairquality = read<OutsideAirQuality>(); // Bare tag (unique field across required ports)
+        (void)val_bare_outsideairquality;
+        auto val_scoped_outsideairquality = read<ports::BodyControlIn::OutsideAirQuality>(); // Port-scoped tag (always unambiguous)
+        (void)val_scoped_outsideairquality;
+        // [BodyControlIn::TargetCabinTemperature] AUTOSAR: proxy->TargetCabinTemperature.Get()
+        auto val_untagged_targetcabintemperature = read<float>(); // Untagged (unique field type across actor)
+        (void)val_untagged_targetcabintemperature;
+        auto val_bare_targetcabintemperature = read<TargetCabinTemperature>(); // Bare tag (unique field across required ports)
+        (void)val_bare_targetcabintemperature;
+        auto val_scoped_targetcabintemperature = read<ports::BodyControlIn::TargetCabinTemperature>(); // Port-scoped tag (always unambiguous)
+        (void)val_scoped_targetcabintemperature;
+    }
+
+    void demonstrate_all_reads() {
+        std::cout << "[VehicleSupervisorExample] Demonstrating all pull reads...\n";
+        demonstrate_bodycontrolin_reads();
     }
 
     /**
@@ -241,6 +293,7 @@ public:
         }
 
         demonstrate_all_emits();
+        demonstrate_all_reads();
         stop();
         std::cout << "[VehicleSupervisorExample] Finished demonstration.\n";
         return true;

@@ -346,6 +346,7 @@ struct is_optional_like<T, std::void_t<
     decltype(*std::declval<const T&>())
 >> : std::true_type {};
 
+
 namespace detail {
 
     // Primary fallback dispatcher for user and actor data types
@@ -614,6 +615,13 @@ inline Stream& operator<<(Stream& os, const std::map<K, V, Compare, Alloc>& v) {
     return os;
 }
 
+template <typename Stream, typename K, typename V, typename Hash, typename KeyEqual, typename Alloc>
+inline Stream& operator<<(Stream& os, const std::unordered_map<K, V, Hash, KeyEqual, Alloc>& v) {
+    StreamSink<Stream> sink(os);
+    write_json(sink, v);
+    return os;
+}
+
 template <typename Stream, typename T>
 inline auto operator<<(Stream& os, const T& opt) -> std::enable_if_t<is_optional_like<T>::value, Stream&> {
     StreamSink<Stream> sink(os);
@@ -628,7 +636,20 @@ inline Stream& operator<<(Stream& os, const std::variant<Ts...>& var) {
     return os;
 }
 
+template <typename Stream, typename C>
+inline auto operator<<(Stream& os, const C& container)
+    -> std::enable_if_t<(is_sequence_container<C>::value || is_map_container<C>::value) &&
+                        !is_optional_like<C>::value, Stream&> {
+    StreamSink<Stream> sink(os);
+    write_json(sink, container);
+    return os;
+}
+
 } // namespace reaktar::json
+
+namespace ara::core {
+    using ::reaktar::json::operator<<;
+}
 
 namespace reaktar {
     using json::to_json;

@@ -19,18 +19,6 @@
 
 namespace reaktar {
 
-// SFINAE traits to detect if Derived has tagged `on(Tag, Arg)`
-template <typename Derived, typename Tag, typename Arg, typename = void>
-struct has_on_event : std::false_type {};
-
-template <typename Derived, typename Tag, typename Arg>
-struct has_on_event<Derived, Tag, Arg,
-    std::void_t<decltype(std::declval<Derived&>().on(std::declval<Tag>(), std::declval<const Arg&>()))>>
-    : std::true_type {};
-
-template <typename Derived, typename Tag, typename Arg>
-inline constexpr bool has_on_event_v = has_on_event<Derived, Tag, Arg>::value;
-
 // strict_val prevents numeric conversions (e.g. bool -> float or uint32_t -> float)
 template <typename Target>
 struct strict_val {
@@ -45,6 +33,30 @@ struct strict_val {
     template <typename Other, typename = std::enable_if_t<std::is_arithmetic_v<Target> && std::is_arithmetic_v<Other> && !std::is_same_v<std::decay_t<Other>, Target>>>
     operator const Other&() const = delete;
 };
+
+// SFINAE traits to detect if Derived has tagged `on(Tag, Arg)`
+template <typename Derived, typename Tag, typename Arg, typename = void>
+struct has_on_event : std::false_type {};
+
+template <typename Derived, typename Tag, typename Arg>
+struct has_on_event<Derived, Tag, Arg,
+    std::void_t<decltype(std::declval<Derived&>().on(std::declval<Tag>(), std::declval<strict_val<std::decay_t<Arg>>&>()))>>
+    : std::true_type {};
+
+template <typename Derived, typename Tag, typename Arg>
+inline constexpr bool has_on_event_v = has_on_event<Derived, Tag, Arg>::value;
+
+// SFINAE traits to detect if Derived has nullary/tag-only handler: `void on(Tag)`
+template <typename Derived, typename Tag, typename = void>
+struct has_on_nullary : std::false_type {};
+
+template <typename Derived, typename Tag>
+struct has_on_nullary<Derived, Tag,
+    std::void_t<decltype(std::declval<Derived&>().on(std::declval<Tag>()))>>
+    : std::true_type {};
+
+template <typename Derived, typename Tag>
+inline constexpr bool has_on_nullary_v = has_on_nullary<Derived, Tag>::value;
 
 // SFINAE traits to detect if Derived has direct `on(Arg)` without a tag (supports const Arg&, Arg by-value, etc.)
 // Uses exact signature check to prevent implicit type conversions (e.g. uint32_t converting to float)
@@ -1027,7 +1039,119 @@ inline constexpr bool is_rejected_fan_out_tag_v = Actor::traits::template is_rej
 template <typename Actor, typename Tag, typename... Args>
 inline constexpr bool can_tag_fan_out_with_args_v = Actor::traits::template can_tag_fan_out_with_args_v<Tag, Args...>;
 
+// Inbound handler (on) traits
+template <typename Actor, typename Payload>
+inline constexpr bool can_on_v = Actor::traits::template can_on_v<Payload>;
+
+template <typename Actor, typename Payload>
+inline constexpr bool is_ambiguous_on_v = Actor::traits::template is_ambiguous_on_v<Payload>;
+
+template <typename Actor, typename Port>
+inline constexpr bool has_port_inbound_v = Actor::traits::template has_port_inbound_v<Port>;
+
+template <typename Actor, typename Port, typename Payload>
+inline constexpr bool can_port_on_v = Actor::traits::template can_port_on_v<Port, Payload>;
+
+template <typename Actor, typename Port, typename Payload>
+inline constexpr bool is_port_on_ambiguous_v = Actor::traits::template is_port_on_ambiguous_v<Port, Payload>;
+
+template <typename Actor, typename Payload>
+inline constexpr bool can_fan_in_v = Actor::traits::template can_fan_in_v<Payload>;
+
+template <typename Actor, typename Tag>
+inline constexpr bool is_ambiguous_tag_on_v = Actor::traits::template is_ambiguous_tag_on_v<Tag>;
+
+template <typename Actor, typename Tag>
+inline constexpr bool can_tag_on_v = Actor::traits::template can_tag_on_v<Tag>;
+
+template <typename Actor, typename Tag>
+inline constexpr bool can_tag_fan_in_v = Actor::traits::template can_tag_fan_in_v<Tag>;
+
+// Inbound field reader (read) traits
+template <typename Actor, typename Tag>
+inline constexpr bool can_read_v = Actor::traits::template can_read_v<Tag>;
+
+template <typename Actor, typename Tag>
+inline constexpr bool is_ambiguous_read_v = Actor::traits::template is_ambiguous_read_v<Tag>;
+
+template <typename Actor, typename Port, typename Tag>
+inline constexpr bool can_port_read_v = Actor::traits::template can_port_read_v<Port, Tag>;
+
+template <typename Actor, typename Port>
+inline constexpr bool has_port_readable_v = Actor::traits::template has_port_readable_v<Port>;
+
+template <typename Actor, typename Port>
+inline constexpr bool is_port_read_ambiguous_v = Actor::traits::template is_port_read_ambiguous_v<Port>;
+
+template <typename Actor, typename Tag>
+inline constexpr bool can_read_tag_v = Actor::traits::template can_read_tag_v<Tag>;
+
+template <typename Actor, typename Tag>
+inline constexpr bool is_ambiguous_read_tag_v = Actor::traits::template is_ambiguous_read_tag_v<Tag>;
+
+template <typename Actor, typename DataType>
+inline constexpr bool can_read_type_v = Actor::traits::template can_read_type_v<DataType>;
+
+template <typename Actor, typename DataType>
+inline constexpr bool is_ambiguous_read_type_v = Actor::traits::template is_ambiguous_read_type_v<DataType>;
+
+// Tag exact arguments & field capabilities traits
+template <typename Actor, typename Tag, typename... Args>
+inline constexpr bool can_tag_emit_with_args_v = Actor::traits::template can_tag_emit_with_args_v<Tag, Args...>;
+
+template <typename Actor, typename Tag>
+inline constexpr bool is_field_without_setter_v = Actor::traits::template is_field_without_setter_v<Tag>;
+
+template <typename Actor, typename Tag>
+inline constexpr bool is_field_without_notifier_v = Actor::traits::template is_field_without_notifier_v<Tag>;
+
 } // namespace traits
+
+// ============================================================================
+// Compile-time Ambiguity Warning Types (Emitted when nuclear option is active)
+// ============================================================================
+namespace diagnostics {
+
+template <typename Actor, typename Port, typename Member, typename CompetingChannels>
+struct [[deprecated("Reaktar Ambiguity Warning: Multiple conflicting on(...) handlers declared for member on port. Competing handlers ignored; resolving to most specialized handler.")]]
+conflicting_handler_warning {
+    constexpr conflicting_handler_warning() noexcept = default;
+};
+
+template <typename Actor, typename MemberTag, typename CompetingPorts>
+struct [[deprecated("Reaktar Ambiguity Warning: Member is provided by multiple ports. Bare on(...) is ambiguous; resolving via specialization priority.")]]
+multi_port_ambiguity_warning {
+    constexpr multi_port_ambiguity_warning() noexcept = default;
+};
+
+template <typename Actor, typename Port, typename PayloadType, typename CompetingMembers>
+struct [[deprecated("Reaktar Ambiguity Warning: Payload type is shared across multiple members on port. Bare on(Port, ...) is ambiguous; resolving via specialization priority.")]]
+port_payload_ambiguity_warning {
+    constexpr port_payload_ambiguity_warning() noexcept = default;
+};
+
+template <typename Actor, typename PayloadType, typename CompetingChannels>
+struct [[deprecated("Reaktar Ambiguity Warning: Payload type is shared across multiple channels across ports. Bare on(Payload) is ambiguous; resolving via specialization priority.")]]
+direct_payload_ambiguity_warning {
+    constexpr direct_payload_ambiguity_warning() noexcept = default;
+};
+
+} // namespace diagnostics
+
+#if defined(__GNUC__) || defined(__clang__)
+#define REAKTAR_EMIT_AMBIGUITY_WARNING(...) \
+    do { \
+        _Pragma("GCC diagnostic push") \
+        _Pragma("GCC diagnostic warning \"-Wdeprecated-declarations\"") \
+        (void)__VA_ARGS__{}; \
+        _Pragma("GCC diagnostic pop") \
+    } while (0)
+#else
+#define REAKTAR_EMIT_AMBIGUITY_WARNING(...) \
+    do { \
+        (void)__VA_ARGS__{}; \
+    } while (0)
+#endif
 
 } // namespace reaktar
 

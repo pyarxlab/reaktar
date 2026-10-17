@@ -155,7 +155,8 @@ public:
     void demonstrate_alertskeleton3_emits() {
         std::cout << "[FanOutTestExample] Outgoing emits for AlertSkeleton3\n";
 
-        emit<EmergencyAlertCustom>(vehicle_data::EmergencyAlert{1001u, ara::core::String{"Speed limit exceeded"}}); // EmergencyAlertCustom (tagged, resolves type collision)
+        emit<ports::AlertSkeleton3>(vehicle_data::EmergencyAlert{1001u, ara::core::String{"Speed limit exceeded"}}); // EmergencyAlertCustom (port-targeted emit)
+        emit<EmergencyAlertCustom>(vehicle_data::EmergencyAlert{1001u, ara::core::String{"Speed limit exceeded"}}); // same as above, fully qualified tag
     }
 
     void demonstrate_supervisorout_emits() {
@@ -217,7 +218,8 @@ public:
     void demonstrate_sensorflushport_emits() {
         std::cout << "[FanOutTestExample] Outgoing emits for SensorFlushPort\n";
 
-        emit<UniqueSensorFlush>(); // UniqueSensorFlush (tagged, resolves type collision)
+        emit<ports::SensorFlushPort>(); // UniqueSensorFlush (port-targeted emit)
+        emit<UniqueSensorFlush>(); // same as above, fully qualified tag
     }
 
     void demonstrate_all_emits() {
@@ -231,6 +233,54 @@ public:
         demonstrate_secondarybody_emits();
         demonstrate_secondarysupervisor_emits();
         demonstrate_sensorflushport_emits();
+    }
+
+    // =============================================================================================
+    // INCOMING READ DEMONSTRATIONS (GROUPED BY PORT & SERVICE INTERFACE)
+    // =============================================================================================
+
+    void demonstrate_primarybody_reads() {
+        std::cout << "[FanOutTestExample] Pull reads for PrimaryBody\n";
+        // [PrimaryBody::OutsideAirQuality] AUTOSAR: proxy->OutsideAirQuality.Get()
+        auto val_port_outsideairquality = read<ports::PrimaryBody>(); // Port-targeted (single readable field on port)
+        (void)val_port_outsideairquality;
+        auto val_scoped_outsideairquality = read<ports::PrimaryBody::OutsideAirQuality>(); // Port-scoped tag (always unambiguous)
+        (void)val_scoped_outsideairquality;
+    }
+
+    void demonstrate_primarysupervisor_reads() {
+        std::cout << "[FanOutTestExample] Pull reads for PrimarySupervisor\n";
+        // [PrimarySupervisor::CurrentDriveMode] AUTOSAR: proxy->CurrentDriveMode.Get()
+        auto val_port_currentdrivemode = read<ports::PrimarySupervisor>(); // Port-targeted (single readable field on port)
+        (void)val_port_currentdrivemode;
+        auto val_scoped_currentdrivemode = read<ports::PrimarySupervisor::CurrentDriveMode>(); // Port-scoped tag (always unambiguous)
+        (void)val_scoped_currentdrivemode;
+    }
+
+    void demonstrate_secondarybody_reads() {
+        std::cout << "[FanOutTestExample] Pull reads for SecondaryBody\n";
+        // [SecondaryBody::OutsideAirQuality] AUTOSAR: proxy->OutsideAirQuality.Get()
+        auto val_port_outsideairquality = read<ports::SecondaryBody>(); // Port-targeted (single readable field on port)
+        (void)val_port_outsideairquality;
+        auto val_scoped_outsideairquality = read<ports::SecondaryBody::OutsideAirQuality>(); // Port-scoped tag (always unambiguous)
+        (void)val_scoped_outsideairquality;
+    }
+
+    void demonstrate_secondarysupervisor_reads() {
+        std::cout << "[FanOutTestExample] Pull reads for SecondarySupervisor\n";
+        // [SecondarySupervisor::CurrentDriveMode] AUTOSAR: proxy->CurrentDriveMode.Get()
+        auto val_port_currentdrivemode = read<ports::SecondarySupervisor>(); // Port-targeted (single readable field on port)
+        (void)val_port_currentdrivemode;
+        auto val_scoped_currentdrivemode = read<ports::SecondarySupervisor::CurrentDriveMode>(); // Port-scoped tag (always unambiguous)
+        (void)val_scoped_currentdrivemode;
+    }
+
+    void demonstrate_all_reads() {
+        std::cout << "[FanOutTestExample] Demonstrating all pull reads...\n";
+        demonstrate_primarybody_reads();
+        demonstrate_primarysupervisor_reads();
+        demonstrate_secondarybody_reads();
+        demonstrate_secondarysupervisor_reads();
     }
 
     /**
@@ -247,6 +297,7 @@ public:
         }
 
         demonstrate_all_emits();
+        demonstrate_all_reads();
         stop();
         std::cout << "[FanOutTestExample] Finished demonstration.\n";
         return true;

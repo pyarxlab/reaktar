@@ -57,9 +57,31 @@
 #  endif
 #endif
 
+// ============================================================================
+// Compile-time Ambiguity Validation Control (Nuclear Bypass)
+// ============================================================================
+
+/**
+ * Ambiguity Validation Control:
+ *
+ * When REAKTAR_DISABLE_AMBIGUITY_VALIDATION (or REAKTAR_DISABLE_DISAMBIGUATION_VALIDATION) is defined:
+ * Compile-time static assertions checking handler collisions, ambiguous direct/port
+ * handlers, and conflicting handlers are completely bypassed, trusting developer intent.
+ *
+ * UNDEFINED by default (ambiguity validation is active).
+ */
+#ifndef REAKTAR_AMBIGUITY_VALIDATION
+#  if defined(REAKTAR_DISABLE_AMBIGUITY_VALIDATION) || defined(REAKTAR_DISABLE_DISAMBIGUATION_VALIDATION)
+#    define REAKTAR_AMBIGUITY_VALIDATION 0
+#  else
+#    define REAKTAR_AMBIGUITY_VALIDATION 1
+#  endif
+#endif
+
 namespace reaktar {
 
 inline constexpr bool strict_validation_enabled = (REAKTAR_STRICT_VALIDATION != 0);
+inline constexpr bool ambiguity_validation_enabled = (REAKTAR_AMBIGUITY_VALIDATION != 0);
 
 } // namespace reaktar
 
